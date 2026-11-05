@@ -68,7 +68,17 @@ float sp=pow(max(dot(R,uDirD),0.0),220.0)*sombra(vW,vec3(0.0,1.0,0.0));col+=uDir
 float espuma=(1.0-smoothstep(0.0,0.3,prof))*(0.55+0.45*a2);col+=L*vec3(0.14,0.15,0.14)*espuma;
 float a=clamp(0.5+prof*0.2,0.5,0.93);a=mix(a,1.0,fr*0.7);a*=smoothstep(0.0,0.06,prof+0.04);
 vec4 c=acabar(col,vW,0.0);o=vec4(c.rgb,a);}`;
-function aguaMalhaRio(){const g=new GB(1<<15,7),N=Math.ceil(RIO.L/1.4),COL=6,linhas=[];
+/* rio na enchente: cada seção vai de uma beira alagada à outra (o alcance de cada lado), com a água entrando um pouco por baixo
+   do chão no fim, para a beira ficar onde o chão encontra a água */
+function aguaMalhaCheia(){const ex=RIO.enchente||0;if(!RIO.alc||Math.abs(RIO.alc.nivel-ex)>0.06)cheiaAlcance();
+  const g=new GB(1<<16,7),N=Math.ceil(RIO.L/1.4),K=12,linhas=[];
+  for(let i=0;i<=N;i++){const s=i/N,p=rioPonto(s);if(lagoR(p[0],p[1])<0.93)break;const w=RIO.larg(s),y=rioNivel(s)+cheiaEx(s),nx=-p[3],nz=p[2],vel=lerp(0.9,0.45,s),
+      we=w+cheiaAlc(s,-1)+1.2,wd=w+cheiaAlc(s,1)+1.2,lin2=[];
+    for(let c=0;c<=2*K;c++){const o=c<K?-we*(K-c)/K:wd*(c-K)/K,x=p[0]+nx*o,z=p[1]+nz*o;lin2.push([x,y,z,p[2],p[3],vel,Math.max(0,y-ground(x,z))]);}linhas.push(lin2);}
+  for(let i=0;i<linhas.length-1;i++)for(let c=0;c<2*K;c++){const a=linhas[i][c],b=linhas[i][c+1],d=linhas[i+1][c+1],e=linhas[i+1][c];
+    for(const v of[a,b,d,a,d,e])g.v7(v[0],v[1],v[2],v[3],v[4],v[5],v[6]);}
+  return unMesh(g.data());}
+function aguaMalhaRio(){if((RIO.enchente||0)>0.02)return aguaMalhaCheia();const g=new GB(1<<15,7),N=Math.ceil(RIO.L/1.4),COL=6,linhas=[];
   for(let i=0;i<=N;i++){const s=i/N,p=rioPonto(s);if(lagoR(p[0],p[1])<0.93)break;const ex=RIO.enchente||0,w=RIO.larg(s)+1.1+ex*4,y=rioNivel(s)+ex,nx=-p[3],nz=p[2],vel=lerp(0.9,0.45,s),lin2=[];
     for(let c=0;c<=COL;c++){const u=-1+2*c/COL,x=p[0]+nx*w*u,z=p[1]+nz*w*u;lin2.push([x,y,z,p[2],p[3],vel,Math.max(0,y-ground(x,z))]);}linhas.push(lin2);}
   for(let i=0;i<linhas.length-1;i++)for(let c=0;c<COL;c++){const a=linhas[i][c],b=linhas[i][c+1],d=linhas[i+1][c+1],e=linhas[i+1][c];
@@ -131,14 +141,14 @@ DESENHO.sombra.push((Pg,perto)=>{if(MESH.ponte&&d2(PONTE.x,PONTE.z,P.x,P.z)<(per
 /* ---------- natação ---------- */
 let nadoBarulhoT=0,nadoBolhaT=0;
 function nadoPasso(dt){if(!RIO.ok||P.y<-20&&!P.nada)return false;const niv=aguaNivel(P.x,P.z);
-  if(!P.nada){if(niv===null)return false;const g=ground(P.x,P.z);if(niv-g<NADO.fundo)return false;
+  if(!P.nada){if(niv===null)return false;const g=chaoEm(P.x,P.z,Math.min(P.y,niv-0.2));if(niv-g<NADO.fundo)return false;   // em cima da ponte alagada: anda na água, não nada
     if(P.y>niv-0.25)return false;                    // ainda no ar ou em cima de algo
     if(chaoEm(P.x,P.z,P.y)>niv-0.6)return false;   // em cima da ponte ou do cais
     P.nada={t:0};P.vy=0;P.agachado=false;P.acao=null;P.aim=0;P.escala=null;P.rola=null;P.muro=null;IN.attack=false;
     sfx('mergulho',P.x,P.z,0.8);for(let i=0;i<14;i++)part(P.x,niv+0.05,P.z,(Math.random()-0.5)*3,1.5+Math.random()*2.5,(Math.random()-0.5)*3,0.9,0.07+Math.random()*0.06,[0.85,0.9,0.95,0.7],false,9.8);
     barulho(P.x,P.z,14,true,niv);dica('nadar','corpo','Nadando! Nadar gasta energia (correndo gasta muito). Sem energia você se afoga: volte para a margem. Arma não funciona na água. No fundo do lago os zumbis não te alcançam.');
     if(typeof diarioConta==='function')diarioConta('nadou',1);}
-  if(niv===null||niv-ground(P.x,P.z)<NADO.sai){const sai=P.nada;P.nada=null;P.noChao=false;P.y=Math.max(P.y,ground(P.x,P.z));if(sai)P.ch.pitch=0;return false;}
+  const pisoN=niv===null?ground(P.x,P.z):chaoEm(P.x,P.z,niv-0.2);if(niv===null||niv-pisoN<NADO.sai){const sai=P.nada;P.nada=null;P.noChao=false;P.y=Math.max(P.y,pisoN);if(sai)P.ch.pitch=0;return false;}
   P.nada.t+=dt;
   let mx=IN.mx,mz=IN.mz;const ml=Math.hypot(mx,mz);if(ml>1){mx/=ml;mz/=ml;}
   const rapido=IN.run&&ml>0.15&&P.energia>2,spd=(rapido?NADO.rapido:NADO.vel)*(P.energia<=0.5?0.5:1)*lesaoVel();

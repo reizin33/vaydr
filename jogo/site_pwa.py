@@ -3,7 +3,7 @@ Usado pelo build.py depois de juntar o jogo. Saída: a pasta site/ ao lado do va
 import json, os
 from PIL import Image, ImageDraw, ImageFilter
 
-VERSAO = 'vaydr-v9-5'          # troque quando mudar a lista de arquivos do service worker
+VERSAO = 'vaydr-v9-5-1'          # troque quando mudar a lista de arquivos do service worker
 COR_FUNDO = '#070a09'
 
 def _icone(tam, mascara=False, cantos=True):

@@ -53,10 +53,37 @@ function aguaTerreno(x,z,h){if(x<-20||z<-190)return h;aguaNiveis();
   const w=RIO.larg(q.s),D=RIO.prof(q.s),L=rioNivel(q.s);
   if(q.d<w){const u=q.d/w,fundo=L-0.3-D*(1-u*u);return Math.min(h,fundo);}
   const sm=smooth(w,w+RIO.BANCO,q.d);return Math.max(lerp(L,h,sm),L+0.38*smooth(w,w+1.3,q.d));}
-/* consulta: altura da superfície da água em (x,z) (null se não tem água ali) */
-function aguaNivel(x,z){if(!RIO.ok||x<-20||z<-190)return null;
+/* enchente: o quanto o rio sobe em cada trecho e até onde a água chega de cada lado.
+   · a água cobre só a beira do rio: em cada trecho ela sobe no máximo até um pouco abaixo do ponto mais alto do chão nos
+     primeiros CHEIA_LIM metros de cada margem (onde o vale é aberto e plano a cheia sobe menos e não chega na clareira,
+     nos sítios nem na vila); perto do lago vai a zero, para emendar com a água do lago;
+   · o alcance anda para fora da margem até o chão subir acima do nível novo, sem passar para o pedaço de outra curva do rio.
+   Recalculado quando o nível muda. */
+const CHEIA_N=96,CHEIA_LIM=12,CHEIA_MAX=14;
+function cheiaAlcance(){const ex=RIO.enchente||0,N=CHEIA_N,A={nivel:ex,e:new Float32Array(N+1),d:new Float32Array(N+1),x:new Float32Array(N+1)};RIO.alc=A;
+  if(ex<=0.02)return A;
+  const T=[];for(let i=0;i<=N;i++){const s=i/N,p=rioPonto(s),w=RIO.larg(s),L=rioNivel(s),nx=-p[3],nz=p[2];let cap=1e9;
+    for(const lado of[-1,1]){let mx=-1e9;for(let d=w;d<=w+CHEIA_LIM;d+=0.5){const x=p[0]+nx*d*lado,z=p[1]+nz*d*lado;if(Math.abs(rioPerto(x,z).s-s)>0.04)break;mx=Math.max(mx,ground(x,z));}
+      if(mx>-1e8)cap=Math.min(cap,mx-0.12);}
+    A.x[i]=clamp(Math.min(ex*(1-smooth(0.8,0.97,s)),cap-L),0,ex);T.push([s,p,w,nx,nz]);}
+  const m=new Float32Array(N+1);for(let i=0;i<=N;i++){let v=1e9;for(let k=-2;k<=2;k++)v=Math.min(v,A.x[clamp(i+k,0,N)]);m[i]=v;}   // suaviza sem passar do limite de nenhum trecho
+  for(let i=0;i<=N;i++)A.x[i]=(m[clamp(i-1,0,N)]+m[i]+m[clamp(i+1,0,N)])/3;
+  for(let i=0;i<=N;i++){const[s,p,w,nx,nz]=T[i],nv=rioNivel(s)+A.x[i];
+    for(const lado of[-1,1]){let r=0;for(let d=w;d<=w+CHEIA_MAX;d+=0.5){const x=p[0]+nx*d*lado,z=p[1]+nz*d*lado;if(ground(x,z)>nv+0.05||Math.abs(rioPerto(x,z).s-s)>0.04)break;r=d-w+0.5;}
+      (lado<0?A.e:A.d)[i]=r;}}
+  return A;}
+function cheiaEx(s){const A=RIO.alc;if(!A||!A.x)return 0;const f=clamp(s,0,1)*CHEIA_N,i=Math.min(CHEIA_N-1,Math.floor(f)),t=f-i;return lerp(A.x[i],A.x[i+1],t);}
+function cheiaAlc(s,lado){const A=RIO.alc;if(!A)return 0;const f=clamp(s,0,1)*CHEIA_N,i=Math.min(CHEIA_N-1,Math.floor(f)),t=f-i,L=lado<0?A.e:A.d;return lerp(L[i],L[i+1],t);}
+/* consulta: altura da superfície da água em (x,z) (null se não tem água ali). Na enchente a água segue o chão: cobre o que
+   estiver mais baixo que o nível novo, até o alcance daquele trecho e lado */
+function aguaNivel(x,z){const ex=RIO.enchente||0;if(!RIO.ok||x<(ex>0.02?-20-CHEIA_MAX:-20)||z<-190)return null;
   const r=lagoR(x,z);if(r<1.02&&ilhaD(x,z)>LAGO.ilha.r+0.5)return LAGO.nivel;
-  const q=rioPerto(x,z),w=RIO.larg(q.s),ex=RIO.enchente||0;if(q.d<w+0.25+ex*4&&q.s<=1)return rioNivel(q.s)+ex;return null;}
+  if(ex>0.02&&(!RIO.alc||Math.abs(RIO.alc.nivel-ex)>0.06))cheiaAlcance();
+  const q=rioPerto(x,z),w=RIO.larg(q.s);if(q.s>1)return null;
+  if(ex<=0.02)return q.d<w+0.25?rioNivel(q.s):null;
+  const nv=rioNivel(q.s)+cheiaEx(q.s);if(q.d<w+0.25)return nv;
+  const a=RIO.pts[q.i],lado=q.dx*(z-a[1])-q.dz*(x-a[0])>=0?1:-1;
+  return q.d<w+cheiaAlc(q.s,lado)+0.3&&ground(x,z)<nv+0.02?nv:null;}
 function aguaProf(x,z){const n=aguaNivel(x,z);if(n===null)return 0;return Math.max(0,n-ground(x,z));}
 /* para colocar coisas no mundo: está na água ou na margem molhada? */
 function aguaPerto(x,z,m){if(x<-24-m||z<-190)return false;if(lagoR(x,z)<1+(m||0)/Math.min(LAGO.a,LAGO.b))return true;const q=rioPerto(x,z);return q.d<RIO.larg(q.s)+(m||0);}
