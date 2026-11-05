@@ -1,0 +1,21 @@
+# saídas do build
+/vaydr.html
+/site/
+jogo/test.html
+jogo/x*.html
+jogo/t*.html
+jogo/check.js
+
+# testes: roteiros gerados, resultados, fotos e cópias temporárias
+jogo/*.json
+jogo/tools/*.json
+jogo/shots/
+jogo/tmp/
+jogo/logs/
+*.log
+__pycache__/
+
+# Electron (próximas partes)
+node_modules/
+dist/
+out/
