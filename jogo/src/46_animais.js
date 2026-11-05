@@ -99,11 +99,24 @@ function faunaPonto(Z,sp){for(let k=0;k<16;k++){let x,z;
     if(faunaPontoOk(x,z,sp,k<11)){Z.falhas=0;return[x,z];}}Z.falhas=(Z.falhas||0)+1;return null;}
 function faunaAtivos(){let n=0;for(const b of BICHOS)if(b.vivo)n++;return n;}
 /* liga as regiões perto do jogador: cria os bichos que faltam (até o número que a região tem) */
-function faunaMaterializar(){if(G.modo==='menu'||!P.alive&&G.modo!=='jogo'||P.y<-20)return;const F=faunaEstado();let ativos=faunaAtivos();
-  for(const Z of ZONAS_FAUNA){if(zonaDist(Z,P.x,P.z)>FAUNA_POP.raioAtiva)continue;
-    for(const sp in Z.f){const e=F.z[Z.id][sp];if(!e)continue;let tem=0;for(const b of BICHOS)if(b.vivo&&b.zona===Z.id&&b.tipo===sp)tem++;
-      let falta=e.n-tem;while(falta>0&&ativos<FAUNA_POP.ativosMax){const S=FAUNA[sp],q=Math.min(falta,randi(Math.random,S.grupo[0],S.grupo[1]));
-        const pt=faunaPonto(Z,sp);if(!pt)break;const g=criarGrupo(sp,pt[0],pt[1],q,Z.id);falta-=g;ativos+=g;if(!g)break;}}}}
+/* as regiões mais perto de você primeiro e uma espécie de cada vez. Antes a lista ia sempre na mesma ordem: quando o limite de
+   bichos ativos enchia com as regiões vizinhas, a última região (Campos do Leste) e as últimas espécies de cada região ficavam
+   sem vaga (no Leste só apareciam coelhos e cervos). Na região onde você está, os bichos longe e fora da vista de outras
+   regiões voltam para a população (não morrem: aparecem de novo quando você voltar lá) para abrir vaga. */
+function faunaMaterializar(){if(G.modo==='menu'||!P.alive&&G.modo!=='jogo'||P.y<-20)return;const F=faunaEstado();let ativos=faunaAtivos(),limite=FAUNA_POP.ativosMax;
+  const zs=ZONAS_FAUNA.map(Z=>[zonaDist(Z,P.x,P.z),Z,Z.rio?0:Math.hypot(P.x-Z.x,P.z-Z.z)/Z.r]).filter(q=>q[0]<=FAUNA_POP.raioAtiva).sort((a,b)=>a[0]-b[0]||a[2]-b[2]);   // dentro de duas regiões: a de centro mais perto primeiro
+  for(let zi=0;zi<zs.length;zi++){const[dz,Z]=zs[zi],falta={};let soma=0;
+    for(const sp in Z.f){const e=F.z[Z.id][sp];if(!e)continue;let tem=0;for(const b of BICHOS)if(b.vivo&&b.zona===Z.id&&b.tipo===sp)tem++;falta[sp]=Math.max(0,e.n-tem);soma+=falta[sp];}
+    if(zi===0&&dz<=0&&soma>0&&ativos+soma>FAUNA_POP.ativosMax)ativos-=faunaLiberar(Math.min(soma,ativos+soma-FAUNA_POP.ativosMax),Z.id);
+    let rodou=true,semLugar=0;while(rodou&&ativos<limite){rodou=false;
+      for(const sp in falta){if(falta[sp]<=0||ativos>=limite)continue;const S=FAUNA[sp],q=Math.min(falta[sp],randi(Math.random,S.grupo[0],S.grupo[1]));
+        const pt=faunaPonto(Z,sp);if(!pt){semLugar+=falta[sp];falta[sp]=0;continue;}const g=criarGrupo(sp,pt[0],pt[1],q,Z.id);if(!g){semLugar+=falta[sp];falta[sp]=0;continue;}falta[sp]-=g;ativos+=g;rodou=true;}}
+    /* a região onde você está não achou lugar agora para alguns (você no meio dela): as outras regiões não pegam essas vagas */
+    if(zi===0&&dz<=0&&semLugar>0)limite=Math.max(ativos,FAUNA_POP.ativosMax-Math.min(semLugar,FAUNA_POP.ativosMax-ativos));}}
+/* devolve à população os bichos selvagens de outras regiões que estão longe (fora do desenho) e calmos, os mais longe primeiro */
+function faunaLiberar(n,zonaId){const c=[];for(const b of BICHOS){if(!b.vivo||!b.zona||b.zona===zonaId||b.domado||b.cria||b.st==='persegue'||b.hp<b.hpMax)continue;
+    const d=Math.hypot(b.x-P.x,b.z-P.z);if(d<FAUNA_POP.raioLento)continue;c.push([d,b]);}
+  c.sort((a,b)=>b[0]-a[0]);let k=0;for(const[,b]of c){if(k>=n)break;const i=BICHOS.indexOf(b);if(i>=0){BICHOS.splice(i,1);k++;}}return k;}
 function criarGrupo(sp,x,z,q,zona){let lider=null,n=0;
   for(let i=0;i<q;i++){const a=Math.random()*6.283,r=i?1.5+Math.random()*2.5:0,px=x+Math.cos(a)*r,pz=z+Math.sin(a)*r;if(i&&!faunaPontoOk(px,pz,sp,false))continue;
     const v=sp==='cervo'?(i===0||Math.random()<0.25?'':'F'):sp==='cabra'||sp==='vaca'?(Math.random()<0.4?'B':''):'';

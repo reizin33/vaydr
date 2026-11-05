@@ -11,7 +11,7 @@ INV = ("const fin=v=>Number.isFinite(v),bad=[];"
        "for(const o of X('OB'))if(!fin(o.x)||!fin(o.y)||!fin(o.z)||!fin(o.hp))bad.push('Onan:'+o.tipo);"
        "const reg=(()=>{try{const r=X('regiaoEm')(P.x,P.z);return r&&r.id||r||'-';}catch(e){return'?';}})();")
 RES = ("return{bad:bad.slice(0,10),reg,x:Math.round(P.x),z:Math.round(P.z),zumbis:Z.filter(z=>z.vivo).length,bichos:X('BICHOS').filter(b=>b.vivo).length,"
-       "obras:X('OB').length,part:(X('PARTS')||[]).length,hora:+G.hora.toFixed(1),dia:G.dia,vida:Math.round(P.vida)};")
+       "obras:X('OB').length,part:X('PART').length,hora:+G.hora.toFixed(1),dia:G.dia,vida:Math.round(P.vida)};")
 s = inicio("X('FAUNA_POP').ativosMax=34;")
 s += [js("vivo();window.__cadaPasso=()=>{const P=__nnc.P;if(P.vida<60)P.vida=60;P.fome=100;P.sede=100;};"
          "for(const[k,q]of[['pistola',1],['municao',60],['molotov',4],['bandagem',10],['tabuas',30],['pregos',20]])X('invAdd')(k,q);")]

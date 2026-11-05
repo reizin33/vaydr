@@ -25,7 +25,14 @@ function aguaLimparVegetacao(){const tira=(x,z,m)=>aguaPerto(x,z,m)||aguaPoi(x,z
   for(const r of ROCKS)if(tira(r.x,r.z,1.5)){r.agua=true;if(r.alive){r.alive=false;const c=COLL.find(q=>q.rock===r);if(c)colRemove(c);}}
   for(const b of BUSHES)if(tira(b.x,b.z,1)){b.agua=true;b.frutas=false;}
   for(const p of PICKS)if(tira(p.x,p.z,0.6)){p.agua=true;p.alive=false;}
-  for(const L of[GRASS,FLORES,SAMAMBAIAS,FOLHAS_CHAO])for(let i=L.length-1;i>=0;i--)if(tira(L[i].x,L[i].z,0.3))L.splice(i,1);}
+  for(const L of[GRASS,FLORES,SAMAMBAIAS,FOLHAS_CHAO])for(let i=L.length-1;i>=0;i--)if(tira(L[i].x,L[i].z,0.3))L.splice(i,1);
+  /* árvore gigante que nasceu dentro do lago (o sorteio da mata não olha a água): o tronco ficava com 3 a 4 m de água em volta e o
+     cipó de baixo começava no fundo do lago. Sai inteira (tronco, galhos, raízes e cipós); as outras gigantes continuam iguais. */
+  for(let i=GIGANTES.length-1;i>=0;i--){const T=GIGANTES[i];if(!tira(T.x,T.z,T.R*0.6))continue;
+    for(const c of COLL.filter(q=>q.gigante===T))colRemove(c);
+    for(const b of T.galhos)if(b.sup){supRemove(b.sup);b.sup=null;}for(const r of T.raizes)if(r.sup){supRemove(r.sup);r.sup=null;}
+    for(const v of T.vias){const k=VIAS.indexOf(v);if(k>=0)VIAS.splice(k,1);}
+    T.agua=true;GIGANTES.splice(i,1);}}
 /* lugares da margem que também precisam de chão livre (cais, cabana) */
 const AGUA_POI=[{x:72.2,z:84,r:5.5},{x:77.5,z:80.5,r:5}];
 function aguaPoi(x,z){for(const p of AGUA_POI)if(Math.hypot(x-p.x,z-p.z)<p.r)return true;return false;}

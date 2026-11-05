@@ -649,8 +649,16 @@ function renascer(){resetLesoes();corpoLevanta();P.escala=null;P.rola=null;P.mur
   for(const z of Z)if(z.vivo&&Math.hypot(z.x-P.x,z.z-P.z)<14){const a=Math.atan2(z.x-P.x,z.z-P.z);z.x=P.x+Math.sin(a)*22;z.z=P.z+Math.cos(a)*22;z.st=z.noturno?'marcha':'vaga';}
   salvarJogo();}
 const MUNDO_V=2;   // muda quando o mapa muda (árvores, casas): o save antigo não aplica a lista velha de árvores e rochas
-/* posição gravada: no meio de uma escalada (cipó, escada de corda) grava a saída mais perto (base ou topo), para não voltar pendurado no ar e cair */
-function posSalvar(){const e=P.escala;if(e&&e.v&&e.v.base&&e.v.topo){const p=e.u>=0.5?e.v.topo:e.v.base;return{x:p.x,z:p.z,y:p.y+0.02};}return{x:P.x,z:P.z,y:P.y};}
+/* posição gravada: no meio de uma escalada (cipó, escada de corda) grava a saída mais perto (base ou topo), para não voltar pendurado no ar e cair.
+   Em cima de uma árvore gigante, encostado no tronco, o carregar acharia que você ficou "dentro" do tronco e mandaria para o chão:
+   grava um pouco mais para fora, no mesmo galho (seguindo o rumo da saída do cipó, quando houver). */
+function posSalvar(){const e=P.escala;let q={x:P.x,z:P.z,y:P.y};
+  if(e&&e.v&&e.v.base&&e.v.topo){const p=e.u>=0.5?e.v.topo:e.v.base;q={x:p.x,z:p.z,y:p.y+0.02,rumo:p.rumo};}
+  if(q.y>-20&&typeof bloqueadoAlto==='function'){const c=bloqueadoAlto(q.x,q.z,0.4,q.y);
+    if(c&&c.gigante&&q.y>ground(q.x,q.z)+1.2){const T=c.gigante,R=T.R*0.98+0.5;let dx=q.x-T.x,dz=q.z-T.z;if(q.rumo!==undefined){dx=Math.sin(q.rumo);dz=Math.cos(q.rumo);}
+      const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
+      for(let d=0;d<3;d+=0.1){const x=T.x+dx*(R+d),z=T.z+dz*(R+d),y=chaoEm(x,z,q.y+0.6);if(Math.abs(y-q.y)<0.9&&!bloqueadoAlto(x,z,0.4,y)){q={x,z,y:y+0.02};break;}}}}
+  return q;}
 function serializar(){const q=posSalvar();return{v:1,mv:MUNDO_V,dia:G.dia,hora:G.hora,noiteN:G.noiteN,noite:G.noite,final:G.final,kills:G.kills,mortes:G.mortes,m:G.m,ev:G.ev,ondas:G.ondas,chuva:G.chuvaAlvo,dicas:G.dicas,
   P:{x:q.x,z:q.z,yaw:P.yaw,vida:P.vida,fome:P.fome,sede:P.sede,energia:P.energia,inv:P.inv,sel:P.sel,lanterna:P.lanterna,roupa:P.roupa,bat:+(P.bat||0).toFixed(1),y:+(q.y||0).toFixed(2)},tm:+(G.tm||0).toFixed(2),cama:G.cama||null,caixas:caixasSalvar(),mapaAlvo:G.mapaAlvo,mapaCid:G.mapaCid||null||null,mochila:P.mochila,
   obras:OB.map(o=>[o.tipo,+o.x.toFixed(2),+o.z.toFixed(2),+o.yaw.toFixed(3),Math.round(o.hp),o.hpMax,o.itens||0,+o.y.toFixed(2),o.ext&&Object.keys(o.ext).length?o.ext:0]),
