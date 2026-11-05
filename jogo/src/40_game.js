@@ -396,7 +396,7 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
         if(hit&&(hit.obra||hit.porta)&&(z.st==='caca'||z.st==='marcha'||z.st==='alerta'||(z.st==='derruba'&&!(hit.obra&&hit.obra.tipo==='pilar'&&hit.obra!==z.obra)))){if(z.st==='derruba')z.derrubando=true;z.st='quebra';z.obra=hit.obra||hit.porta;z.t=0;}
         z.stuck+=dt;if(z.stuck>1.2){const mv=Math.hypot(z.x-z.lastX,z.z-z.lastZ);if(mv<0.25&&z.desvio<=0){z.desvio=0.9;z.desvioS=Math.random()<0.5?-1:1;}z.stuck=0;z.lastX=z.x;z.lastZ=z.z;}}}
     else if(z.st==='atordoado')collide(z,S.r*(ch.s||1),c=>c.solid);
-    if(!dentroMapa(z.x,z.z,-10)&&z.y>-20){const k=Math.hypot(z.x,z.z);if(k>MAP_R+10&&!dentroCidade(z.x,z.z,10)){z.x*=(MAP_R+10)/k;z.z*=(MAP_R+10)/k;}}
+    if(!dentroMapa(z.x,z.z,-10)&&z.y>-20){const k=Math.hypot(z.x,z.z),rm=raioMapaEm(z.x,z.z);if(k>rm+10&&!dentroCidade(z.x,z.z,10)){z.x*=(rm+10)/k;z.z*=(rm+10)/k;}}
     {const cz=zChaoAgua(z,chaoEm(z.x,z.z,z.y));if(z.y>cz+0.3||z.vy>0){z.vy=(z.vy||0)-14*dt;z.y+=z.vy*dt;if(z.y<=cz){if(z.vy<-12)ferirZ(z,(-z.vy-12)*9,0,0,true);z.y=cz;z.vy=0;}}else{if(z.vy<-12)ferirZ(z,(-z.vy-12)*9,0,0,true);z.y=cz;z.vy=0;}}
     ch.x=z.x;ch.z=z.z;ch.y=z.y+z.sink;
     // animação

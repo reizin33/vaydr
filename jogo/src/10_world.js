@@ -83,7 +83,9 @@ const MAP_R=150;
 function dentroMapa(x,z,m=0){if(x*x+z*z<(MAP_R-m)**2)return true;if(dentroCidade(x,z,-m))return true;
   return x>MAP_R-40&&x<CIDADE.x0+6&&Math.abs(z-(x<168?roadZ(x):8.2))<11-m;}
 /* devolve a entidade para dentro: para a última posição boa, ou puxa para o círculo */
-function voltarMapa(e,x0,z0){if(dentroMapa(x0,z0)){e.x=x0;e.z=z0;return;}const r=Math.hypot(e.x,e.z);if(r>MAP_R-0.5&&!dentroCidade(e.x,e.z)){e.x*=(MAP_R-0.5)/r;e.z*=(MAP_R-0.5)/r;}}
+/* raio do mapa na direção do ponto (o círculo da mata; a Mata dos Morros, 62m, abre a oeste e ao sul) */
+function raioMapaEm(x,z){return MAP_R;}
+function voltarMapa(e,x0,z0){if(dentroMapa(x0,z0)){e.x=x0;e.z=z0;return;}const r=Math.hypot(e.x,e.z),rm=raioMapaEm(e.x,e.z);if(r>rm-0.5&&!dentroCidade(e.x,e.z)){e.x*=(rm-0.5)/r;e.z*=(rm-0.5)/r;}}
 
 /* ---------- colisão ---------- */
 const COLL=[],CGRID=new Map(),CELL=4;let cStamp=1;

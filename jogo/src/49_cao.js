@@ -104,7 +104,7 @@ function updateCao(dt){const c=CAO,ch=c.ch;if(!ch)return;
       if(c.desvio>0){c.desvio-=dt;const px=-dz*c.desvioS,pz=dx*c.desvioS;dx=dx*0.35+px;dz=dz*0.35+pz;}
       const v=Math.min(spd,dd/Math.max(dt,1e-3));const ox=c.x,oz=c.z;c.x+=dx*v*dt;c.z+=dz*v*dt;if(RIO.ok&&aguaProf(c.x,c.z)>0.75){c.x=ox;c.z=oz;}c.yaw=angLerp(c.yaw,Math.atan2(dx,dz),1-Math.exp(-dt*9));
       collide(c,0.28,cc=>cc.solid&&!cc.portao);
-      if(!dentroMapa(c.x,c.z,2)){const rr=Math.hypot(c.x,c.z);if(rr>MAP_R-2&&!dentroCidade(c.x,c.z)){c.x*=(MAP_R-2)/rr;c.z*=(MAP_R-2)/rr;}}
+      if(!dentroMapa(c.x,c.z,2)){const rr=Math.hypot(c.x,c.z),rm=raioMapaEm(c.x,c.z);if(rr>rm-2&&!dentroCidade(c.x,c.z)){c.x*=(rm-2)/rr;c.z*=(rm-2)/rr;}}
       c.stuck+=dt;if(c.stuck>1.2){const mv=Math.hypot(c.x-c.lastX,c.z-c.lastZ);if(mv<0.3*spd/2&&c.desvio<=0){c.desvio=0.9;c.desvioS=Math.random()<0.5?-1:1;c.travado++;}else c.travado=0;c.stuck=0;c.lastX=c.x;c.lastZ=c.z;}
       if(c.travado>=3&&c.st==='segue'&&dp>5){caoTeleporte();}
       c.amp=approach(c.amp,1,dt*5);c.ph+=dt*(modo==='corre'?13:8)*Math.min(1,v/2+0.3);c.paradoT=0;}}
