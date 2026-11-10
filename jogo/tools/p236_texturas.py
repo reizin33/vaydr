@@ -13,12 +13,19 @@ LUG = ("const F0=F;window.__L={clareira:[F0[0]+9,F0[2]-11,2.6],mata:[-112,8,-1.5
        "const g=n.ground,d=Math.hypot(g(x+1,z)-g(x-1,z),g(x,z+1)-g(x,z-1))/2;if(!best||d>best[2])best=[x,z,d];}"
        "const b=best,dx=X('ground')(b[0]+1,b[1])-X('ground')(b[0]-1,b[1]),dz=X('ground')(b[0],b[1]+1)-X('ground')(b[0],b[1]-1),l=Math.hypot(dx,dz)||1;"
        "window.__L.encosta=[b[0]-dx/l*7,b[1]-dz/l*7,Math.atan2(dx/l,dz/l),r2(b[2])];}"
-       "{const x=F0[0]+14,z=F0[2]+6;for(let k=0;k<3;k++)X('criarObra')('paredeCasa',x+k*2.4,z,0);window.__L.parede=[x+2.4,z-4.5,0];}")
+       "{const x=F0[0]+14,z=F0[2]+6;for(let k=0;k<3;k++)X('criarObra')('paredeCasa',x+k*2.4,z,0);window.__L.parede=[x+2.4,z-4.5,0];}"
+       "{const R=X('ROADS').find(r=>r.cor!=='asfalto'&&r.pts.length>3);if(R){const k=Math.floor(R.pts.length/2),a=R.pts[k],b=R.pts[k+1],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz)||1;"
+       "window.__L.estrada=[a[0]-dx/l*3,a[1]-dz/l*3,Math.atan2(dx/l,dz/l)];}}")
 s += [js(LUG), ["gwait", 0.4], ev("lugares", "return window.__L;")]
+VISTA = "const fz=X('placeById')('fazenda');window.__V={pos:[fz.x-40,X('ground')(fz.x-40,fz.z-30)+26,fz.z-30],tgt:[fz.x+10,X('ground')(fz.x+10,fz.z+10),fz.z+10]};"
 def vai_ver(nome):
     return (f"const q=window.__L['{nome}'];vai(q[0],q[1]);P.yaw=q[2];P.body=q[2];P.pitch={'-0.16' if nome=='encosta' else '-0.08'};G.hora=10.5;"
             "X('rebuildVeg')(true);X('rebuildGrass')&&X('rebuildGrass')();")
-for nome in ("clareira", "mata", "encosta", "parede"):
+s += [js(VISTA)]
+for q, tx in (("antes", "false"), ("depois", "true")):
+    s += foto(f"t_vista_{q}.png", f"n.cfg.texReal={tx};vai(window.__V.pos[0],window.__V.pos[2]);G.camFix={{pos:window.__V.pos,tgt:window.__V.tgt}};X('rebuildVeg')(true);", 0.6, 3.5)
+s += [js("G.camFix=null;")]
+for nome in ("clareira", "mata", "encosta", "parede", "estrada"):
     s += foto(f"t_{nome}_antes.png", "n.cfg.texReal=false;" + vai_ver(nome), 0.6, 3.5)
     s += foto(f"t_{nome}_depois.png", "n.cfg.texReal=true;" + vai_ver(nome), 0.3, 3.5)
 # tempo de desenho (ms por quadro, como no p233c): sem e com textura em cada lugar
