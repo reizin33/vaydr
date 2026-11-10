@@ -190,5 +190,6 @@ MAPA_DESENHOS.push(function mapaAlto(g,X,Y,k,n,range){
   g.fillStyle=n>0.5?'#1d2a1c':'#24331e';g.beginPath();g.arc(X(ARC.x),Y(ARC.z),ARC.r*k,0,Math.PI*2);g.fill();
   g.strokeStyle=g.fillStyle;g.lineCap='round';g.lineJoin='round';g.lineWidth=ARC.cw*2*k;g.beginPath();ARC.corr.forEach((p,i)=>i?g.lineTo(X(p[0]),Y(p[1])):g.moveTo(X(p[0]),Y(p[1])));g.stroke();
   if(range<1e3)return;const D=regD();g.font=`600 italic ${Math.max(11,Math.round(g.canvas.width/78))}px system-ui,sans-serif`;g.textAlign='center';g.textBaseline='middle';
-  for(const r of REGIOES){if(r.id==='mata'||r.id==='estrada'||!D[r.id]||!D[r.id].descoberta)continue;const tx=X(r.x),ty=Y(r.z)+(r.id==='alto'?-r.r*k*0.55:r.r*k*0.62);
+  for(const r of REGIOES){if(r.id==='mata'||r.id==='estrada'||!D[r.id]||!D[r.id].descoberta)continue;let tx=X(r.x);const ty=Y(r.z)+(r.id==='alto'?-r.r*k*0.55:r.r*k*0.62);
+    {const m=g.measureText(r.nome).width/2+4;tx=Math.max(m,Math.min(g.canvas.width-m,tx));}   // nome perto da beira do mapa (Mata dos Morros) não sai cortado
     g.lineWidth=3;g.strokeStyle='rgba(7,10,9,.7)';g.strokeText(r.nome,tx,ty);g.fillStyle='rgba(232,214,160,.92)';g.fillText(r.nome,tx,ty);}});

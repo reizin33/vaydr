@@ -1,7 +1,7 @@
 import asyncio, sys, json
 from playwright.async_api import async_playwright
-BASE='/tmp/claude-0/-home-claude/d6133a28-118d-54a2-ac28-a551fc07194e/scratchpad/jogo/'
 import os
+BASE=os.path.dirname(os.path.abspath(__file__))+'/'   # a pasta jogo/ onde está este arquivo (antes era um caminho fixo da sessão)
 # cada execução usa a sua própria cópia da página: dá para recompilar enquanto o teste roda
 import shutil
 os.makedirs(BASE+'tmp',exist_ok=True)

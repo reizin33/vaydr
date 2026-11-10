@@ -4,10 +4,10 @@ import sys, os; sys.path.insert(0, os.path.dirname(__file__))
 from vt import *
 s = inicio("X('FAUNA_POP').ativosMax=0;")
 s += [js("vivo();X('BICHOS').length=0;Z.length=0;window.__cadaPasso=()=>{const P=__nnc.P;if(P.vida<60)P.vida=60;P.fome=100;P.sede=100;__nnc.Z.length=0;"
-         "const t=window.__t;if(t&&performance.now()-(window.__ult||0)>1000){window.__ult=performance.now();window.__traj.push([Math.round(t.x),Math.round(t.z),Math.round(t.v*10)/10]);}};")]
+         "const t=window.__t;if(t&&G.t-(window.__ult||0)>=1){window.__ult=G.t;window.__traj.push([Math.round(t.x),Math.round(t.z),Math.round(t.v*10)/10]);}};")]
 s += [ev("densidade", """const T=X('TREES'),deg=a=>((a%360)+360)%360,bins={};for(const t of T){if(t.agua)continue;const r=Math.hypot(t.x,t.z),a=deg(Math.atan2(t.z,t.x)*180/Math.PI);if(a<70||a>240||r<90)continue;
  const b=Math.floor(r/10)*10,k=b+(t.morros?'nova':'velha');bins[k]=(bins[k]||0)+1;}const out={};for(const k in bins){const b=parseInt(k),ar=Math.PI*((b+10)**2-b*b)*170/360;out[k]={n:bins[k],m2PorArvore:Math.round(ar/bins[k])};}return out;""")]
-for a in (180, 160, 135, 110, 90, 205, 225):
+for a in (180, 160, 135, 118, 90, 205, 232):   # 110 e 225 caíam em ponto ruim de largada (07/11): trocados por 118 e 232
     s += [js("window.__t=null;X('sairCarro')&&X('sairCarro')();const a=" + str(a) + "*Math.PI/180,t=X('VEICS').find(v=>v.id==='caminhonete'||v.tipo==='caminhonete');let r=146,x=0,z=0;"
              "for(;r>132;r-=1){x=Math.cos(a)*r;z=Math.sin(a)*r;if(X('pontoLivre')(x,z))break;}"
              "t.x=x;t.z=z;t.yaw=Math.atan2(Math.cos(a),Math.sin(a));t.v=0;t.comb=80;t.hp=Math.max(t.hp||0,80);X('veicColisor')(t);vai(t.x+2,t.z+2);X('entrarVeic')(t);window.__traj=[];window.__t=t;window.__r0=r;X('IN').mz=1;"),
