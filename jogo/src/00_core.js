@@ -213,6 +213,7 @@ vec4 w=uModel*vec4(aPos,1.0);vC=aCol;vN=mat3(uModel)*aNrm;vInt=max(aBone,uIntO);
 vW=w.xyz;gl_Position=uViewProj*w;}`;
 const LIT_FS=`precision highp float;precision highp sampler2DShadow;
 in vec3 vW,vN;in vec4 vC;in float vInt;in vec2 vUV;uniform sampler2D uAlbT;uniform float uUseTex;uniform vec4 uJog;
+uniform highp sampler2DArray uTR,uTN;uniform float uTexOn;uniform vec3 uTexMed[5];
 uniform vec3 uTint,uRim;uniform float uEmis,uWet;uniform vec4 uVer;
 ${GLSL_LUZ}
 out vec4 o;
@@ -225,7 +226,7 @@ if(uVer.w>0.0){vec3 sg=uVer.xyz-uCam;float L2=max(dot(sg,sg),0.01);vec3 dv=vW-uC
 #endif
 vec3 nf=normalize(cross(dFdx(vW),dFdy(vW)));
 vec3 n=normalize(vN);if(dot(n,nf)<0.0&&uUseTex<1.5)n=-n;   /* capim com recorte: a normal fica para cima dos dois lados (aceso como o chão) */
-vec3 al=vC.rgb*uTint;float e=vC.a;float spc=0.0,shn=20.0;   /* brilho (especular) do material: Etapa 21 */
+vec3 al=vC.rgb*uTint;float e=vC.a;float spc=0.0,shn=20.0;bool tab=false;   /* brilho (especular) do material: Etapa 21 */
 /* modelo com textura de verdade (ferramentas do Poly Haven): a cor vem da textura; 2 = com recorte pela transparência (grama) */
 bool txt=uUseTex>0.5;if(txt){vec4 tx=texture(uAlbT,vUV);
   /* recorte: de longe a textura menor (mipmap) mistura folha e vazio e o capim afinaria até sumir; o recorte compensa pelo nível */
@@ -243,7 +244,12 @@ float g=texture(uNoise,q*0.21).r*0.55+texture(uNoise,q*1.07).r*0.45;al*=mix(1.0,
 /* madeira (tons marrons): veio esticado e emenda das tábuas */
 /* (vermelho e laranja forte ficam de fora: tijolo, abóbora; em superfície deitada ao ar livre, como terra de canteiro, só um veio fraco e sem emenda) */
 if(al.r>al.g&&al.g>=al.b*0.95&&al.g>al.r*0.38&&sat>0.02&&lm<0.5){bool hz=abs(nf.y)>0.55,fora=hz&&vInt<0.5;float wk=smoothstep(0.02,0.06,sat)*k*(fora?0.3:1.0);vec2 wq=hz?vW.xz:q;
-  float veio=texture(uNoise,vec2(wq.x*0.45,wq.y*8.5)).r;float em=fora?0.0:smoothstep(0.455,0.5,abs(fract(wq.y*4.0)-0.5));al*=mix(1.0,(0.8+0.4*veio)*(1.0-em*0.45),wk);}
+  /* prova de estilo (10/11): parede de madeira do lado de fora (base, casas, cercas) com a textura de tábua velha da Poly Haven,
+     puxada para o tom da peça; o veio e a emenda de ruído saem */
+  if(uTexOn>0.5&&!hz&&vInt<0.5){vec3 u1=vec3(q/1.8,4.0);vec3 tc=texture(uTR,u1).rgb;float dl=dot(tc,vec3(0.3,0.59,0.11))/max(dot(uTexMed[4],vec3(0.3,0.59,0.11)),1e-4);
+    al=mix(tc*(dot(al,vec3(0.3,0.59,0.11))/max(dot(uTexMed[4],vec3(0.3,0.59,0.11)),1e-4)),al*dl,0.5);vec3 tn=texture(uTN,u1).xyz*2.0-1.0;
+    vec3 T=abs(nf.x)>abs(nf.z)?vec3(0.0,0.0,1.0):vec3(1.0,0.0,0.0);n=normalize(n+(T*tn.x-vec3(0.0,1.0,0.0)*tn.y)*0.8);tab=true;}
+  else{float veio=texture(uNoise,vec2(wq.x*0.45,wq.y*8.5)).r;float em=fora?0.0:smoothstep(0.455,0.5,abs(fract(wq.y*4.0)-0.5));al*=mix(1.0,(0.8+0.4*veio)*(1.0-em*0.45),wk);}}
 /* telhado (faces inclinadas): fileiras de telha com variação de uma para outra */
 if(nf.y>0.3&&nf.y<0.97){vec2 sd=normalize(nf.xz+vec2(1e-4));float tr=dot(vW.xz,sd)*2.8,lat=dot(vW.xz,vec2(-sd.y,sd.x))*2.2;
   float tj=texture(uNoise,vec2(floor(tr)*0.37,floor(lat+0.5*mod(floor(tr),2.0))*0.29)).r;float ln=smoothstep(0.8,1.0,fract(tr));
@@ -261,7 +267,7 @@ float lum=dot(al,vec3(0.3,0.59,0.11));if(abs(nf.y)<0.3&&lum>0.2){float k2=1.0-sm
   float suj=smoothstep(0.48,0.86,st)*0.4+smoothstep(0.55,0.8,um)*0.2;al*=(1.0-suj*smoothstep(0.2,0.42,lum)*k2)*mix(1.0,0.8,smoothstep(0.45,0.8,lum));}
 #ifndef SKIN
 /* Etapa 21 (gráficos Alto e Ultra): relevo pelo ruído (luz rasante mostra a textura), tijolo com argamassa, folha, casca e pedra */
-if(uDetail>1.5&&k>0.01){float mx2=max(al.r,max(al.g,al.b)),sat2=mx2-min(al.r,min(al.g,al.b)),lm2=dot(al,vec3(0.3,0.59,0.11));
+if(uDetail>1.5&&k>0.01&&!tab){float mx2=max(al.r,max(al.g,al.b)),sat2=mx2-min(al.r,min(al.g,al.b)),lm2=dot(al,vec3(0.3,0.59,0.11));
   bool tij=al.r>al.g*3.2&&al.r>al.b*5.0&&abs(nf.y)<0.4&&lm2<0.42,verde=al.g>al.r*1.05&&al.g>al.b*1.15,cinza=sat2<0.06&&lm2<0.5;
   float bs=cinza?0.42:tij?0.6:verde?0.4:lm2>0.5?0.14:0.28;   /* reboco claro: relevo de leve */
   float s1=1.9,e1=0.025,h0=texture(uNoise,q*s1).r,hx=texture(uNoise,q*s1+vec2(e1,0.0)).r-h0,hy=texture(uNoise,q*s1+vec2(0.0,e1)).r-h0;vec2 gr=vec2(hx,hy)*(bs*k*7.5);
@@ -292,6 +298,7 @@ uniform mat4 uViewProj;out vec3 vW,vN;out vec4 vC;
 void main(){vW=aPos;vN=aNrm;vC=aCol;gl_Position=uViewProj*vec4(aPos,1.0);}`;
 const TER_FS=`precision highp float;precision highp sampler2DShadow;
 in vec3 vW,vN;in vec4 vC;uniform sampler2D uSplat;uniform vec3 uSplatT;uniform float uWet;
+uniform highp sampler2DArray uTR,uTN;uniform float uTexOn;uniform vec4 uTexTam;uniform vec3 uTexMed[5];
 ${GLSL_LUZ}
 out vec4 o;
 void main(){vec3 n=normalize(vN);vec2 w=vW.xz;float dist=length(vW-uCam);float near=1.0-smoothstep(18.0,60.0,dist);
@@ -318,10 +325,36 @@ if(m.r>0.3&&vW.x>7.0&&vW.x<168.0){float dz=vW.z-(5.6+sin(vW.x*0.045)*3.2);float 
 float ln=(1.0-smoothstep(0.075,0.075+fw*1.5,abs(dz)))*dash*(0.45+0.55*smoothstep(0.25,0.6,n2));al=mix(al,vec3(0.5,0.38,0.07),ln*m.r);}
 float rk=smoothstep(0.86,0.68,n.y)*(1.0-m.r);vec3 rock=vec3(0.14,0.135,0.12)*(0.6+0.8*texture(uNoise,vec2(w.x*0.11+w.y*0.07,vW.y*0.8)).r);
 al=mix(al,rock,rk);
+/* prova de estilo (10/11): texturas realistas da Poly Haven. Grama nos campos (puxada para o verde do jogo), chão de mata e folhas
+   em manchas dentro da mata, terra onde o chão é batido, rocha nas encostas (projeção nos três eixos, para não esticar no barranco).
+   Estrada, asfalto, concreto e areia continuam como antes. O relevo de cada textura entra na luz (tex: quanto da textura entrou). */
+float tex=0.0;
+if(uTexOn>0.5){float lc2=dot(vC.rgb,vec3(0.3,0.59,0.11)),areia=smoothstep(0.2,0.3,lc2)*smoothstep(1.5,2.0,vC.r/max(vC.b,0.02));
+  float kt=(1.0-m.r)*(1.0-m.b)*(1.0-areia)*(1.0-m.g*0.6);
+  if(kt>0.01){float aberto=m.a,terra=clamp(vC.a,0.0,1.0),fol=smoothstep(0.32,0.68,texture(uNoise,w*0.035+3.1).r);
+    float wG=aberto*(1.0-terra),wM=(1.0-aberto)*(1.0-fol)+terra+m.g,wF=(1.0-aberto)*fol*(1.0-terra);float sw=wG+wM+wF;wG/=sw;wM/=sw;wF/=sw;
+    float mx=smoothstep(0.35,0.65,texture(uNoise,w*0.018+5.0).r);   /* a mesma textura em duas escalas, trocando em manchas: esconde a repetição */
+    vec3 tc=vec3(0.0),tn=vec3(0.0);
+    if(wG>0.01){vec3 u1=vec3(w*uTexTam.x,0.0),u2=vec3(w*uTexTam.x*0.41+0.37,0.0);vec3 c=mix(texture(uTR,u1).rgb,texture(uTR,u2).rgb,mx);
+      float dl=dot(c,vec3(0.3,0.59,0.11))/max(dot(uTexMed[0],vec3(0.3,0.59,0.11)),1e-4);c=mix(c,vC.rgb*dl*1.05,0.55);
+      tc+=wG*c;tn+=wG*mix(texture(uTN,u1).xyz,texture(uTN,u2).xyz,mx);}
+    if(wM>0.01){vec3 u1=vec3(w*uTexTam.y,1.0),u2=vec3(w*uTexTam.y*0.43+0.21,1.0);tc+=wM*mix(texture(uTR,u1).rgb,texture(uTR,u2).rgb,mx)*0.85;tn+=wM*mix(texture(uTN,u1).xyz,texture(uTN,u2).xyz,mx);}
+    if(wF>0.01){vec3 u1=vec3(w*uTexTam.z,2.0),u2=vec3(w*uTexTam.z*0.39+0.63,2.0);tc+=wF*mix(texture(uTR,u1).rgb,texture(uTR,u2).rgb,mx)*0.72;tn+=wF*mix(texture(uTN,u1).xyz,texture(uTN,u2).xyz,mx);}
+    tc*=0.86+0.28*n2;   /* variação grande de cor (sol e sombra das manchas), como no chão de antes */
+    tn=tn*2.0-1.0;
+    al=mix(al,tc,kt*(1.0-rk));tex=kt*(1.0-rk);
+    vec3 np=normalize(vec3(n.x+tn.x*0.9,n.y,n.z-tn.y*0.9));n=normalize(mix(n,np,tex));}
+  /* rocha das encostas */
+  if(rk>0.01){vec3 bw=pow(abs(vN),vec3(4.0));bw/=bw.x+bw.y+bw.z;float s4=uTexTam.w;
+    vec3 cx=texture(uTR,vec3(vW.zy*s4,3.0)).rgb,cy=texture(uTR,vec3(vW.xz*s4,3.0)).rgb,cz=texture(uTR,vec3(vW.xy*s4,3.0)).rgb;
+    vec3 nx=texture(uTN,vec3(vW.zy*s4,3.0)).xyz*2.0-1.0,ny=texture(uTN,vec3(vW.xz*s4,3.0)).xyz*2.0-1.0,nz=texture(uTN,vec3(vW.xy*s4,3.0)).xyz*2.0-1.0;
+    vec3 rc=cx*bw.x+cy*bw.y+cz*bw.z;float dl=dot(rc,vec3(0.3,0.59,0.11))/max(dot(uTexMed[3],vec3(0.3,0.59,0.11)),1e-4);
+    rc=mix(rc*0.42,vec3(0.15,0.14,0.125)*dl,0.45);   /* a pedra da foto é clara demais para a mata: escurece e puxa para o cinza do jogo */
+    al=mix(al,rc,rk);vec3 nr=vec3(0.0,-nx.y,nx.x)*bw.x+vec3(ny.x,0.0,-ny.y)*bw.y+vec3(nz.x,-nz.y,0.0)*bw.z;n=normalize(n+nr*rk*0.9);tex=max(tex,rk);}}
 al*=1.0-uWet*0.35*(1.0-rk);
 /* Etapa 21 (Alto e Ultra): relevo do chão pelo ruído (mais forte na rocha), perto da câmera */
-if(uDetail>1.5&&near>0.0){float e2=0.012,sc=mix(0.9,2.2,rk),b0=texture(uNoise,w*sc).r,bx=texture(uNoise,w*sc+vec2(e2,0.0)).r-b0,bz=texture(uNoise,w*sc+vec2(0.0,e2)).r-b0;
-  n=normalize(n-vec3(bx,0.0,bz)*near*(1.0-m.r)*(1.0-m.b)*mix(7.0,14.0,rk));}
+if(uDetail>1.5&&near>0.0&&tex<0.99){float e2=0.012,sc=mix(0.9,2.2,rk),b0=texture(uNoise,w*sc).r,bx=texture(uNoise,w*sc+vec2(e2,0.0)).r-b0,bz=texture(uNoise,w*sc+vec2(0.0,e2)).r-b0;
+  n=normalize(n-vec3(bx,0.0,bz)*near*(1.0-m.r)*(1.0-m.b)*mix(7.0,14.0,rk)*(1.0-tex));}
 vec3 L=luz(vW,n);
 vec3 c=al*L;
 if(uWet>0.01){vec3 v=normalize(uCam-vW);vec3 hv=normalize(v+uDirD);c+=uDirC*pow(max(dot(normalize(mix(n,vN,0.7)),hv),0.0),60.0)*uWet*0.22*(m.r+m.b*0.6+0.15);}
