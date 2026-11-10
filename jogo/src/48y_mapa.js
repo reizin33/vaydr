@@ -9,11 +9,11 @@ function abrirMapa(){if(G.modo!=='jogo')return;mapaVolta='jogo';G.modo='mapa';IN
 function fecharMapa(){if(G.modo!=='mapa')return;G.modo=mapaVolta;tela(null);sfx('clique');}
 function desenharMapaGrande(){const c=$('mapa-g');if(!c)return;const css=Math.max(240,Math.min(c.clientWidth||600,1100)),dp=Math.min(2,window.devicePixelRatio||1),Wd=Math.round(css*dp);
   if(c.width!==Wd){c.width=Wd;c.height=Wd;}const g=c.getContext('2d');if(!g)return;const n=0;   // o mapa usa sempre as cores de dia (fica legível à noite)
-  const x0=-MAP_R-6,x1=Math.max(CIDADE.x1+8,typeof MAPA_MAR!=='undefined'?MAPA_MAR.x1:0),z0=Math.min(-MAP_R,CIDADE.z0,typeof MAPA_Z0!=='undefined'?MAPA_Z0:0)-6,z1=Math.max(MAP_R,CIDADE.z1)+6,lado=Math.max(x1-x0,z1-z0),k=Wd/lado,ox=(lado-(x1-x0))/2,oz=(lado-(z1-z0))/2;
+  const RMX=typeof raioMapaMax==='function'?raioMapaMax():MAP_R,x0=-RMX-6,x1=Math.max(CIDADE.x1+8,typeof MAPA_MAR!=='undefined'?MAPA_MAR.x1:0),z0=Math.min(-RMX,CIDADE.z0,typeof MAPA_Z0!=='undefined'?MAPA_Z0:0)-6,z1=Math.max(RMX,CIDADE.z1)+6,lado=Math.max(x1-x0,z1-z0),k=Wd/lado,ox=(lado-(x1-x0))/2,oz=(lado-(z1-z0))/2;
   const X=x=>(x-x0+ox)*k,Y=z=>(z-z0+oz)*k;
   g.clearRect(0,0,Wd,Wd);g.fillStyle='#121a12';g.fillRect(0,0,Wd,Wd);
   // a mata (disco do mapa) e a cidade
-  g.fillStyle='#24331e';g.beginPath();g.arc(X(0),Y(0),MAP_R*k,0,Math.PI*2);g.fill();
+  g.fillStyle='#24331e';g.beginPath();if(typeof raioMapaAng==='function'){for(let a=0;a<=360;a+=2){const r=raioMapaAng(a),ra=a*Math.PI/180,px=X(Math.cos(ra)*r),py=Y(Math.sin(ra)*r);a?g.lineTo(px,py):g.moveTo(px,py);}g.closePath();}else g.arc(X(0),Y(0),MAP_R*k,0,Math.PI*2);g.fill();
   g.fillStyle='#3a3a38';g.fillRect(X(CIDADE.x0),Y(CIDADE.z0),(CIDADE.x1-CIDADE.x0)*k,(CIDADE.z1-CIDADE.z0)*k);
   for(const p of PLACES){g.fillStyle='#3c5431';g.beginPath();g.arc(X(p.x),Y(p.z),p.r*k,0,Math.PI*2);g.fill();}
   g.lineCap='round';g.lineJoin='round';
