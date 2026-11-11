@@ -8,7 +8,7 @@
      package.json (a versão da Steam é montada assim, porque a Steam atualiza sozinha)
    - fotos do modo foto vão para Imagens\VAYDR; a cópia do save abre a janela de salvar em Documentos\VAYDR
    - testes de fumaça (usados no GitHub): --smoke=1 abre, começa um jogo, salva, baixa a cópia e fecha;
-     --smoke=2 reabre e continua o jogo salvo; --smoke=atualizacao procura a versão nova, baixa e instala;
+     --smoke=2 reabre, continua o jogo salvo e sai pelo botão Sair do jogo; --smoke=atualizacao procura a versão nova, baixa e instala;
      --smoke=versao só escreve a versão. Resultados na pasta da variável VAYDR_TESTE_SAIDA. */
 const { app, BrowserWindow, protocol, net, shell, session, ipcMain, Menu } = require('electron');
 const path = require('node:path');
@@ -226,11 +226,16 @@ async function fumaca() {
   await dormir(15000);
   await foto('2-continuou');
   passo('continuou o jogo salvo', { ok: jogando, fome: await js('Math.round(__nnc.P.fome*10)/10'), dia: await js('__nnc.G.dia') });
-  rel.ok = !!s && continuar && salvouAoFechar && jogando && erros().length === 0;
+  // volta ao menu e sai pelo botão "Sair do jogo", como o jogador
+  await js("__nnc.ev('mostrarMenu')()");
+  await dormir(1500);
+  const sair = await js("!!document.getElementById('m-sair')&&!document.getElementById('t-menu').hidden");
+  passo('menu com o botão Sair do jogo', { ok: sair });
+  rel.ok = !!s && continuar && salvouAoFechar && jogando && sair && erros().length === 0;
   codigoSaida = rel.ok ? 0 : 1;
   escrever();
-  podeFechar = true;
-  win.close();
+  setTimeout(() => { rel.ok = false; rel.motivo = 'o botão Sair do jogo não fechou o jogo'; escrever(); app.exit(5); }, 15000);
+  await js("document.getElementById('m-sair').click()");
 }
 let atualizacaoTerminou = false;
 function fumacaAtualizacao(nome, valor) {
