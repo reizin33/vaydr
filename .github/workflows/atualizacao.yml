@@ -34,6 +34,19 @@ jobs:
           "EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
           Write-Host "instalado em $($exe.FullName), versão $($exe.VersionInfo.ProductVersion)"
 
+      - name: Jogar na versão antiga e salvar
+        shell: pwsh
+        env:
+          VAYDR_TESTE_SAIDA: ${{ runner.temp }}\teste
+          VAYDR_GL: swiftshader
+        run: |
+          New-Item -ItemType Directory -Force $env:VAYDR_TESTE_SAIDA | Out-Null
+          $p = Start-Process -FilePath $env:EXE -ArgumentList "--smoke=1" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(900000)) { $p.Kill(); throw "não terminou em 15 minutos" }
+          Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-1.json" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "jogar e salvar na versão antiga falhou (código $($p.ExitCode))" }
+
       - name: Abrir a versão antiga e deixar ela se atualizar
         shell: pwsh
         env:
@@ -63,6 +76,18 @@ jobs:
           $agora = (Get-Content "$env:VAYDR_TESTE_SAIDA\versao.txt").Trim()
           Write-Host "antes: ${{ inputs.de }} · mais nova publicada: $nova · instalada agora: $agora"
           if ($agora -ne $nova) { throw "a versão instalada ($agora) não é a mais nova ($nova)" }
+
+      - name: Continuar o jogo salvo na versão nova (o save passa de uma versão para a outra)
+        shell: pwsh
+        env:
+          VAYDR_TESTE_SAIDA: ${{ runner.temp }}\teste
+          VAYDR_GL: swiftshader
+        run: |
+          $p = Start-Process -FilePath $env:EXE -ArgumentList "--smoke=2" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(900000)) { $p.Kill(); throw "não terminou em 15 minutos" }
+          Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-2.json" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "continuar o jogo na versão nova falhou (código $($p.ExitCode))" }
 
       - name: Guardar o relatório
         if: always()
