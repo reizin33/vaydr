@@ -41,8 +41,10 @@ function log(...partes) {
     if (!arqLog) { arqLog = path.join(app.getPath('userData'), 'vaydr.log'); if (fs.existsSync(arqLog) && fs.statSync(arqLog).size > 1e6) fs.renameSync(arqLog, arqLog + '.antigo'); }
     fs.appendFileSync(arqLog, linha);
   } catch (_) {}
-  if (SMOKE) process.stdout.write(linha);
+  if (SMOKE) { try { process.stdout.write(linha); } catch (_) {} }
 }
+// erro inesperado no aplicativo: fica no registro em vez de abrir uma caixa de erro (no teste, encerra com código 4)
+process.on('uncaughtException', (e) => { log('erro inesperado', String((e && e.stack) || e)); if (SMOKE) { try { rel.excecao = String((e && e.stack) || e); escrever(); } catch (_) {} app.exit(4); } });
 
 /* ---------- estado da janela (tela cheia, tamanho) ---------- */
 const arqJanela = () => path.join(app.getPath('userData'), 'janela.json');
