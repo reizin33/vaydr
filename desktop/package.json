@@ -1,0 +1,72 @@
+{
+  "name": "vaydr",
+  "productName": "VAYDR",
+  "version": "0.0.0",
+  "description": "VAYDR: sobrevivência com zumbis. Sobreviver é construir.",
+  "author": "VAYDR",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "vaydr": {
+    "atualizacaoAutomatica": true
+  },
+  "scripts": {
+    "preparar": "node preparar.mjs",
+    "exe": "electron-builder --win --x64 --publish never",
+    "abrir": "electron ."
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "electron": "44.9.2",
+    "electron-builder": "26.15.0"
+  },
+  "build": {
+    "appId": "com.vaydr.jogo",
+    "productName": "VAYDR",
+    "copyright": "VAYDR",
+    "artifactName": "VAYDR-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "VAYDR",
+      "language": "1046",
+      "installerLanguages": [
+        "pt_BR"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "reizin33",
+        "repo": "vaydr",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

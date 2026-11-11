@@ -1,0 +1,73 @@
+# Teste da atualização automática, de ponta a ponta, num Windows da nuvem:
+# instala uma versão antiga já publicada, abre o jogo, e confere que ele acha a versão mais nova publicada,
+# baixa, instala sozinho e que depois o VAYDR instalado é a versão nova.
+name: Teste da atualização automática
+
+on:
+  workflow_dispatch:
+    inputs:
+      de:
+        description: "Versão antiga para instalar primeiro (ex.: 9.9.0)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  atualizar:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Baixar e instalar a versão antiga
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v${{ inputs.de }}" -R "${{ github.repository }}" -p "VAYDR-Setup-*.exe" -D velho
+          $inst = Get-ChildItem velho\*.exe | Select-Object -First 1
+          Write-Host "instalando $($inst.Name)"
+          $p = Start-Process -FilePath $inst.FullName -ArgumentList "/S" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(300000)) { throw "o instalador não terminou" }
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter VAYDR.exe | Select-Object -First 1
+          if (-not $exe) { throw "o VAYDR não foi instalado" }
+          "EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          Write-Host "instalado em $($exe.FullName), versão $($exe.VersionInfo.ProductVersion)"
+
+      - name: Abrir a versão antiga e deixar ela se atualizar
+        shell: pwsh
+        env:
+          VAYDR_TESTE_SAIDA: ${{ runner.temp }}\teste
+        run: |
+          New-Item -ItemType Directory -Force $env:VAYDR_TESTE_SAIDA | Out-Null
+          $p = Start-Process -FilePath $env:EXE -ArgumentList "--smoke=atualizacao" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(600000)) { $p.Kill(); throw "não terminou em 10 minutos" }
+          Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-atualizacao.json" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "a atualização falhou (código $($p.ExitCode))" }
+          # o instalador da versão nova roda em silêncio depois que o jogo fecha
+          $fim = (Get-Date).AddMinutes(4)
+          while ((Get-Date) -lt $fim -and (Get-Process | Where-Object { $_.ProcessName -like "VAYDR*" -or $_.ProcessName -like "*Setup*" -or $_.ProcessName -like "Un_A*" })) { Start-Sleep 3 }
+          Start-Sleep 5
+
+      - name: Conferir que o VAYDR instalado é a versão nova
+        shell: pwsh
+        env:
+          VAYDR_TESTE_SAIDA: ${{ runner.temp }}\teste
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $nova = (gh release view -R "${{ github.repository }}" --json tagName --jq .tagName).TrimStart("v")
+          $p = Start-Process -FilePath $env:EXE -ArgumentList "--smoke=versao" -PassThru
+          $null = $p.Handle
+          $null = $p.WaitForExit(120000)
+          $agora = (Get-Content "$env:VAYDR_TESTE_SAIDA\versao.txt").Trim()
+          Write-Host "antes: ${{ inputs.de }} · mais nova publicada: $nova · instalada agora: $agora"
+          if ($agora -ne $nova) { throw "a versão instalada ($agora) não é a mais nova ($nova)" }
+
+      - name: Guardar o relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teste-atualizacao
+          path: ${{ runner.temp }}\teste
+          if-no-files-found: warn

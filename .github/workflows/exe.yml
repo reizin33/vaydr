@@ -1,0 +1,133 @@
+# VAYDR para Windows: monta o instalador (.exe), testa o jogo aberto num Windows da nuvem e, quando tem versão, publica.
+# - Rodar à mão (aba Actions > "VAYDR para Windows" > Run workflow): sem versão só monta e testa; com versão (ex.: 9.9.0) também publica.
+# - Enviar uma etiqueta v9.9.0 também monta, testa e publica.
+# As instalações procuram atualização nas versões publicadas aqui (Releases).
+name: VAYDR para Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versão para publicar (ex.: 9.9.0). Vazio = só monta e testa"
+        required: false
+        default: ""
+      steam:
+        description: "Montar a versão da Steam (sem atualização automática)"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: exe-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Versão
+        id: v
+        shell: bash
+        run: |
+          V="${{ inputs.versao }}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="${GITHUB_REF#refs/tags/v}"; fi
+          PUB=sim
+          if [ -z "$V" ]; then V="0.0.${{ github.run_number }}"; PUB=nao; fi
+          if [ "${{ inputs.steam }}" = "true" ]; then PUB=nao; fi
+          echo "versao=$V" >> "$GITHUB_OUTPUT"
+          echo "publicar=$PUB" >> "$GITHUB_OUTPUT"
+          echo "Versão $V · publicar: $PUB · steam: ${{ inputs.steam }}"
+
+      - name: Juntar o jogo numa página
+        working-directory: jogo
+        shell: bash
+        run: SAIDA=test.html python build.py
+
+      - name: Instalar o Electron
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Pôr as fontes dentro da página
+        working-directory: desktop
+        run: node preparar.mjs
+
+      - name: Montar o instalador
+        working-directory: desktop
+        shell: bash
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.steam }}" = "true" ]; then EXTRA="-c.extraMetadata.vaydr.atualizacaoAutomatica=false"; fi
+          npx electron-builder --win --x64 --publish never -c.extraMetadata.version=${{ steps.v.outputs.versao }} $EXTRA
+          ls -la dist
+
+      - name: "Teste 1: abrir, começar um jogo, salvar e fechar"
+        shell: pwsh
+        env:
+          VAYDR_TESTE_SAIDA: ${{ github.workspace }}\teste
+          VAYDR_GL: swiftshader
+        run: |
+          New-Item -ItemType Directory -Force $env:VAYDR_TESTE_SAIDA | Out-Null
+          $p = Start-Process -FilePath "desktop\dist\win-unpacked\VAYDR.exe" -ArgumentList "--smoke=1" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(900000)) { $p.Kill(); throw "o jogo não fechou em 15 minutos" }
+          Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-1.json" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "teste 1 falhou (código $($p.ExitCode))" }
+
+      - name: "Teste 2: reabrir e continuar o jogo salvo"
+        shell: pwsh
+        env:
+          VAYDR_TESTE_SAIDA: ${{ github.workspace }}\teste
+          VAYDR_GL: swiftshader
+        run: |
+          $p = Start-Process -FilePath "desktop\dist\win-unpacked\VAYDR.exe" -ArgumentList "--smoke=2" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(900000)) { $p.Kill(); throw "o jogo não fechou em 15 minutos" }
+          Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-2.json" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "teste 2 falhou (código $($p.ExitCode))" }
+
+      - name: Juntar o registro do jogo
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force teste | Out-Null
+          Copy-Item "$env:APPDATA\VAYDR\vaydr.log" teste\ -ErrorAction SilentlyContinue
+
+      - name: Guardar fotos e relatórios dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testes-${{ steps.v.outputs.versao }}
+          path: teste/
+          if-no-files-found: warn
+
+      - name: Guardar o instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: instalador-${{ steps.v.outputs.versao }}${{ inputs.steam && '-steam' || '' }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.blockmap
+            desktop/dist/latest.yml
+
+      - name: Publicar a versão (as instalações se atualizam a partir daqui)
+        if: steps.v.outputs.publicar == 'sim'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.v.outputs.versao }}"
+          cd desktop/dist
+          gh release create "v$V" "VAYDR-Setup-$V.exe" "VAYDR-Setup-$V.exe.blockmap" latest.yml \
+            --target "$GITHUB_SHA" --title "VAYDR $V" \
+            --notes "Para jogar no Windows: baixe **VAYDR-Setup-$V.exe** e abra. Na primeira vez o Windows pode mostrar \"O Windows protegeu o computador\": clique em **Mais informações** e depois em **Executar assim mesmo**. Quem já tem o VAYDR instalado recebe esta versão sozinho."
