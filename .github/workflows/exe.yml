@@ -111,6 +111,18 @@ jobs:
           path: teste/
           if-no-files-found: warn
 
+      - name: Mandar fotos e relatórios para o ramo testes-exe (dá para conferir sem baixar artefato)
+        if: always()
+        shell: bash
+        run: |
+          cd teste || exit 0
+          git init -q -b testes-exe
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "testes do .exe: execução ${{ github.run_number }}, versão ${{ steps.v.outputs.versao }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" testes-exe
+
       - name: Guardar o instalador
         uses: actions/upload-artifact@v4
         with:
