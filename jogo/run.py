@@ -30,6 +30,9 @@ async def run(plan):
                 # clique e toque esperam até 2 min: a tela de criação refaz 4 fotos do personagem a cada escolha, e sem placa de vídeo isso demora
                 if k=='wait': await pg.wait_for_timeout(st[1]*1000)
                 elif k in('click','tap'):
+                    # versão 10: "Novo mundo" (#m-novo) fica na tela Jogar sozinho; os testes antigos clicam nele direto do menu
+                    if st[1]=='#m-novo':
+                        await pg.evaluate("()=>{const b=document.getElementById('m-novo');if(b&&!b.offsetParent){try{__nnc.ev('pfAbrirSozinho')()}catch(e){}}}")
                     await (pg.click(st[1],timeout=120000) if k=='click' else pg.tap(st[1],timeout=120000))
                     # Novo jogo abre a criação do personagem: os testes antigos confirmam o personagem padrão
                     # (passo ["click","#m-novo","criacao"] deixa a tela aberta para testar a criação)

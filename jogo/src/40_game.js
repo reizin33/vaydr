@@ -1,5 +1,5 @@
 /* ================= estado do jogo ================= */
-const CFG_KEY='nnc_cfg_v1',SAVE_KEY='nnc_jogo_v1';
+const CFG_KEY='nnc_cfg_v1';let SAVE_KEY='nnc_jogo_v1';   // a chave muda com o mundo escolhido (62q_perfis: saveChaves)
 const cfg=Object.assign({graf:small?'medio':touch?'alto':'ultra',dif:'normal',cam:'3',tela:touch?'celular':'pc',sens:1,som:1,musica:0.55,efeitos:0.9,teclas:1},store.get(CFG_KEY)||{});
 function saveCfg(){store.set(CFG_KEY,cfg);}
 const DIF={facil:{dano:0.6,hp:0.8,horda:0.7,fome:0.75},normal:{dano:1,hp:1,horda:1,fome:1},dificil:{dano:1.5,hp:1.25,horda:1.4,fome:1.25}};
