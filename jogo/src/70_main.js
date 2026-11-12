@@ -19,7 +19,7 @@ function frame(now){const dt=Math.min(0.05,Math.max(0,(now-last)/1000)||0.016);l
     // rodando pesado (abaixo de uns 40 quadros por segundo): primeiro baixa a resolução, depois um degrau dos gráficos (se a pessoa não escolheu nos Ajustes);
     // confere de novo até ficar liso três vezes seguidas
     if(!perfDone&&G.t>3){perfAcc+=dt;perfN++;if(perfN>=90){const avg=perfAcc/perfN;perfAcc=0;perfN=0;
-      if(avg>0.024&&dpr>1){dpr=Math.max(1,dpr-0.25);resize();perfOk=0;}
+      if(avg>0.024&&dpr>1&&(cfg.res||"auto")==="auto"){dpr=Math.max(1,dpr-0.25);resize();perfOk=0;}
       else if(avg>0.025&&!TESTE&&!cfg.grafManual&&cfg.graf!=='baixo'){const ord=['baixo','medio','alto','ultra'];cfg.graf=ord[Math.max(0,ord.indexOf(cfg.graf)-1)];aplicarCfg();perfOk=0;
         feed('Gráficos ajustados para '+({baixo:'Baixo',medio:'Médio',alto:'Alto'}[cfg.graf])+' para rodar mais liso');}
       else if(++perfOk>=3)perfDone=true;}}}

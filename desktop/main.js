@@ -163,6 +163,9 @@ function prepararDownloads() {
 const daPagina = (e) => { try { return new URL(e.senderFrame.url).protocol === 'vaydr:'; } catch (_) { return false; } };
 ipcMain.on('vaydr:versao', (e) => { e.returnValue = app.getVersion(); });
 ipcMain.on('vaydr:sair', (e) => { if (daPagina(e) && win) win.close(); });
+// Configurações > Resolução > Modo de tela (o mesmo que F11 e Alt+Enter; a escolha fica lembrada como sempre)
+ipcMain.on('vaydr:tela-cheia', (e, ligar) => { if (daPagina(e) && win) win.setFullScreen(!!ligar); });
+ipcMain.on('vaydr:tela-cheia?', (e) => { e.returnValue = !!(win && !win.isDestroyed() && win.isFullScreen()); });
 ipcMain.on('vaydr:reiniciar-atualizar', async (e) => {
   if (!daPagina(e) || !atualizador || !versaoBaixada) return;
   log('reiniciar para atualizar:', await salvarAntes());

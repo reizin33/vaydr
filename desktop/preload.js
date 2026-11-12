@@ -6,4 +6,6 @@ contextBridge.exposeInMainWorld('vaydrPC', {
   aoAtualizar: (cb) => { ipcRenderer.on('vaydr:atualizacao-pronta', (_e, v) => { try { cb(String(v)); } catch (_) {} }); },
   reiniciarParaAtualizar: () => ipcRenderer.send('vaydr:reiniciar-atualizar'),
   sair: () => ipcRenderer.send('vaydr:sair'),
+  telaCheia: (ligar) => ipcRenderer.send('vaydr:tela-cheia', !!ligar),
+  estaTelaCheia: () => ipcRenderer.sendSync('vaydr:tela-cheia?'),
 });

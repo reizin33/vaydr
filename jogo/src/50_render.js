@@ -321,7 +321,7 @@ function render(){
     gl.uniform4f(ru.uCol,rl[0],rl[1],rl[2],lerp(0.42,0.5,n)*E.r);gl.bindVertexArray(RAINV);gl.drawArrays(gl.LINES,0,RAIN_N*2);}
   gl.depthMask(true);gl.disable(gl.BLEND);
   // arma em primeira pessoa
-  if(cfg.cam==='1'&&P.alive&&!CARRO.ativo&&!lunetaAtiva()&&!P.nada){const id=viewModel(TMP);   // dirigindo: as mãos estão no volante, sem a arma na frentegl.clear(gl.DEPTH_BUFFER_BIT);persp(PRV,0.9,asp,0.01,10);
+  if(cfg.cam==='1'&&P.alive&&!CARRO.ativo&&!lunetaAtiva()&&!P.nada){const id=viewModel(TMP);gl.clear(gl.DEPTH_BUFFER_BIT);persp(PRV,0.9,asp,0.01,10);   // dirigindo (CARRO.ativo): as mãos estão no volante, sem a arma na frente
     const f=cam.fwd,r=cam.right,u=cam.up,p=cam.pos;CW.set([r[0],r[1],r[2],0,u[0],u[1],u[2],0,-f[0],-f[1],-f[2],0,p[0],p[1],p[2],1]);
     mul(VPV,PRV,V);setLit(PL);gl.uniformMatrix4fv(PL.u.uViewProj,false,VPV);gl.uniform1f(PL.u.uShadowOn,0);mul(TMP2,CW,TMP);
     if(id==='arco')desenharArco1P(PL,CW);

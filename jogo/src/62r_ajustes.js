@@ -4,9 +4,37 @@
    arquivo puser nos Ajustes depois e não estiver na lista vai para "Jogo".
    Conta e perfil: nome do perfil, personagem, trocar de perfil e apagar o perfil (com todos os mundos dele). No meio de
    um jogo, trocar e apagar ficam para o menu. */
-const AJ_SECOES=[['graficos','Gráficos',['aj-graf','aj-graf-nota','aj-tex','aj-fps','aj-fov']],['som','Som',['aj-som','aj-mus','aj-efx']],
-  ['controles','Controles e teclas',['aj-sens','aj-invy','aj-sensgp','aj-teclas-btn','aj-tela']],['jogo','Jogo',['aj-dif','aj-cam','aj-camdist','aj-animabre','aj-criativo']],
-  ['acess','Acessibilidade',['aj-hud','aj-teclas']],['conta','Conta e perfil',[]]];
+/* 12/11 (lobby novo): o Himalaia pediu abas de Som, Resolução e Sensibilidade. Resolução é nova (modo de tela e resolução do
+   desenho); Sensibilidade saiu de Controles, que ficou com as teclas, o tipo de controle e os comandos na tela. */
+const AJ_SECOES=[['graficos','Gráficos',['aj-graf','aj-graf-nota','aj-tex','aj-fps','aj-fov']],['resolucao','Resolução',['aj-modo-tela','aj-res','aj-res-info']],['som','Som',['aj-som','aj-mus','aj-efx']],
+  ['sens','Sensibilidade',['aj-sens','aj-sensgp','aj-invy']],['controles','Controles e teclas',['aj-teclas-btn','aj-tela','aj-teclas']],['jogo','Jogo',['aj-dif','aj-cam','aj-camdist','aj-animabre','aj-criativo']],
+  ['acess','Acessibilidade',['aj-hud']],['conta','Conta e perfil',[]]];
+/* ---------- Resolução ----------
+   Modo de tela: no PC (aplicativo) pede ao aplicativo (o mesmo do F11); no navegador, a tela cheia do navegador.
+   Resolução do desenho: Automática (como antes: segue o nível de gráfico e baixa sozinha se o jogo ficar pesado) ou fixa em
+   100%, 75% ou 50% dos pixels da tela (fixa, o jogo não mexe). */
+if(!('res' in cfg))cfg.res='auto';
+{const card=document.querySelector('#t-ajustes .cartao'),ok=$('aj-ok');
+ ok.insertAdjacentHTML('beforebegin','<div class="opcao" id="aj-modo-tela-l"><span class="rot">Modo de tela</span><div class="segs" id="aj-modo-tela"><button type="button" data-v="janela">Janela</button><button type="button" data-v="cheia">Tela cheia</button></div></div>'+
+   '<div class="opcao" id="aj-res-l"><span class="rot">Resolução do desenho</span><div class="segs" id="aj-res"><button type="button" data-v="auto">Automática</button><button type="button" data-v="1">100%</button><button type="button" data-v="0.75">75%</button><button type="button" data-v="0.5">50%</button></div></div>'+
+   '<p class="aj-nota" id="aj-res-info"></p>');}
+const resPC=()=>!!(window.vaydrPC&&typeof window.vaydrPC.telaCheia==='function');
+function resTelaCheia(){if(resPC())try{return!!window.vaydrPC.estaTelaCheia();}catch(_){}return!!document.fullscreenElement;}
+function resAplicar(){if(cfg.res==='auto')return;const k=Number(cfg.res)||1;dpr=Math.max(0.35,(window.devicePixelRatio||1)*k);resize();}
+function resInfo(){const i=$('aj-res-info');if(!i)return;const c=document.getElementById('cena'),w=c?c.width:0,h=c?c.height:0,pw=Math.round(innerWidth*(window.devicePixelRatio||1)),ph=Math.round(innerHeight*(window.devicePixelRatio||1));
+  i.textContent='Tela: '+pw+' × '+ph+' · o jogo desenha em '+w+' × '+h+(pw?' ('+Math.round(w/pw*100)+'%)':'')+'. '+(cfg.res==='auto'?'Automática: segue o nível de gráfico e baixa sozinha se o jogo ficar pesado.':'Menos resolução deixa o jogo mais leve e um pouco mais borrado.');
+  const mt=$('aj-modo-tela');if(mt){const tc=resTelaCheia();mt.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.v==='cheia')===tc)));}
+  const r=$('aj-res');if(r)r.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===String(cfg.res))));}
+{const _a=aplicarCfg;aplicarCfg=function(){const r=_a.apply(this,arguments);try{resAplicar();resInfo();}catch(e){console.error('resolução',e);}return r;};}
+$('aj-res').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;sfx('clique');cfg.res=b.dataset.v;saveCfg();aplicarCfg();});
+$('aj-modo-tela').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;sfx('clique');const quer=b.dataset.v==='cheia';
+  if(resPC()){try{window.vaydrPC.telaCheia(quer);}catch(_){}}
+  else if(quer&&!document.fullscreenElement){const el=document.documentElement;if(el.requestFullscreen)el.requestFullscreen().catch(()=>{});}
+  else if(!quer&&document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
+  setTimeout(resInfo,350);setTimeout(resInfo,900);});
+addEventListener('resize',()=>{if(!$('t-ajustes').hidden)setTimeout(resInfo,60);});
+document.addEventListener('fullscreenchange',()=>setTimeout(resInfo,60));
+if(!resPC()&&!(document.documentElement.requestFullscreen))$('aj-modo-tela-l').hidden=true;
 let ajSecao='graficos',ajApagaConfirma=false;
 {const st=document.createElement('style');st.textContent=`
 #t-ajustes .cartao.aj-sec-cartao{width:min(820px,100%);grid-template-columns:200px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;align-items:start;gap:16px 22px}
@@ -31,7 +59,9 @@ let ajSecao='graficos',ajApagaConfirma=false;
 {const card=document.querySelector('#t-ajustes .cartao'),ok=$('aj-ok');card.classList.add('aj-sec-cartao');
  const nav=document.createElement('nav');nav.className='aj-nav';nav.setAttribute('aria-label','Seções dos ajustes');
  const ICO={graficos:'<path d="M3 5h18v12H3zM8 21h8M12 17v4"/>',som:'<path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
-   controles:'<rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M6.5 10.5v3M5 12h3M15.5 11h.01M18 13h.01"/>',jogo:'<path d="M12 3 4 7v5c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V7z"/>',
+   controles:'<rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M6.5 10.5v3M5 12h3M15.5 11h.01M18 13h.01"/>',
+   resolucao:'<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4M7 8h3M7 8v3M17 12h-3M17 12V9"/>',
+   sens:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',jogo:'<path d="M12 3 4 7v5c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V7z"/>',
    acess:'<circle cx="12" cy="4.5" r="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5M12 14.5 8.5 21M12 14.5l3.5 6.5"/>',conta:'<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.9-3.8 3.9-6 7.5-6s6.6 2.2 7.5 6"/>'};
  const paineis={};
  for(const[k,nome,ids]of AJ_SECOES){const b=document.createElement('button');b.type='button';b.dataset.secB=k;b.setAttribute('aria-pressed','false');
@@ -48,7 +78,7 @@ let ajSecao='graficos',ajApagaConfirma=false;
    '<p class="aj-pf-msg" id="aj-pf-msg" role="status"></p>';
  const h2=card.querySelector('h2');h2.after(nav);nav.after(...Object.values(paineis));card.append(ok);}
 function ajMostrarSecao(k){ajSecao=k;for(const b of document.querySelectorAll('.aj-nav [data-sec-b]'))b.setAttribute('aria-pressed',String(b.dataset.secB===k));
-  for(const p of document.querySelectorAll('#t-ajustes .aj-painel'))p.hidden=p.dataset.sec!==k;if(k==='conta')ajContaRender();}
+  for(const p of document.querySelectorAll('#t-ajustes .aj-painel'))p.hidden=p.dataset.sec!==k;if(k==='conta')ajContaRender();if(k==='resolucao')resInfo();}
 function ajContaRender(){const noJogo=ajustesVolta!=='t-menu',tem=!!PERFIL;$('aj-pf-n').textContent=tem?PERFIL.nome:'Sem perfil';$('aj-pf-av').innerHTML=tem?pfAvatar(PERFIL):'';
   $('aj-pf-info').textContent=tem?(PERFIL.mundos.length===1?'1 mundo':PERFIL.mundos.length+' mundos')+' · perfil neste aparelho':'';
   if(document.activeElement!==$('aj-pf-nome'))$('aj-pf-nome').value=tem?PERFIL.nome:'';
