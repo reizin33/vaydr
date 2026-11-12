@@ -9,7 +9,7 @@
 const SGRAV={buf:{},pronto:false,carregando:false,ult:{}};
 /* volume de cada grupo (ajustado medindo o jogo com tools/p246_som.py) */
 const SGRAV_NIVEL={passo_grama:2.4,passo_asf:2.2,passo_agua:1.0,golpe:0.6,acerto:0.8,madeira:1.0,pedra:0.7,quebrar:1.1,vidro:0.7,construir:0.85,galho:1.8,
-  gemido:0.32,ataqueZ:0.32,morteZ:0.34,rugido:0.95,dor:0.48,tiro:3.0,espingarda:1.0,rifle:1,explosao:1.2,vazio:0.3,recarga:0.75,latido:0.4,uivo:1,tosse:0.6,trovao:0.6,bau:0.38,pegar:0.5};
+  gemido:0.32,ataqueZ:0.32,morteZ:0.34,rugido:0.95,dor:0.48,tiro:1.8,espingarda:1.0,rifle:1,explosao:1.2,vazio:0.3,recarga:0.75,latido:0.4,uivo:1,tosse:0.6,trovao:0.6,bau:0.38,pegar:0.5};
 /* tom por tipo de zumbi: colosso e brutamontes mais graves, corredor e gritador mais agudos */
 function sgravTomZ(ty){return ty==='colosso'?0.72:ty==='brute'?0.84:ty==='runner'?1.12:ty==='screamer'?1.2:1;}
 /* qual gravação vale para cada efeito (null: continua o som por código) */
