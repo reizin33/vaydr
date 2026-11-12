@@ -44,10 +44,10 @@ s += [js(F+"window.__dl=null;X('saveBaixar')().then(ok=>{window.__dl=ok;});"), [
       js(F+"const t=JSON.parse(window.__saveBaixado);t.dia=11;X('saveAbrirTexto')(JSON.stringify(t));"), ["wait", 0.2],
       ["click", "#sv-lista [data-copia='arquivo']"], ["wait", 0.2], ["click", "#sv-lista [data-copia='arquivo']"], ["wait", 0.6],
       ev("abriuArquivo", F+"return{modo:G.modo,dia:G.dia};")]
-# 10) menu: Salvamentos abre e volta; novo jogo apaga as cópias
+# 10) menu: Salvamentos abre e volta; (versão 10) Novo mundo começa noutro mundo e não apaga o de antes
 s += [js(F+"X('salvarJogo')();X('salvarJogo')();X('mostrarMenu')();"), ["wait", 0.3], ["click", "#m-salvo"], ["wait", 0.3],
       ev("doMenu", F+"return{visivel:!document.getElementById('t-salvo').hidden};"), ["click", "#sv-voltar"], ["wait", 0.3],
       ev("voltouMenu", F+"return{menu:!document.getElementById('t-menu').hidden};"),
-      ["click", "#m-novo"], ["wait", 0.3], ["click", "#c-sim"], ["wait", 1.0],
-      ev("novoApaga", F+"return{principal:!!LS.getItem(K)&&ler(K).dia,anterior:!!LS.getItem(KB),dia:!!LS.getItem(KD),diaJogo:G.dia};")]
+      ["click", "#m-novo"], ["wait", 1.0],
+      ev("novoMundo", F+"return{antigoContinua:!!LS.getItem('nnc_jogo_v1')&&ler('nnc_jogo_v1').dia,chaveNova:K!=='nnc_jogo_v1',novoSalvo:!!LS.getItem(K),diaJogo:G.dia};")]
 salvar('p110.json', s)

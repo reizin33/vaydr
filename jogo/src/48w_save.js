@@ -7,8 +7,10 @@
    Caiu e o jogo foi salvo com você caído? Ao continuar, você acorda na clareira (ou na sua cama) e a mochila segue onde caiu.
    Tela "Salvamento": mostra as cópias, volta para uma delas, baixa o jogo como arquivo e abre um jogo de um arquivo
    (para guardar fora do aparelho ou levar para outro). */
-const SAVE_BAK=SAVE_KEY+'_bak',SAVE_DIA=SAVE_KEY+'_dia',SAVE_RUIM=SAVE_KEY+'_danificado',SAVE_SV=2;
-const SAVE_FONTES=[[SAVE_KEY,'principal'],[SAVE_BAK,'anterior'],[SAVE_DIA,'do começo do dia']];
+let SAVE_BAK,SAVE_DIA,SAVE_RUIM,SAVE_FONTES;const SAVE_SV=2;
+/* cada mundo tem a sua chave (62q_perfis); o primeiro mundo continua em nnc_jogo_v1, o save de antes dos perfis */
+function saveChaves(k){SAVE_KEY=k;SAVE_BAK=k+'_bak';SAVE_DIA=k+'_dia';SAVE_RUIM=k+'_danificado';SAVE_FONTES=[[SAVE_KEY,'principal'],[SAVE_BAK,'anterior'],[SAVE_DIA,'do começo do dia']];}
+saveChaves(SAVE_KEY);
 const fin=v=>typeof v==='number'&&isFinite(v);
 function saveValido(s){if(!s||typeof s!=='object'||Array.isArray(s))return'não é um jogo salvo';if(s.v!==1)return'versão desconhecida';
   if(!fin(s.dia)||s.dia<1)return'dia inválido';if(!fin(s.hora))return'hora inválida';

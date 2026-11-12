@@ -18,7 +18,7 @@ s = [["wait", 2],
      e("normal", "n.invAdd('feijao',3);X('salvarJogo')();const s=raw('nnc_jogo_v1');return{ativo:ADM.ativo,feijaoSalvo:s&&s.P.inv.filter(q=>q&&q.id==='feijao').reduce((a,q)=>a+q.n,0),admSave:!!raw('nnc_adm_jogo_v1')};"),
      j("X('salvarJogo')();X('mostrarMenu')();"), ["wait", 0.5],
      # liga nos Ajustes
-     ["click", "#m-ajustes"], ["wait", 0.3], ["click", "#aj-criativo button[data-v='1']"], ["click", "#aj-ok"], ["wait", 0.3],
+     ["click", "#m-ajustes"], ["wait", 0.3], ["click", "[data-sec-b='jogo']"], ["click", "#aj-criativo button[data-v='1']"], ["click", "#aj-ok"], ["wait", 0.3],
      e("ligado", "X('mostrarMenu')();return{cfg:n.cfg.criativo,botao:!document.getElementById('m-criativo').hidden,pausaBotao:document.getElementById('p-criativo').hidden};"),
      ["click", "#m-criativo"], ["wait", 1.5], j("window.__turbo=6;window.__semRender=true;Z.length=0;"), ["gwait", 0.3],
      e("entrou", "return{ativo:ADM.ativo,modo:G.modo,selo:document.body.classList.contains('criativo'),dia:G.dia,feijao:conta('feijao'),pausaBotao:!document.getElementById('p-criativo').hidden};"),
@@ -74,6 +74,6 @@ s = [["wait", 2],
      j("X('salvarJogo')();"), ["reload"], ["wait", 3],
      e("recarregou", "return{ativo:ADM.ativo,botao:!document.getElementById('m-criativo').hidden};"),
      # desligar nos Ajustes esconde o botão
-     ["click", "#m-ajustes"], ["wait", 0.3], ["click", "#aj-criativo button[data-v='0']"], ["click", "#aj-ok"], ["wait", 0.3],
+     ["click", "#m-ajustes"], ["wait", 0.3], ["click", "[data-sec-b='jogo']"], ["click", "#aj-criativo button[data-v='0']"], ["click", "#aj-ok"], ["wait", 0.3],
      e("desligado", "X('mostrarMenu')();return{cfg:n.cfg.criativo,botao:!document.getElementById('m-criativo').hidden};")]
 salvar('p159.json', s)
