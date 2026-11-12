@@ -27,6 +27,7 @@ function musica(dt){const ctx=AU.ctx;if(!ctx||ctx.state!=='running'||!cfg.som||(
   if(AU.noiteAnt===true&&!G.noite&&P.alive)temaAmanhecer(ctx.currentTime+0.1);AU.noiteAnt=G.noite;
   if(chefe&&!AU.chefeAnt)temaChefe(ctx.currentTime+0.05);AU.chefeAnt=chefe;
   if(AU.vivoAnt===true&&!P.alive)temaMorte(ctx.currentTime+0.05);AU.vivoAnt=P.alive;
+  musCiclo(dt,ctx);
   const bpm=AU.boss>0.5?104:lerp(lerp(70,98,AU.tens),118,AU.comb),oit=60/bpm/2;
   if(AU.prox<ctx.currentTime)AU.prox=ctx.currentTime+0.06;
   while(AU.prox<ctx.currentTime+0.3){agendar(AU.prox,AU.nota,E.n||0,oit);AU.prox+=oit;AU.nota++;}}
@@ -41,6 +42,18 @@ function agendar(t,i,noite,oit){const p=i%8,cp=Math.floor(i/8),boss=AU.boss||0,c
   if(hord>0.3&&noite>0.4&&p===0&&boss<0.3)coro(t,ac,oit*8,0.03*hord);
   if(hord>0.55&&p===4&&R()<0.6)tambor(t,0.18*hord);
   if(vir>0.15&&p===0)desafino(t,ac,oit*8,0.02+0.03*vir);}
+/* pausas na trilha calma (v10.1): sem perigo, a música toca uns 70 a 110 s e depois some devagar por 1,5 a 3 min, deixando
+   só o som do lugar. Perigo, combate, chefe, horda e os temas curtos (amanhecer, chefe, morte) trazem a música de volta na hora. */
+function musCiclo(dt,ctx){if(!AU.musCiclo)return;
+  if(AU.cicloOn===undefined){AU.cicloOn=true;AU.cicloT=60+Math.random()*30;}
+  AU.cicloT-=dt;if(AU.cicloT<=0){AU.cicloOn=!AU.cicloOn;AU.cicloT=AU.cicloOn?70+Math.random()*40:90+Math.random()*90;}
+  AU.temaT=Math.max(0,(AU.temaT||0)-dt);
+  const perigo=Math.max(AU.tens||0,AU.comb||0,AU.boss||0,AU.hord||0),k=Math.max(AU.cicloOn?1:0,clamp(perigo*2.5,0,1),AU.temaT>0?1:0);
+  const sobe=k>AU.musCiclo.gain.value+0.01,tc=sobe?0.5:3.5,t=ctx.currentTime;   // sobe rápido (0,5 s), some devagar (3,5 s)
+  AU.musCiclo.gain.setTargetAtTime(k,t,tc);AU.revMusCiclo.gain.setTargetAtTime(k,t,tc);}
+{const _ai=audioInit;audioInit=function(){_ai.apply(this,arguments);
+  try{if(AU.ctx&&AU.mus&&!AU.musCiclo){const ctx=AU.ctx;AU.musCiclo=ctx.createGain();AU.mus.disconnect();AU.mus.connect(AU.musCiclo).connect(AU.master);
+    AU.revMusCiclo=ctx.createGain();AU.revMus.disconnect();AU.revMus.connect(AU.revMusCiclo).connect(AU.rev);}}catch(e){console.error('música',e);}};}
 /* instrumentos novos */
 function bronze(t,m,dur,v){const ctx=AU.ctx,f=ctx.createBiquadFilter();f.type='lowpass';f.Q.value=2;f.frequency.setValueAtTime(260,t);f.frequency.exponentialRampToValueAtTime(1600,t+0.08);f.frequency.exponentialRampToValueAtTime(520,t+dur);
   const g=ctx.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.03);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);f.connect(g);g.connect(AU.mus);g.connect(AU.revMus);
@@ -56,6 +69,6 @@ function chimbal(t,v){const ctx=AU.ctx,s=ctx.createBufferSource();s.buffer=AU.ru
 function desafino(t,ac,dur,v){const ctx=AU.ctx,g=voz2(t,dur,v),f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;f.connect(g);
   for(const m of[ac[0],ac[0]+1,ac[2]+6]){const o=ctx.createOscillator();o.type='triangle';o.frequency.setValueAtTime(NOTA(m),t);o.frequency.linearRampToValueAtTime(NOTA(m)*0.97,t+dur);o.connect(f);o.start(t);o.stop(t+dur*1.05);}}
 /* temas curtos */
-function temaAmanhecer(t){for(const[k,m]of[[0,60],[1,64],[2,67],[3,72],[4.5,76]])pluck(t+k*0.16,m,0.07);pad(t,[60,64,67],2.6,0.04);sino(t+0.75,84,0.035);}
-function temaChefe(t){bronze(t,33,1.4,0.12);bronze(t+0.02,40,1.4,0.08);for(let k=0;k<6;k++)tambor(t+k*0.09,0.22+k*0.03,k%2===1);tambor(t+0.62,0.45);}
-function temaMorte(t){for(const[k,m]of[[0,64],[1,63],[2,60],[3,57]])pluck(t+k*0.32,m,0.06,true);pad(t+0.2,[45,48,51],3.2,0.05);drone(t+0.3,3.4,0.05);}
+function temaAmanhecer(t){AU.temaT=7;for(const[k,m]of[[0,60],[1,64],[2,67],[3,72],[4.5,76]])pluck(t+k*0.16,m,0.07);pad(t,[60,64,67],2.6,0.04);sino(t+0.75,84,0.035);}
+function temaChefe(t){AU.temaT=7;bronze(t,33,1.4,0.12);bronze(t+0.02,40,1.4,0.08);for(let k=0;k<6;k++)tambor(t+k*0.09,0.22+k*0.03,k%2===1);tambor(t+0.62,0.45);}
+function temaMorte(t){AU.temaT=7;for(const[k,m]of[[0,64],[1,63],[2,60],[3,57]])pluck(t+k*0.32,m,0.06,true);pad(t+0.2,[45,48,51],3.2,0.05);drone(t+0.3,3.4,0.05);}

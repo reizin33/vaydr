@@ -55,6 +55,7 @@ const VL_GEAR='<svg class="vl-gear" viewBox="0 0 24 24" fill="none" stroke="curr
 .vl-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%;filter:saturate(.8) brightness(.72);transition:transform .8s cubic-bezier(.2,.7,.2,1),filter .5s}
 .vl-pan:hover .vl-img,.vl-pan:focus-visible .vl-img{transform:scale(1.06);filter:saturate(1) brightness(.85)}
 .vl-pan[data-k="multi"] .vl-img{filter:saturate(.55) brightness(.6)}
+.vl-pan[data-k="pers"] .vl-img{object-position:50% 4%}
 .vl-grade{position:absolute;inset:0;background-image:linear-gradient(rgba(236,228,210,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(236,228,210,.05) 1px,transparent 1px);background-size:28px 28px}
 .vl-gear{position:absolute;left:50%;top:34%;width:min(300px,80%);height:auto;transform:translate(-50%,-50%);color:rgba(236,228,210,.16);transition:transform 1.2s cubic-bezier(.2,.7,.2,1)}
 .vl-pan:hover .vl-gear,.vl-pan:focus-visible .vl-gear{transform:translate(-50%,-50%) rotate(30deg)}
@@ -66,7 +67,7 @@ const VL_GEAR='<svg class="vl-gear" viewBox="0 0 24 24" fill="none" stroke="curr
 .vl-tag{position:absolute;right:20px;top:18px;padding:5px 9px;border-radius:999px;border:1px solid rgba(143,202,255,.5);background:rgba(12,26,40,.7);font:800 11.5px/1 var(--f-ui);letter-spacing:.16em;text-transform:uppercase;color:#cfe7ff}
 .vl-txt{position:absolute;left:26px;right:26px;bottom:26px;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;color:var(--bone)}
 .vl-barra{display:block;width:38px;height:3px;border-radius:2px;background:var(--cor)}
-.vl-tit{margin:0;font:700 clamp(20px,8.8cqw,38px)/.98 var(--f-display);letter-spacing:.05em;text-transform:uppercase;text-wrap:balance}
+.vl-tit{margin:0;font:700 clamp(18px,8.2cqw,38px)/.98 var(--f-display);letter-spacing:.05em;text-transform:uppercase;text-wrap:balance}
 .vl p.vl-sub{margin:0;font:600 16px/1.35 var(--f-ui);letter-spacing:0;text-transform:none;color:#c3c7bb}
 .vl-mais{display:grid;gap:8px;opacity:0;max-height:0;overflow:hidden;transition:opacity .35s,max-height .45s;font:700 14.5px/1.3 var(--f-ui);color:#d9dccf}
 .vl-pan.vl-dest .vl-mais{opacity:1;max-height:170px}
@@ -79,7 +80,7 @@ const VL_GEAR='<svg class="vl-gear" viewBox="0 0 24 24" fill="none" stroke="curr
 .vl #m-continuar::before{content:"";position:absolute;left:16px;top:50%;margin-top:-7px;border-style:solid;border-width:7px 0 7px 11px;border-color:transparent transparent transparent currentColor}
 .vl #m-continuar:hover{background:#d8641f}.vl #m-continuar small{font:600 13.5px/1.1 var(--f-ui);letter-spacing:0;text-transform:none;opacity:.92}
 .vl #m-continuar[hidden]{display:none}
-.vl-ir.btn{display:inline-flex;align-items:center;gap:8px;justify-self:start;width:auto;min-height:0;padding:4px 0;border:0;background:none;color:#fff;font:800 14px/1 var(--f-ui);letter-spacing:.16em;text-transform:uppercase}
+.vl-ir.btn{display:inline-flex;align-items:center;gap:8px;justify-self:start;width:auto;min-height:0;padding:4px 0;border:0;background:none;color:#fff;font:800 clamp(11.5px,4.7cqw,14px)/1 var(--f-ui);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
 .vl-ir.btn.prim{background:none;border:0}.vl-ir.btn:disabled{opacity:1}
 .vl-seta{transition:transform .3s}.vl-pan:hover .vl-seta,.vl-pan:focus-visible .vl-seta{transform:translateX(6px)}
 /* rodapé */

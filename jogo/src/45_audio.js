@@ -4,10 +4,20 @@ const AU={ctx:null,master:null,fx:null,amb:null,mus:null,rev:null,revIn:null,rui
 function impulso(ctx,dur,dec){const n=Math.floor(ctx.sampleRate*dur),b=ctx.createBuffer(2,n,ctx.sampleRate);
   for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,dec);}return b;}
 function audioInit(){if(AU.ctx)return;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ctx=new C();AU.ctx=ctx;
-  const comp=ctx.createDynamicsCompressor();comp.threshold.value=-12;comp.knee.value=10;comp.ratio.value=3;comp.attack.value=0.005;comp.release.value=0.25;comp.connect(ctx.destination);
-  AU.master=ctx.createGain();AU.master.connect(comp);
+  /* saída (v10.1): corte do grave que só treme a caixa → menos agudo áspero → compressor que junta tudo → limitador que
+     segura os picos (tiro, explosão, impacto) bem abaixo do máximo, para nada estourar no ouvido.
+     O compressor do navegador sobe sozinho o volume de tudo ("makeup", medido: +7,7 dB neste ajuste e +3,4 dB no limitador);
+     o ganho logo depois de cada um desconta isso, para o som baixo ficar no mesmo nível de antes (+2,9 dB) e só o alto descer */
+  const lim=ctx.createDynamicsCompressor();lim.threshold.value=-6;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=0.001;lim.release.value=0.12;
+  const limG=ctx.createGain();limG.gain.value=Math.pow(10,-3.42/20);lim.connect(limG).connect(ctx.destination);
+  const comp=ctx.createDynamicsCompressor();comp.threshold.value=-24;comp.knee.value=10;comp.ratio.value=3;comp.attack.value=0.006;comp.release.value=0.25;
+  const compG=ctx.createGain();compG.gain.value=Math.pow(10,-4.78/20);comp.connect(compG).connect(lim);
+  const brilho=ctx.createBiquadFilter();brilho.type='highshelf';brilho.frequency.value=6000;brilho.gain.value=-6;brilho.connect(comp);
+  const sub=ctx.createBiquadFilter();sub.type='highpass';sub.frequency.value=30;sub.Q.value=0.7;sub.connect(brilho);
+  AU.master=ctx.createGain();AU.master.connect(sub);AU.saida=limG;
   AU.fx=ctx.createGain();AU.amb=ctx.createGain();AU.mus=ctx.createGain();for(const g of[AU.fx,AU.amb,AU.mus])g.connect(AU.master);
-  AU.rev=ctx.createConvolver();AU.rev.buffer=impulso(ctx,2.8,2.4);const rg=ctx.createGain();rg.gain.value=0.55;AU.rev.connect(rg).connect(AU.master);
+  AU.rev=ctx.createConvolver();AU.rev.buffer=impulso(ctx,2.8,2.4);const rg=ctx.createGain();rg.gain.value=0.42;
+  const rl=ctx.createBiquadFilter();rl.type='lowpass';rl.frequency.value=3200;rl.Q.value=0.5;AU.rev.connect(rl).connect(rg).connect(AU.master);   // eco mais quente, sem chiado
   AU.revIn=ctx.createGain();AU.revIn.connect(AU.rev);AU.revMus=ctx.createGain();AU.revMus.gain.value=0.5;AU.revMus.connect(AU.rev);
   const len=ctx.sampleRate*2,b=ctx.createBuffer(1,len,ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;AU.ruido=b;
   const loop=(type,f,q)=>{const s=ctx.createBufferSource();s.buffer=b;s.loop=true;const fl=ctx.createBiquadFilter();fl.type=type;fl.frequency.value=f;fl.Q.value=q;const g=ctx.createGain();g.gain.value=0;
@@ -20,8 +30,12 @@ function audioInit(){if(AU.ctx)return;try{const C=window.AudioContext||window.we
   {const o=ctx.createOscillator(),o2=ctx.createOscillator(),fl=ctx.createBiquadFilter(),g=ctx.createGain();o.type='sawtooth';o2.type='square';fl.type='lowpass';fl.frequency.value=420;fl.Q.value=2;g.gain.value=0;
     o.connect(fl);o2.connect(fl);fl.connect(g).connect(AU.fx);o.start();o2.start();AU.motor={o,o2,fl,g};}
   audioVol();}catch(_){AU.ctx=null;}}
-function audioVol(){if(!AU.master)return;const ef=cfg.efeitos??0.9;AU.master.gain.value=cfg.som?0.85:0;AU.fx.gain.value=ef;AU.amb.gain.value=ef*0.9;AU.mus.gain.value=cfg.musica??0.55;AU.revMus.gain.value=0.5*(cfg.musica??0.55);}
-function sfx(nome,x,z,vol,extra){const ctx=AU.ctx;if(!ctx||!cfg.som||ctx.state!=='running')return;let v=vol===undefined?1:vol,pan=0,dist=0;
+function audioVol(){if(!AU.master)return;const ef=cfg.efeitos??0.9,mu=cfg.musica??0.55;AU.master.gain.value=cfg.som?0.85:0;AU.fx.gain.value=ef;AU.amb.gain.value=ef*0.9;AU.mus.gain.value=mu*0.7;AU.revMus.gain.value=0.35*mu;}
+/* nível de cada efeito (v10.1), medido no jogo com tools/p246_som.py: os mais altos (explosão, impacto, tiros, os temas de
+   missão e de nível) desceram para perto do resto; o ambiente fica como estava */
+const SOM_NIVEL={impacto:0.43,explosao:0.5,tiro:0.62,espingarda:0.62,rifle:0.78,missao:0.45,nivel:0.58,rugido:0.72,acerto:0.7,grito:0.72,gritoLonge:0.6,
+  galho:0.6,pedra:0.75,fogo:0.8,quebrar:0.9,coracao:0.8,vidro:0.7,sussurro:0.85,alarme:0.7,buzina:0.75,apito:0.7,isca:0.8,latas:0.85};
+function sfx(nome,x,z,vol,extra){const ctx=AU.ctx;if(!ctx||!cfg.som||ctx.state!=='running')return;let v=(vol===undefined?1:vol)*(SOM_NIVEL[nome]??1),pan=0,dist=0;
   if(x!==undefined){const dx=x-P.x,dz=z-P.z;dist=Math.hypot(dx,dz);v*=clamp(1-dist/48,0,1);if(v<0.02)return;const rx=-Math.cos(P.yaw),rz=Math.sin(P.yaw);pan=clamp((dx*rx+dz*rz)/(dist+1),-0.85,0.85);}
   const t=ctx.currentTime,out=ctx.createGain(),pn=ctx.createStereoPanner?ctx.createStereoPanner():null;out.gain.value=v;
   if(pn){pn.pan.value=pan;out.connect(pn).connect(AU.fx);}else out.connect(AU.fx);
@@ -38,6 +52,7 @@ function sfx(nome,x,z,vol,extra){const ctx=AU.ctx;if(!ctx||!cfg.som||ctx.state!=
     o.connect(a).connect(g);o.connect(b2).connect(g);g.connect(out);o.start(t0);vb.start(t0);o.stop(t0+dur+0.05);vb.stop(t0+dur+0.05);
     if(ruido)noise(dur*0.9,'bandpass',fa*1.4,fa,1.5,ruido,dl);};
   const r=()=>0.9+Math.random()*0.2;
+  if(SGRAV.pronto&&cfg.somGravado!==false&&sgravTocar(nome,extra,out,t,ctx,eco,pn))return;   // gravação de verdade (45c); sem ela, o som por código abaixo
   switch(nome){
     case'tiro':noise(0.35,'lowpass',4200,260,0.7,1.3);tone(0.22,'sine',130,42,1.0);noise(0.9,'lowpass',900,120,0.6,0.22,0.12);eco(0.7);break;
     case'vazio':tone(0.04,'square',1400,900,0.12);break;
@@ -63,7 +78,7 @@ function sfx(nome,x,z,vol,extra){const ctx=AU.ctx;if(!ctx||!cfg.som||ctx.state!=
     case'quebrar':noise(0.55,'lowpass',1600,180,0.8,1);noise(0.12,'bandpass',1200,600,2,0.6,0.05);break;
     case'recarga':tone(0.03,'square',1800,1600,0.12);tone(0.03,'square',1200,1100,0.12,0.5);tone(0.04,'square',2000,1800,0.14,1.0);break;
     case'clique':tone(0.04,'sine',880,700,0.15);break;
-    case'galho':noise(0.04,'highpass',2400,1500,1,0.9);noise(0.22,'bandpass',800*r(),380,2.2,0.55,0.03);tone(0.07,'triangle',240,80,0.28,0.01);noise(0.08,'highpass',2000,1600,1,0.4,0.16);break;
+    case'galho':noise(0.04,'bandpass',2400,1500,1,0.6);noise(0.22,'bandpass',800*r(),380,2.2,0.55,0.03);tone(0.07,'triangle',240,80,0.28,0.01);noise(0.08,'bandpass',2000,1600,1,0.25,0.16);break;
     case'sussurro':{for(let i=0;i<7;i++)noise(0.09+Math.random()*0.12,'bandpass',2200+Math.random()*2200,1600+Math.random()*900,7,0.16+Math.random()*0.1,i*0.11+Math.random()*0.05);eco(0.7);break;}
     case'gritoLonge':voz(1.7,540*r(),360,1100,2500,0.22,0,0.12);voz(1.2,610,420,1250,2700,0.1,0.25,0.05);eco(1);break;
     case'passosMata':{for(let i=0;i<5;i++)noise(0.08,'bandpass',600+Math.random()*500,300,1.2,0.45,i*(0.42+Math.random()*0.1));eco(0.5);break;}
@@ -74,7 +89,7 @@ function sfx(nome,x,z,vol,extra){const ctx=AU.ctx;if(!ctx||!cfg.som||ctx.state!=
     case'passo':{const sup=extra||'grama';if(sup==='agua'){noise(0.2,'bandpass',800*r(),380,0.8,0.7);noise(0.12,'highpass',3200*r(),2200,1,0.3,0.04);noise(0.08,'bandpass',1500,900,2,0.25,0.12);}
       else if(sup==='asf')noise(0.07,'bandpass',1900*r(),900,1.2,0.5);else if(sup==='terra')noise(0.09,'bandpass',1200*r(),500,0.9,0.55);
       else{noise(0.11,'lowpass',1100*r(),300,0.7,0.55);noise(0.05,'highpass',3200,2400,1,0.12);}break;}
-    case'estalo':noise(0.012+Math.random()*0.02,'highpass',2500+Math.random()*3000,1800,1,0.6);if(Math.random()<0.15)tone(0.02,'square',300+Math.random()*400,200,0.12);break;
+    case'estalo':noise(0.012+Math.random()*0.02,'bandpass',1800+Math.random()*2200,1500,0.9,0.9);if(Math.random()<0.15)tone(0.02,'square',300+Math.random()*400,200,0.12);break;
     case'passaro':{const n=2+Math.floor(Math.random()*4),f=2400+Math.random()*1800,pp=(Math.random()-0.5)*1.6;if(pn)pn.pan.value=pp;out.gain.value=0.05+Math.random()*0.05;
       for(let i=0;i<n;i++)tone(0.07+Math.random()*0.06,'sine',f*(0.9+Math.random()*0.25),f*(Math.random()<0.5?1.35:0.7),0.5,i*(0.11+Math.random()*0.05));break;}
     case'coruja':{if(pn)pn.pan.value=(Math.random()-0.5)*1.6;out.gain.value=0.11;eco(0.5);for(let i=0;i<3;i++)tone(i===1?0.22:0.42,'sine',i===1?410:390,i===1?400:360,0.5,i===0?0:i===1?0.55:0.85);break;}
@@ -139,7 +154,7 @@ function musicaV7(dt){const ctx=AU.ctx;if(!ctx||ctx.state!=='running'||!cfg.som|
 function agendarV7(t,i,noite,oit){const p=i%8,cp=Math.floor(i/8),ac=ACORDES[cp%8],ten=AU.tens,R=Math.random;
   if(p===0){if(noite<0.6)pad(t,ac,oit*8,0.045*(1-ten*0.7)*(1-noite*0.5));else drone(t,oit*8,0.05);baixo(t,ac[0]-24,oit*5,0.1*(1-ten*0.3));}
   if(noite<0.6&&ten<0.5&&R()<0.4*(1-noite))pluck(t,ac[Math.floor(R()*3)]+(R()<0.4?12:0),0.055);
-  if(noite>=0.6&&ten<0.5&&p%4===2&&R()<0.28)sino(t,pick(R,[69,72,75,76,80])+12,0.03);
+  if(noite>=0.6&&ten<0.5&&p%4===2&&R()<0.28)sino(t,pick(R,[69,72,75,76,80]),0.03);   // uma oitava abaixo: sino mais quente, sem agudo que fura
   if(ten>0.08){if(p%2===0)tambor(t,0.24*ten);if(p===3||p===7)tambor(t,0.13*ten,true);
     if(ten>0.35)pluck(t,[57,60,64,63][p%4]-12+(cp%2?-2:0),0.06*ten,true);}}
 function voz2(t,dur,g0){const ctx=AU.ctx,g=ctx.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(g0,t+dur*0.35);g.gain.linearRampToValueAtTime(0.0001,t+dur*1.05);g.connect(AU.mus);g.connect(AU.revMus);return g;}
@@ -155,7 +170,7 @@ function pluck(t,m,v,duro){const ctx=AU.ctx,o=ctx.createOscillator(),o2=ctx.crea
   const L=duro?0.45:1.5;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.006);g.gain.exponentialRampToValueAtTime(0.0001,t+L);
   o.connect(f);o2.connect(g2).connect(f);f.connect(g);g.connect(AU.mus);g.connect(AU.revMus);o.start(t);o2.start(t);o.stop(t+L+0.05);o2.stop(t+L+0.05);}
 function sino(t,m,v){const ctx=AU.ctx,g=ctx.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+3.2);g.connect(AU.mus);g.connect(AU.revMus);
-  for(const[k,a]of[[1,1],[2.76,0.35],[5.4,0.12]]){const o=ctx.createOscillator(),og=ctx.createGain();o.frequency.value=NOTA(m)*k;og.gain.value=a;o.connect(og).connect(g);o.start(t);o.stop(t+3.3);}}
+  for(const[k,a]of[[1,1],[2.76,0.3],[5.4,0.06]]){const o=ctx.createOscillator(),og=ctx.createGain();o.frequency.value=NOTA(m)*k;og.gain.value=a;o.connect(og).connect(g);o.start(t);o.stop(t+3.3);}}
 function tambor(t,v,leve){const ctx=AU.ctx,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.setValueAtTime(leve?140:95,t);o.frequency.exponentialRampToValueAtTime(leve?70:40,t+0.3);
   g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.005);g.gain.exponentialRampToValueAtTime(0.0001,t+(leve?0.2:0.4));o.connect(g).connect(AU.mus);o.start(t);o.stop(t+0.45);
   const s=ctx.createBufferSource();s.buffer=AU.ruido;const fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.value=leve?2400:900;const ng=ctx.createGain();ng.gain.setValueAtTime(v*0.5,t);ng.gain.exponentialRampToValueAtTime(0.0001,t+0.08);
