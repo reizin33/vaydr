@@ -357,8 +357,9 @@ const mapC=$('minimapa');let mapCtx=null;
 function drawMap(){if(!mapCtx)return;const obs=(G.obsAte||0)>G.t,c=mapC,g=mapCtx,Wd=c.width,R=Wd/2,cx=R,cy=R,range=obs?110:42,k=(R-3)/range,sx=P.x,sz=P.z,n=E.n||0;
   const X=x=>cx+(x-sx)*k,Y=z=>cy+(z-sz)*k;
   g.clearRect(0,0,Wd,Wd);g.save();g.beginPath();g.arc(cx,cy,R-1,0,Math.PI*2);g.clip();
-  g.fillStyle=n>0.5?'#111a14':'#25341f';g.fillRect(0,0,Wd,Wd);
-  for(const p of PLACES){g.fillStyle=n>0.5?'#1d2a1c':'#3f5733';g.beginPath();g.arc(X(p.x),Y(p.z),p.r*k,0,Math.PI*2);g.fill();}
+  const v2=cfg.tela==='pc';   // HUD v2 (62w_hud2): verde-escuro, anéis de distância e a missão em losango
+  g.fillStyle=n>0.5?(v2?'#0e1a11':'#111a14'):(v2?'#1f3a24':'#25341f');g.fillRect(0,0,Wd,Wd);
+  for(const p of PLACES){g.fillStyle=n>0.5?(v2?'#16261a':'#1d2a1c'):(v2?'#2f4d31':'#3f5733');g.beginPath();g.arc(X(p.x),Y(p.z),p.r*k,0,Math.PI*2);g.fill();}
   g.lineCap='round';for(const r of ROADS){g.strokeStyle=r.cor==='asfalto'?(n>0.5?'#3a3a38':'#6d6b66'):(n>0.5?'#4d4335':'#8b7759');g.lineWidth=Math.max(1.5,r.w*k*0.8);
     g.beginPath();r.pts.forEach((p,i)=>i?g.lineTo(X(p[0]),Y(p[1])):g.moveTo(X(p[0]),Y(p[1])));g.stroke();}
   for(const f of MAPA_DESENHOS){try{f(g,X,Y,k,n,range);}catch(e){}}
@@ -371,12 +372,16 @@ function drawMap(){if(!mapCtx)return;const obs=(G.obsAte||0)>G.t,c=mapC,g=mapCtx
   for(const z of Z){if(!z.vivo||d2(z.x,z.z,sx,sz)>range*range)continue;g.fillStyle=z.tipo==='screamer'?'#ffb0a8':z.tipo==='brute'?'#ff2a1a':'#ff4a3d';g.beginPath();g.arc(X(z.x),Y(z.z),z.tipo==='brute'?3.2:2.2,0,Math.PI*2);g.fill();}
   if(obs&&G.cid)for(const h of G.cid.hordas||[]){if(h.membros.length)continue;const q=h.n||0;g.fillStyle='rgba(255,60,40,.35)';g.beginPath();g.arc(X(h.x),Y(h.z),Math.max(3,(2+q*0.25)*k*2.2),0,Math.PI*2);g.fill();g.fillStyle='#ff6a50';g.beginPath();g.arc(X(h.x),Y(h.z),2.6,0,Math.PI*2);g.fill();}
   for(const rg of RINGS){if(rg.a<0)continue;g.strokeStyle='rgba(255,110,90,'+(0.8*(1-rg.a/1.5))+')';g.lineWidth=1.5;g.beginPath();g.arc(X(rg.x),Y(rg.z),(0.6+rg.a*7)*k,0,Math.PI*2);g.stroke();}
+  if(v2){g.strokeStyle='rgba(236,228,210,.11)';g.lineWidth=1;for(const f of [0.36,0.7]){g.beginPath();g.arc(cx,cy,R*f,0,Math.PI*2);g.stroke();}}
   g.restore();
   const marca=(x,z,cor,raio)=>{let mx=X(x),my=Y(z);const dx=mx-cx,dy=my-cy,dd=Math.hypot(dx,dy);if(dd>R-6){mx=cx+dx/dd*(R-6);my=cy+dy/dd*(R-6);}
     g.fillStyle=cor;g.beginPath();g.arc(mx,my,raio,0,Math.PI*2);g.fill();g.strokeStyle='#070a09';g.lineWidth=1.2;g.stroke();};
   if(d2(CARRO.x,CARRO.z,sx,sz)<range*range){g.save();g.translate(X(CARRO.x),Y(CARRO.z));g.rotate(-CARRO.yaw);g.fillStyle='#e0c77e';g.strokeStyle='#070a09';g.lineWidth=1;g.fillRect(-1.1*k,-2.5*k,2.2*k,5*k);g.strokeRect(-1.1*k,-2.5*k,2.2*k,5*k);g.restore();}
   else if(CARRO.comb>0||invCount('gasolina'))marca(CARRO.x,CARRO.z,'#e0c77e',2.8);
-  const mi=missaoInfo();if(mi.alvo)marca(mi.alvo.x,mi.alvo.z,'#ff8a3d',3.6+Math.sin(G.t*5));
+  const mi=missaoInfo();if(mi.alvo){if(v2){let mx=X(mi.alvo.x),my=Y(mi.alvo.z);const dx=mx-cx,dy=my-cy,dd=Math.hypot(dx,dy);if(dd>R-8){mx=cx+dx/dd*(R-8);my=cy+dy/dd*(R-8);}
+    const s2=Math.max(4,R*0.075)*(1+0.12*Math.sin(G.t*5));g.save();g.translate(mx,my);g.rotate(Math.PI/4);g.shadowColor='rgba(255,138,61,.85)';g.shadowBlur=8;
+    g.fillStyle='#ff8a3d';g.fillRect(-s2,-s2,s2*2,s2*2);g.shadowBlur=0;g.strokeStyle='#2a1508';g.lineWidth=1;g.strokeRect(-s2,-s2,s2*2,s2*2);g.restore();}
+    else marca(mi.alvo.x,mi.alvo.z,'#ff8a3d',3.6+Math.sin(G.t*5));}
   if(P.mochila)marca(P.mochila.x,P.mochila.z,'#97c76e',3.4);
   if(CAO.ativo&&CAO.st!=='carro')marca(CAO.x,CAO.z,'#e0a35c',2.6);else if(CAO.st==='espera'&&d2(CAO.x,CAO.z,sx,sz)<30*30)marca(CAO.x,CAO.z,'#e0a35c',2.2);
   if(G.ev&&G.ev.ativo)marca(G.ev.x,G.ev.z,'#ff4a3d',3.4);

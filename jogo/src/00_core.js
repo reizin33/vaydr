@@ -243,7 +243,9 @@ float g=texture(uNoise,q*0.21).r*0.55+texture(uNoise,q*1.07).r*0.45;al*=mix(1.0,
 {float mx=max(al.r,max(al.g,al.b)),sat=mx-min(al.r,min(al.g,al.b)),lm=dot(al,vec3(0.3,0.59,0.11));
 /* madeira (tons marrons): veio esticado e emenda das tábuas */
 /* (vermelho e laranja forte ficam de fora: tijolo, abóbora; em superfície deitada ao ar livre, como terra de canteiro, só um veio fraco e sem emenda) */
-if(al.r>al.g&&al.g>=al.b*0.95&&al.g>al.r*0.38&&sat>0.02&&lm<0.5){bool hz=abs(nf.y)>0.55,fora=hz&&vInt<0.5;float wk=smoothstep(0.02,0.06,sat)*k*(fora?0.3:1.0);vec2 wq=hz?vW.xz:q;
+/* v10.1: só marrom de verdade (cor relativa forte, sat > 44% do mx): pedra, rocha, concreto e cascalho cinza-quente (caverna, mina,
+   poço, ponte, portal do trem, cais) pegavam a textura de tábua e pareciam caixote de madeira */
+if(al.r>al.g&&al.g>=al.b*0.95&&al.g>al.r*0.38&&sat>0.02&&sat>mx*0.44&&lm<0.5){bool hz=abs(nf.y)>0.55,fora=hz&&vInt<0.5;float wk=smoothstep(0.02,0.06,sat)*k*(fora?0.3:1.0);vec2 wq=hz?vW.xz:q;
   /* prova de estilo (10/11): parede de madeira do lado de fora (base, casas, cercas) com a textura de tábua velha da Poly Haven,
      puxada para o tom da peça; o veio e a emenda de ruído saem */
   if(uTexOn>0.5&&!hz&&vInt<0.5){vec3 u1=vec3(q/1.8,4.0);vec3 tc=texture(uTR,u1).rgb;float dl=dot(tc,vec3(0.3,0.59,0.11))/max(dot(uTexMed[4],vec3(0.3,0.59,0.11)),1e-4);
@@ -280,7 +282,7 @@ if(uDetail>1.5&&k>0.01&&!tab){float mx2=max(al.r,max(al.g,al.b)),sat2=mx2-min(al
   /* casca das árvores: sulcos verticais */
   if(!verde&&al.r>al.g&&al.g>=al.b&&abs(nf.y)<0.6){float bk=texture(uNoise,vec2(q.x*7.0,q.y*0.55)).r,bk2=texture(uNoise,vec2(q.x*2.1,q.y*0.2)+3.0).r;al*=mix(1.0,(0.62+0.55*bk)*(0.85+0.3*bk2),k);}
 #endif
-  spc=cinza&&abs(nf.y)<0.9?0.24:sat2>0.28?0.1:verde?0.06:0.04;shn=cinza?42.0:verde?14.0:22.0;}
+  spc=cinza&&abs(nf.y)<0.9?0.24*smoothstep(0.008,0.04,lm2):sat2>0.28?0.1:verde?0.06:0.04;shn=cinza?42.0:verde?14.0:22.0;}   /* quase preto (boca da caverna, fundo da mina): sem brilho, senão vira purpurina */
 #endif
 }
 /* na textura: metal cinza brilha, madeira e ferrugem quase nada */

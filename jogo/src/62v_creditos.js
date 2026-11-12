@@ -10,7 +10,8 @@ const CREDITOS=[
     {obra:'Destroyed Car 03 / Backrooms Car (Gameready ver)',autor:'Renafox',link:'sketchfab.com/3d-models/destroyed-car-03-backrooms-car-gameready-ver-efc4dfe2c7284a64bc9281eb4f61d402',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'escala ajustada e convertido para o jogo'},
     {obra:'Destroyed Building 02',autor:'Prince Obrymec',link:'sketchfab.com/3d-models/destroyed-building-02-13875c4f2a3d46e4a110aded70e7d466',lic:'Sketchfab Standard',mod:'cores aplicadas no jogo'},
     {obra:'Decayed concrete train shed with graffiti',autor:'',link:'fab.com',lic:'Fab Standard'},
-    {obra:'Old Concrete Bunker PBR Scan',autor:'',link:'fab.com',lic:'Fab Standard'}]},
+    {obra:'Old Concrete Bunker PBR Scan',autor:'',link:'fab.com',lic:'Fab Standard'},
+    {obra:'Corroded subway tunnel',autor:'',link:'fab.com',lic:'Fab Standard',mod:'escala ajustada e convertido para o jogo'}]},
   {tit:'Texturas e modelos',itens:[
     {obra:'Grama, chão da mata, folhas, rocha, tábuas, capim, ferramentas, baú, galhos e pinheiro',autor:'Poly Haven',link:'polyhaven.com',lic:'CC0'}]},
   {tit:'Sons gravados',itens:[

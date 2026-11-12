@@ -23,7 +23,7 @@ function texMesh(f,uv,tex){const m=litMesh(f);gl.bindVertexArray(m.vao);const b=
   gl.enableVertexAttribArray(6);gl.vertexAttribPointer(6,2,gl.FLOAT,false,8,0);gl.bindVertexArray(null);m.uvBuf=b;m.tex=tex;return m;}
 function mod3dTextura(id,url){if(MOD3D_TEX[id])return MOD3D_TEX[id];
   const t=skTextura(url,true,()=>{t.pronta=true;const an=gl.getExtension('EXT_texture_filter_anisotropic');if(an){gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameterf(gl.TEXTURE_2D,an.TEXTURE_MAX_ANISOTROPY_EXT,4);}});
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);   /* enquanto a imagem não chega, o pixel provisório já serve (textura completa) */
+  /* o filtro do pixel provisório agora é posto dentro de skTextura (lá a textura fica ligada só na unidade 8) */
   return MOD3D_TEX[id]=t;}
 function mod3dAplicar(){if(typeof MOD3D==='undefined'||!MESH.arma)return;
   {const b=gl.createTexture();gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,b);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));gl.activeTexture(gl.TEXTURE0);}

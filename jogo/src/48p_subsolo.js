@@ -20,7 +20,7 @@ const subD=()=>G.sub||(G.sub=subNovo());
 function subNovo(){const c=()=>String(1000+Math.floor(Math.random()*9000));return{abertas:{},docs:{},energia:{},visitou:{},caixas:{},veios:{},codigo:{lab:c(),arsenal:c()},populou:{},salaVista:{}};}
 /* ---------- salas, ligações e portas ---------- */
 function subComplexo(id,nome,tipo,cores){const c={id,nome,tipo,salas:[],cor:Object.assign({piso:0x55524c,par:0x6a6862,teto:0x3c3b38},cores||{}),seed:id.length*131+id.charCodeAt(0)*7};SUB.complexos.push(c);return c;}
-function subSala(c,nome,x0,x1,z0,z1,o){o=o||{};const h=o.h||SUB_H,s={id:'sub'+SUB.salas.length,c,nome,x0,x1,z0,z1,y:Y_SUB,h,teto:Y_SUB+h,escura:o.escura??0.94,metro:true,sub:true,tipo:'subsolo',
+function subSala(c,nome,x0,x1,z0,z1,o){o=o||{};const h=o.h||SUB_H,s={id:'sub'+SUB.salas.length,c,nome,x0,x1,z0,z1,y:Y_SUB,h,teto:Y_SUB+h,escura:o.escura??0.94,metro:true,sub:true,tipo:'subsolo',modelo:!!o.modelo,
     rocha:!!o.rocha,esporos:o.esporos||0,esporos0:o.esporos||0,ab:{n:[],s:[],o:[],l:[]},x:(x0+x1)/2,z:(z0+z1)/2};SUB.salas.push(s);c.salas.push(s);return s;}
 /* abre uma passagem entre duas salas encostadas (no meio da parte em comum, ou na posição pedida) */
 function subLiga(A,B,w,pos){w=w||1.4;
@@ -55,6 +55,9 @@ function subMontar(){if(SUB.complexos.length)return;
   const E=subComplexo('estacao','Estação escondida','estacao',{piso:0x5a5752,par:0x6c6a64,teto:0x3e3d3a});
   const ePlat=subSala(E,'Plataforma escondida',-100,-80,-82,-74,{h:4}),eLinha=subSala(E,'Linha do trem escondida',-100,-80,-86,-82,{h:4}),eSala=subSala(E,'Sala de controle da estação',-80,-74,-80,-74);
   subLiga(ePlat,t1a,1.6,-92.5);subLiga(ePlat,eLinha,6);subPorta(ePlat,eSala,1.2,{tipo:'codigo',cod:'arsenal'},-77);
+  // v10.1: a linha segue para um túnel de metrô abandonado (modelo escaneado, 62u_lugares: tunelMetro). A sala dá o nome, o escuro,
+  // as paredes de colisão e a parede das pontas; o resto (piso, teto, laterais) quem desenha é o modelo
+  const eTun=subSala(E,'Túnel do metrô abandonado',-80,-66,-89.5,-80,{h:6.5,modelo:true});subLiga(eLinha,eTun,4);
   // ===== mina velha (liga na estação e na caverna) =====
   const M=subComplexo('mina','Mina velha da Serra','mina',{piso:0x4a3f34,par:0x5a4c3e,teto:0x3a3027});
   const mGal=subSala(M,'Galeria da mina',-108,-100,-86,-80,{rocha:true,h:3}),mFrente=subSala(M,'Frente de lavra',-112,-104,-96,-86,{rocha:true,h:3}),mEsc=subSala(M,'Escritório da mina',-104,-100,-92,-86);
@@ -277,8 +280,9 @@ let SUB_MALHAS=null;
 function subGeo(c){const g=new GB(32768,8),R=rng(c.seed),C=c.cor;
   const box=(x0,x1,y0,y1,z0,z1,col,s,j)=>add(g,boxTris(x1-x0,y1-y0,z1-z0),mat((x0+x1)/2,(y0+y1)/2,(z0+z1)/2),lin(col),{b:s.escura,j:j??0.06,rnd:R});
   for(const s of c.salas){const y=s.y,t=s.teto,pc=s.rocha?0x5a524a:C.par;
-    box(s.x0,s.x1,y-0.3,y,s.z0,s.z1,s.rocha?0x4a4440:C.piso,s,s.rocha?0.14:0.05);box(s.x0,s.x1,t,t+0.3,s.z0,s.z1,s.rocha?0x3a3530:C.teto,s,s.rocha?0.14:0.05);
-    for(const p of s.paredes){box(p.x0,p.x1,y,t,p.z0,p.z1,pc,s,s.rocha?0.18:0.05);
+    if(!s.modelo){box(s.x0,s.x1,y-0.3,y,s.z0,s.z1,s.rocha?0x4a4440:C.piso,s,s.rocha?0.14:0.05);box(s.x0,s.x1,t,t+0.3,s.z0,s.z1,s.rocha?0x3a3530:C.teto,s,s.rocha?0.14:0.05);}
+    for(const p of s.paredes){if(s.modelo&&(p.lado==='n'||p.lado==='s'))continue;   // sala com modelo: só as paredes das pontas
+      box(p.x0,p.x1,y,t,p.z0,p.z1,pc,s,s.rocha?0.18:0.05);
       if(s.rocha){const n=Math.max(1,Math.floor((p.b1-p.b0)/1.5));for(let k=0;k<n;k++){const u=p.b0+(k+0.5)*(p.b1-p.b0)/n,L=p.lado==='n'||p.lado==='s',px=L?u:(p.lado==='o'?s.x0+0.3:s.x1-0.3),pz=L?(p.lado==='n'?s.z0+0.3:s.z1-0.3):u;
           add(g,icoSubTris(0.5+R()*0.4,0.45,R,1),mat(px,y+0.3+R()*(t-y-0.6),pz),lin(R()<0.5?0x5f5750:0x4f4842),{b:s.escura,j:0.12,rnd:R});}}
       else if(c.tipo!=='tunel'&&p.b1-p.b0>2){const L=p.lado==='n'||p.lado==='s',px=L?(p.x0+p.x1)/2:(p.lado==='o'?s.x0+0.31:s.x1-0.31),pz=L?(p.lado==='n'?s.z0+0.31:s.z1-0.31):(p.z0+p.z1)/2;   // faixa no meio da parede

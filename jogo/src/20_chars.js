@@ -223,9 +223,10 @@ function poseLoco(o,ph,amp,t,run){o.fill(0);const rk=typeof run==='number'?clamp
   S3(o,9,s*0.62*amp+pe*0.4,0,-0.03);S3(o,10,(0.08+Math.max(0,Math.sin(ph+1.3+Math.PI))*0.95)*amp+0.04+Math.max(0,-pe)*1.2,0,0);}
 /* golpe corpo a corpo: s de 0 a 1; vertical para machado/picareta, horizontal para o resto */
 function poseMelee(o,s,vertical){let ux,uz,fo,pr,ch,cy;
-  if(vertical){if(s<0.4){const k=easeIO(s/0.4);ux=lerp(-0.4,-2.9,k);fo=lerp(-0.7,-0.5,k);ch=lerp(0.05,-0.15,k);pr=0;}
-    else{const k=easeOut(Math.min(1,(s-0.4)/0.22));ux=lerp(-2.9,-0.7,k);fo=lerp(-0.5,-0.2,k);ch=lerp(-0.15,0.4,k);pr=lerp(0,1.2,k);}
-    S3(o,1,ch,0,0);S3(o,2,-ch*0.4,0,0);S3(o,3,ux,0,-0.18);S3(o,4,fo,0,0);S3(o,5,ux,0,0.12);S3(o,6,fo,0,0);S3(o,11,pr,0,0);return;}
+  /* golpe de cima (machado): v10.1 o tronco também gira (o ombro direito vai para trás no preparo e vem na descida), para o golpe ter peso */
+  if(vertical){let tw;if(s<0.4){const k=easeIO(s/0.4);ux=lerp(-0.4,-2.9,k);fo=lerp(-0.7,-0.5,k);ch=lerp(0.05,-0.15,k);pr=0;tw=lerp(0,0.32,k);}
+    else{const k=easeOut(Math.min(1,(s-0.4)/0.22)),v=1-smooth(0.7,1,s);ux=lerp(-2.9,-0.7,k);fo=lerp(-0.5,-0.2,k);ch=lerp(-0.15,0.4,k);pr=lerp(0,1.2,k);tw=lerp(0.32,-0.22,k)*v;}
+    S3(o,1,ch,tw,0);S3(o,2,-ch*0.4,-tw*0.5,0);S3(o,3,ux,0,-0.18);S3(o,4,fo,0,0);S3(o,5,ux,0,0.12);S3(o,6,fo,0,0);S3(o,11,pr,0,0);return;}
   if(s<0.38){const k=easeIO(s/0.38);cy=lerp(0,-0.7,k);ux=lerp(-0.35,-1.3,k);uz=lerp(-0.12,-0.75,k);fo=lerp(-0.9,-0.55,k);pr=lerp(0,0.5,k);}
   else{const k=easeOut(Math.min(1,(s-0.38)/0.2));cy=lerp(-0.7,0.65,k);ux=lerp(-1.3,-1.45,k);uz=lerp(-0.75,0.35,k);fo=lerp(-0.55,-0.15,k);pr=lerp(0.5,0.9,k);}
   S3(o,1,0.08,cy,0);S3(o,2,0,-cy*0.5,0);S3(o,3,-0.4,0,0.2);S3(o,4,-0.8,0,0);S3(o,5,ux,0,uz);S3(o,6,fo,0,0);S3(o,11,pr,0,0);}

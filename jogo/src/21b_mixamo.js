@@ -130,11 +130,18 @@ function skSubconjuntos(t,vb,idx){const nv=vb.length/28,dv=new DataView(vb.buffe
     maos:tris(i=>em(i,[K.LeftHand,K.RightHand])||em(i,[K.LeftForeArm,K.RightForeArm])&&dHand(i)<0.06),
     pernasCurtas:tris(i=>(em(i,[K.LeftUpLeg,K.RightUpLeg])&&Y[i]>joelho+0.1)||(dom[i]===K.Hips&&Y[i]<=hip+0.06)),
     cinto:tris(i=>em(i,[K.Hips,K.Spine,K.LeftUpLeg,K.RightUpLeg])&&Y[i]>hip+0.0&&Y[i]<hip+0.085)};}
-function skTextura(url,srgb,cb){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([150,140,130,255]));
-  const im=new Image();im.onload=()=>{if(!gl)return;gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+/* textura nova é montada na unidade 8 (nenhum sampler lê essa) e a unidade ativa de antes volta no fim. Antes ela entrava na
+   unidade ativa, que no meio do desenho é a 0, a da sombra: os lugares montam quando alguém chega perto (no meio do desenho),
+   a sombra saía da unidade 0 e o desenho seguinte dava "Mismatch between texture format and sampler type". O retorno de
+   chamada (cb) também roda com a unidade 8 ativa e a textura ligada nela. */
+function skNaUnidade(f){const a=gl.getParameter(gl.ACTIVE_TEXTURE);gl.activeTexture(gl.TEXTURE8);try{f();}finally{gl.activeTexture(a);}}
+function skTextura(url,srgb,cb){const t=gl.createTexture();
+  skNaUnidade(()=>{gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([150,140,130,255]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);});   /* enquanto a imagem não chega, o pixel provisório já serve (textura completa) */
+  const im=new Image();im.onload=()=>{if(!gl)return;skNaUnidade(()=>{gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
     gl.texImage2D(gl.TEXTURE_2D,0,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,im);gl.generateMipmap(gl.TEXTURE_2D);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);if(cb)cb();};
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);if(cb)cb();});};
   im.src=url;return t;}
 function skMalha(t){const d=SKD[t.nome],vb=b64bytes(d.vb),ib=b64bytes(d.ib);
   const vao=gl.createVertexArray();gl.bindVertexArray(vao);const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,vb,gl.STATIC_DRAW);

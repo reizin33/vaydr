@@ -34,20 +34,23 @@ for(const[t,e]of[['oficina',['pneu',1,1,0.3]],['oficina',['oleoMotor',1,2,0.4]],
   ['celeiro',['oleoMotor',1,1,0.2]],['celeiro',['kitFerramentas',1,1,0.08]],['militar',['bateriaVeic',1,1,0.12]],['militar',['pecasRotor',1,1,0.04]],['suprimentos',['oleoMotor',1,1,0.2]]])lootMais('LOOT',t,e);   // depois: a caixa militar só existe quando a história carrega
 for(const[t,e]of[['pecas',['pneu',.25,1,1]],['pecas',['oleoMotor',.35,1,2]],['pecas',['bateriaVeic',.15,1,1]],['pecas',['kitFerramentas',.12,1,1]],['carro',['oleoMotor',.12,1,1]],['fosso',['kitFerramentas',.15,1,1]],['fosso',['oleoMotor',.3,1,2]]])lootMais('CID',t,e);
 /* tipos: velocidade, aceleração, gasto, rodas [x,y,z,frente,escala], carga, barulho, caixa de colisão, lugares de câmera */
+/* v10.1: veículos mais lentos e com arrancada mais pesada (pedido do Himalaia: estavam rápidos demais). Antes:
+   caminhonete 17/8,5 · carro 19/9,5 · moto 22/11 · triciclo 15/9 · barco 12/4,5 · helicóptero 30/6 (velocidade máx. m/s / aceleração m/s²).
+   A aceleração também cai perto da velocidade máxima (acelTaper), em vez de ir reta até o limite. */
 const VTIPOS={
-  caminhonete:{nome:'Caminhonete',art:'a',maxV:17,ace:8.5,cons:1,galao:50,cap:12,ruido:24,hw:1.0,hd:2.45,bateria:true,terra:true,cacamba:true,fora:0.9,
+  caminhonete:{nome:'Caminhonete',art:'a',maxV:13,ace:3.0,cons:1,galao:50,cap:12,ruido:24,hw:1.0,hd:2.45,bateria:true,terra:true,cacamba:true,fora:0.9,
     rodas:[[0.86,0.42,1.55,1,1],[-0.86,0.42,1.55,1,1],[0.86,0.42,-1.55,0,1],[-0.86,0.42,-1.55,0,1]],assento:[0.42,1.48,0.12],farol:[[0.68,0.98,2.47],[-0.68,0.98,2.47]],lanterna:[[0.8,1.08,-2.5],[-0.8,1.08,-2.5]],camD:7.4,camH:1.9,larg:1.72,comp:3.1},
-  sedan:{nome:'Carro',art:'o',maxV:19,ace:9.5,cons:0.8,galao:60,cap:8,ruido:20,hw:0.95,hd:2.15,bateria:true,terra:true,fora:0.7,
+  sedan:{nome:'Carro',art:'o',maxV:14.5,ace:3.4,cons:0.8,galao:60,cap:8,ruido:20,hw:0.95,hd:2.15,bateria:true,terra:true,fora:0.7,
     rodas:[[0.8,0.37,1.3,1,0.88],[-0.8,0.37,1.3,1,0.88],[0.8,0.37,-1.35,0,0.88],[-0.8,0.37,-1.35,0,0.88]],assento:[0.38,1.18,-0.15],farol:[[0.6,0.72,2.12],[-0.6,0.72,2.12]],lanterna:[[0.62,0.78,-2.12],[-0.62,0.78,-2.12]],camD:6.6,camH:1.6,larg:1.6,comp:2.65},
-  moto:{nome:'Moto',art:'a',maxV:22,ace:11,cons:0.45,galao:100,cap:2,ruido:26,hw:0.35,hd:1.05,bateria:true,terra:true,fora:0.85,exposto:true,moto:true,
+  moto:{nome:'Moto',art:'a',maxV:16,ace:4.2,cons:0.45,galao:100,cap:2,ruido:26,hw:0.35,hd:1.05,bateria:true,terra:true,fora:0.85,exposto:true,moto:true,
     rodas:[[0,0.33,0.74,1,0.78],[0,0.33,-0.72,0,0.78]],assento:[0,1.45,-0.15],farol:[[0,0.98,0.95]],lanterna:[[0,0.75,-1.0]],camD:5.2,camH:1.55,larg:0.3,comp:1.46},
-  triciclo:{nome:'Triciclo',art:'o',maxV:15,ace:9,cons:0.6,galao:80,cap:4,ruido:22,hw:0.75,hd:1.3,bateria:false,terra:true,fora:1.0,exposto:true,
+  triciclo:{nome:'Triciclo',art:'o',maxV:11,ace:3.2,cons:0.6,galao:80,cap:4,ruido:22,hw:0.75,hd:1.3,bateria:false,terra:true,fora:1.0,exposto:true,
     rodas:[[0,0.36,0.98,1,0.86],[0.66,0.38,-0.62,0,0.9],[-0.66,0.38,-0.62,0,0.9]],assento:[0,1.38,-0.2],farol:[[0,0.92,1.15]],lanterna:[[0.5,0.8,-1.0],[-0.5,0.8,-1.0]],camD:5.6,camH:1.6,larg:1.32,comp:1.6},
-  barco:{nome:'Barco a motor',art:'o',maxV:12,ace:4.5,cons:0.9,galao:50,cap:6,ruido:22,hw:0.95,hd:2.3,bateria:false,agua:true,exposto:true,
+  barco:{nome:'Barco a motor',art:'o',maxV:9,ace:2.4,cons:0.9,galao:50,cap:6,ruido:22,hw:0.95,hd:2.3,bateria:false,agua:true,exposto:true,
     assento:[0,1.15,-1.4],farol:[[0,1.0,2.1]],lanterna:[],camD:7,camH:1.8},
   jangada:{nome:'Jangada',art:'a',maxV:2.6,ace:1.6,cons:0,galao:0,cap:3,ruido:4,hw:1.2,hd:1.6,bateria:false,agua:true,exposto:true,remo:true,semMotor:true,
     assento:[0,1.25,-0.3],farol:[],lanterna:[],camD:6,camH:1.7},
-  heli:{nome:'Helicóptero',art:'o',maxV:30,ace:6,cons:3.2,galao:25,cap:4,ruido:75,hw:1.4,hd:3.8,bateria:true,voa:true,rotor:true,
+  heli:{nome:'Helicóptero',art:'o',maxV:22,ace:3.5,cons:3.2,galao:25,cap:4,ruido:75,hw:1.4,hd:3.8,bateria:true,voa:true,rotor:true,
     assento:[0.4,1.75,1.15],farol:[[0,0.9,2.6]],lanterna:[],camD:11,camH:3.2}};
 const VT=v=>VTIPOS[(v||CARRO).tipo]||VTIPOS.caminhonete;
 const VEICS=[];
@@ -124,12 +127,14 @@ const VMESH={caminhonete:'carro',sedan:'v_sedan',moto:'v_moto',triciclo:'v_tri',
 function updateCarro(dt){for(const v of VEICS){if(v===CARRO&&v.ativo)updateVeic(v,dt);else if(Math.abs(v.v)>0.02||VT(v).voa&&v.alt>0.05||VT(v).agua)updateVeic(v,dt);}}
 function veicPode(v){const T=VT(v),p=v.pecas;if(v.hp<=0)return T.nome+' destruíd'+T.art;if(!T.semMotor&&p.motor<=0)return'O motor está quebrado';if(T.bateria&&!p.bateria)return'Sem bateria: não pega';
   if(T.rotor&&p.rotor<2)return'Faltam peças de rotor ('+p.rotor+' de 2)';if(!T.semMotor&&v.comb<=0)return'Sem combustível';return null;}
+/* força da arrancada conforme a velocidade: cheia parado, vai caindo até 12% perto do máximo (o carro "pesa" no fim) */
+function acelTaper(v,maxV){return v<=0?1:Math.max(0.12,1-Math.pow(clamp(v/maxV,0,1),2));}
 function updateVeic(v,dt){const T=VT(v);if(T.voa)return updateHeli(v,dt);if(T.agua)return updateBarco(v,dt);const c=v,p=v.pecas;
   let acc=0,str=0;if(c.ativo){acc=IN.mz;str=IN.mx;}
   const vivo=c.hp>0&&p.motor>0,temComb=c.comb>0;if(!vivo||!temComb)acc=Math.min(acc,0)*(vivo?1:0);
   const fur=p.pneus.filter(q=>q<=0).length,mot=p.motor/100,ri=roadInfo(c.x,c.z),naEstrada=ri.road&&ri.d<ri.road.w/2+1||dentroCidade(c.x,c.z,-2);
   const maxV=T.maxV*(1-0.22*fur)*(p.motor<35?0.75:1)*(naEstrada?1:T.fora),ace=T.ace*(0.55+0.45*mot);
-  if(acc>0.05)c.v+=ace*acc*dt*(c.v<0?2:1);else if(acc<-0.05)c.v+=(c.v>0.5?-15:-5.5)*(-acc)*dt;else c.v*=Math.exp(-dt*0.55);
+  if(acc>0.05)c.v+=ace*acc*dt*(c.v<0?2:acelTaper(c.v,maxV));else if(acc<-0.05)c.v+=(c.v>0.5?-15:-5.5)*(-acc)*dt;else c.v*=Math.exp(-dt*0.55);
   if(IN.freio&&c.ativo)c.v*=Math.exp(-dt*3.5);
   if(!temComb&&c.ativo)c.v*=Math.exp(-dt*0.8);
   c.v=clamp(c.v,-6,maxV);if(c.v>maxV)c.v=maxV;if(Math.abs(c.v)<0.03&&Math.abs(acc)<0.05)c.v=0;
@@ -177,7 +182,7 @@ function veicSeguir(c,dt,fx,fz){if(!c.ativo)return;const T=VT(c);P.x=c.x;P.z=c.z
 /* barco e jangada: só na água; encalha na margem; a correnteza do rio leva */
 function updateBarco(v,dt){const T=VT(v),c=v,p=v.pecas;let acc=0,str=0;if(c.ativo){acc=IN.mz;str=IN.mx;}
   const motorOk=T.semMotor||(c.hp>0&&p.motor>0&&c.comb>0);if(!motorOk)acc=Math.min(0,acc)*0.3;
-  const maxV=T.maxV*(T.semMotor?1:(0.6+0.4*p.motor/100));if(acc>0.05)c.v+=T.ace*acc*dt;else if(acc<-0.05)c.v-=T.ace*0.8*(-acc)*dt;else c.v*=Math.exp(-dt*(T.semMotor?0.9:0.45));
+  const maxV=T.maxV*(T.semMotor?1:(0.6+0.4*p.motor/100));if(acc>0.05)c.v+=T.ace*acc*dt*acelTaper(c.v,maxV);else if(acc<-0.05)c.v-=T.ace*0.8*(-acc)*dt;else c.v*=Math.exp(-dt*(T.semMotor?0.9:0.45));
   c.v=clamp(c.v,-maxV*0.4,maxV);c.steer=approach(c.steer,str,dt*2.5);c.yaw-=c.steer*clamp(Math.abs(c.v)/2+0.25,0,1)*(T.semMotor?0.8:1.1)*dt*(c.v>=0?1:-1);
   const fx=Math.sin(c.yaw),fz=Math.cos(c.yaw),ox=c.x,oz=c.z;c.x+=fx*c.v*dt;c.z+=fz*c.v*dt;
   if(RIO.ok&&lagoR(c.x,c.z)>1){const q=rioPerto(c.x,c.z);if(q.d<RIO.larg(q.s)){const k=lerp(0.6,0.3,q.s);c.x+=q.dx*k*dt;c.z+=q.dz*k*dt;}}

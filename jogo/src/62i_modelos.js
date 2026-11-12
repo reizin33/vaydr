@@ -16,7 +16,7 @@ let MODX_INFO={};
 function texModelo(id,url,rep){if(MOD3D_TEX[id])return MOD3D_TEX[id];
   const t=skTextura(url,true,()=>{gl.bindTexture(gl.TEXTURE_2D,t);const an=gl.getExtension('EXT_texture_filter_anisotropic');if(an)gl.texParameterf(gl.TEXTURE_2D,an.TEXTURE_MAX_ANISOTROPY_EXT,4);
     if(rep){gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);}t.pronta=true;});
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  /* o filtro do pixel provisório agora é posto dentro de skTextura (lá a textura fica ligada só na unidade 8) */
   return MOD3D_TEX[id]=t;}
 /* malha instanciada com textura (atributo 6 = UV), no mesmo arranjo das outras instanciadas */
 function instTex(d,max,tex,alfa,cor){const g=mod3dDecodificar(d);if(cor)cor(g.f);const m=instMesh(g.f,max);gl.bindVertexArray(m.vao);const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,g.uv,gl.STATIC_DRAW);

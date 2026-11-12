@@ -156,8 +156,16 @@ function drawStat(Pg,mesh,M){gl.uniformMatrix4fv(Pg.u.uModel,false,M);gl.bindVer
   gl.drawArrays(gl.TRIANGLES,0,mesh.count);}
 /* igual, mas escurecendo como interior (k de 0 a 1) quando a peça está dentro de prédio ou metrô */
 function drawStatI(Pg,mesh,M,k){if(k>0&&Pg.u.uIntO)gl.uniform1f(Pg.u.uIntO,k);drawStat(Pg,mesh,M);if(k>0&&Pg.u.uIntO)gl.uniform1f(Pg.u.uIntO,0);}
-function viewModel(o){const d=selDef(),id=selItem()?selItem().id:null;const a=P.acao;let sx=0,sy=0,kick=0,bob=Math.sin(P.ph*2)*0.012*P.amp,bobx=Math.cos(P.ph)*0.012*P.amp;
-  if(a&&a.tipo==='golpe'){const s=clamp(a.t/a.dur,0,1);const w=s<0.4?-easeIO(s/0.4)*0.9:lerp(-0.9,1.2,easeOut(Math.min(1,(s-0.4)/0.25)))*(1-smooth(0.7,1,s));if(a.vertical)sx=w;else sy=-w*1.2;}
+/* golpe de cima na primeira pessoa: quanto a mão anda (x direita, y cima, z para trás), gira de lado (rz) e a mais na lâmina (rx)
+   no alto do preparo (sobe) e no fim da descida (desce) */
+const GOLPE_FP={k:-0.85,kd:-0.3,sobe:[0.08,0.3,0.15,0.4,0],desce:[-0.2,-0.12,-0.22,-0.3,0]};
+function viewModel(o){const d=selDef(),id=selItem()?selItem().id:null;const a=P.acao;let sx=0,sy=0,kick=0,bob=Math.sin(P.ph*2)*0.012*P.amp,bobx=Math.cos(P.ph)*0.012*P.amp,gx=0,gy=0,gz=0,gr=0;
+  if(a&&a.tipo==='golpe'){const s=clamp(a.t/a.dur,0,1);const w=s<0.4?-easeIO(s/0.4)*0.9:lerp(-0.9,1.2,easeOut(Math.min(1,(s-0.4)/0.25)))*(1-smooth(0.7,1,s));if(a.vertical)sx=w*(a.soco?1:w<0?GOLPE_FP.k:GOLPE_FP.kd);else sy=-w*1.2;
+    /* v10.1, golpe de cima (machado, picareta): o giro estava ao contrário (a lâmina descia para fora da tela no preparo e subia no
+       golpe); agora sobe no preparo e desce no golpe (k negativo). E o braço inteiro trabalha: no preparo a mão sobe e vai para trás
+       do ombro; na descida cruza para o meio da tela, para baixo e para a frente, e volta. Antes só o punho girava */
+    if(a.vertical&&!a.soco){const sobe=s<0.4?easeIO(s/0.4):1-easeOut(Math.min(1,(s-0.4)/0.2)),desce=s<0.4?0:easeOut(Math.min(1,(s-0.4)/0.2))*(1-smooth(0.68,1,s)),A=GOLPE_FP.sobe,B=GOLPE_FP.desce;
+      gx=A[0]*sobe+B[0]*desce;gy=A[1]*sobe+B[1]*desce;gz=A[2]*sobe+B[2]*desce;gr=A[3]*sobe+B[3]*desce;sx+=A[4]*sobe+B[4]*desce;}}
   if(a&&a.tipo==='usar')kick=-0.5*Math.min(1,a.t/0.2,(a.dur-a.t)/0.2);
   if(a&&a.tipo==='recarga')kick=-0.6*Math.sin(Math.min(1,a.t/a.dur)*Math.PI);
   if(a&&a.tipo==='empurrar')kick=0.4*Math.min(1,a.t/0.12,(a.dur-a.t)/0.2);
@@ -167,7 +175,7 @@ function viewModel(o){const d=selDef(),id=selItem()?selItem().id:null;const a=P.
   // soco de mãos vazias: o punho sobe e avança para dentro da tela (dá para ver a pele e a manga escolhidas)
   if(!fogo&&a&&a.tipo==='golpe'&&a.soco&&!a.pedra){const k=Math.sin(clamp(a.t/a.dur,0,1)*Math.PI);px-=0.13*k;py+=0.27*k;pz-=0.16*k;}
   if(fogo)trs(o,px,py,pz,-Math.PI/2+P.recuo*0.12+kick,Math.PI,0,1,1,1);
-  else trs(o,px,py,pz,-2.45+sx+kick,0.25+sy,Math.PI,0.85,0.85,0.85);
+  else trs(o,px+gx,py+gy,pz+gz,-2.45+sx+kick,0.25+sy,Math.PI+gr,0.85,0.85,0.85);
   return id;}
 /* pássaros de dia: dois bandos circulando alto */
 const BIRD_N=10,birdArr=new Float32Array(16*6*7);
@@ -230,10 +238,13 @@ function render(){
   gl.uniform1f(su.uMoonV,E.moonV);gl.uniform1f(su.uSunV,E.sunV);gl.uniform1f(su.uStars,E.stars);gl.uniform1f(su.uTime,G.t);gl.uniform1f(su.uExp,E.exp);
   gl.uniform3fv(su.uMoonC,E.moonC);if(su.uLua)gl.uniform3fv(su.uLua,E.lua||[-1,1,1]);gl.uniform1f(su.uCloud,E.cloud);gl.uniform3fv(su.uCloudLit,E.cloudL);gl.uniform3fv(su.uCloudSh,E.cloudS);gl.uniform2fv(su.uCloudOff,E.cloudOff);
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,NOISE_TEX);gl.uniform1i(su.uNoise,1);gl.activeTexture(gl.TEXTURE0);
-  gl.bindVertexArray(EMPTY);gl.drawArrays(gl.TRIANGLES,0,3);
+  /* v10.1: com a câmera no subsolo o céu e as montanhas não são desenhados (fica o fundo preto). As salas de lá são fechadas,
+     mas o túnel do metrô escaneado deixa frestas (furos na parede, pé da parede do fim) e por elas aparecia o céu claro */
+  const ceuOn=!(cam.pos[1]<SUB_FUNDO);
+  gl.bindVertexArray(EMPTY);if(ceuOn)gl.drawArrays(gl.TRIANGLES,0,3);
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
   gl.useProgram(PU.p);gl.uniformMatrix4fv(PU.u.uViewProj,false,VP);gl.uniformMatrix4fv(PU.u.uModel,false,ID);const sl=post?E.silL:E.sil;gl.uniform4f(PU.u.uTint,sl[0],sl[1],sl[2],1);
-  gl.uniform3fv(PU.u.uFog,post?E.fogL:E.hor);gl.uniform1f(PU.u.uSil,1);gl.bindVertexArray(MESH.sil.vao);gl.drawArrays(gl.TRIANGLES,0,MESH.sil.count);
+  gl.uniform3fv(PU.u.uFog,post?E.fogL:E.hor);gl.uniform1f(PU.u.uSil,1);gl.bindVertexArray(MESH.sil.vao);if(ceuOn)gl.drawArrays(gl.TRIANGLES,0,MESH.sil.count);
   const towerFar=Math.hypot(cam.pos[0]-TOWER[0],cam.pos[2]-TOWER[1])>70;
   if(towerFar){gl.bindVertexArray(MESH.towerSil.vao);gl.drawArrays(gl.TRIANGLES,0,MESH.towerSil.count);}
   gl.uniform1f(PU.u.uSil,0);gl.uniform4f(PU.u.uTint,1,1,1,1);const nb=birdsGeom();

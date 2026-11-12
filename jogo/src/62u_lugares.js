@@ -26,6 +26,9 @@ const LUGARES=[
   {id:'carro3',m:'carroDestruido',nome:'Carro destruído',x:-22.2,z:-36.2,yaw:3.35,semChao:true,dist:150},
   {id:'carro4',m:'carroDestruido',nome:'Carro destruído',x:-40.5,z:63.5,yaw:-1.86,semChao:true,dist:150},
   {id:'carro5',m:'carroDestruido',nome:'Carro destruído',x:111.3,z:33.7,yaw:-1.27,semChao:true,dist:150},
+  // no subsolo (sub): o túnel do metrô continua a linha da estação escondida (48p: sala "Túnel do metrô abandonado"). Não mexe
+  // no terreno nem na mata de cima; só aparece com a câmera lá embaixo; colisão só vale lá embaixo; luz de interior (escuro)
+  {id:'tunelMetro',m:'tunelMetro',nome:'Túnel do metrô abandonado',x:-73,z:-84.75,yaw:Math.PI/2,sub:true,dist:70},
 ];
 const LUG={malhas:{},info:{},col:0};
 /* meia-largura e meia-profundidade do modelo (com folga f) e o giro */
@@ -36,11 +39,11 @@ function lugLocal(L,x,z){const c=Math.cos(L.yaw),s=Math.sin(L.yaw),dx=x-L.x,dz=z
 /* distância de um ponto até o retângulo girado do lugar (0 dentro) */
 function lugDist(L,x,z,f=0){const R=lugRet(L,f),q=lugLocal(L,x,z);
   return Math.hypot(Math.max(Math.abs(q[0])-R.hx,0),Math.max(Math.abs(q[1])-R.hz,0));}
-function lugEm(x,z,f=0){for(const L of LUGARES)if(LUGX[L.m]&&lugDist(L,x,z,f)<=0)return L;return null;}
+function lugEm(x,z,f=0){for(const L of LUGARES)if(!L.sub&&LUGX[L.m]&&lugDist(L,x,z,f)<=0)return L;return null;}
 /* 1) chão: a altura do lugar é a média do terreno embaixo; dentro (e na beirada plana) fica plano, e na volta (blend) volta ao
    natural. Com piso andável, o terreno fica um pouco abaixo (afunda) só embaixo do modelo */
 (function lugAplainar(){if(typeof LUGX==='undefined')return;
-  for(const L of LUGARES){if(!LUGX[L.m])continue;let s=0,n=0;const R=lugRet(L,0);
+  for(const L of LUGARES){if(!LUGX[L.m])continue;if(L.sub){L.y=Y_SUB;LUG.info[L.id]={x:L.x,z:L.z,y:L.y,sub:true};continue;}let s=0,n=0;const R=lugRet(L,0);
     for(let u=-0.5;u<=0.5;u+=0.1)for(let v=-0.5;v<=0.5;v+=0.1){const p=lugMundo(L,u*2*R.hx,v*2*R.hz);s+=ground(p[0],p[1]);n++;}
     L.y=s/n;if(L.semChao){LUG.info[L.id]={x:L.x,z:L.z,y:+L.y.toFixed(2)};continue;}   // carro: fica no chão como está
     const pl=L.plano||0,af=L.afunda||0;
@@ -50,13 +53,13 @@ function lugEm(x,z,f=0){for(const L of LUGARES)if(LUGX[L.m]&&lugDist(L,x,z,f)<=0
 /* 2) colisão e piso: caixas do modelo, giradas junto; superfície plana na altura do piso onde ele é andável */
 (function lugColisao(){if(typeof LUGX==='undefined')return;
   for(const L of LUGARES){const X=LUGX[L.m];if(!X)continue;
-    for(const b of X.col||[]){const p=lugMundo(L,b[0],b[1]);colBox(p[0],p[1],b[2],b[3],L.yaw,{lugar:L.id});LUG.col++;}
+    for(const b of X.col||[]){const p=lugMundo(L,b[0],b[1]);colBox(p[0],p[1],b[2],b[3],L.yaw,L.sub?{lugar:L.id,sub:true,y0:L.y-1,y1:L.y+7}:{lugar:L.id});LUG.col++;}
     if(L.piso){const t=X.tam;supAdd({t:'ret',x:L.x,z:L.z,hw:t[0]/2-0.3,hd:t[2]/2-0.3,yaw:L.yaw,y:L.y,lugar:L.id});}}})();
 /* 3) depois que a mata nasce: sai de vez o que ficou dentro de cada lugar (sem mudar a ordem de nada: os ids continuam os
    mesmos, e o jogo salvo continua valendo) */
 function lugLimpar(){if(typeof LUGX==='undefined')return;let n=0;
   /* árvore e pedra saem também da volta (limpa: o quintal da casa, a clareira da ruína); o resto, só de dentro */
-  const dentro=(x,z,f,arv)=>{for(const L of LUGARES)if(LUGX[L.m]&&lugDist(L,x,z,f+(arv?(L.limpa??0):0))<=0)return true;return false;};
+  const dentro=(x,z,f,arv)=>{for(const L of LUGARES)if(!L.sub&&LUGX[L.m]&&lugDist(L,x,z,f+(arv?(L.limpa??0):0))<=0)return true;return false;};
   for(const t of TREES)if(!t.agua&&dentro(t.x,t.z,1.5,true)){t.agua=true;t.alive=false;colRemove(COLL.find(c=>c.tree===t));n++;}
   for(const r of ROCKS)if(!r.agua&&dentro(r.x,r.z,1,true)){r.agua=true;r.alive=false;colRemove(COLL.find(c=>c.rock===r));n++;}
   for(const b of BUSHES)if(!b.agua&&dentro(b.x,b.z,0.8,true)){b.agua=true;b.frutas=false;n++;}
@@ -70,18 +73,23 @@ function lugLimpar(){if(typeof LUGX==='undefined')return;let n=0;
    chega perto (a textura de um escaneado grande pesa na memória de vídeo; quem nunca passa lá não paga). Parte com textura
    espera a textura carregar; parte sem textura (só cor) entra na hora, com o relevo de detalhe do jogo por cima */
 function lugMontar(id){if(LUG.malhas[id]!==undefined)return LUG.malhas[id];LUG.malhas[id]=null;
+  const sub=LUGARES.some(L=>L.m===id&&L.sub);   // no subsolo a luz é a de dentro (como as salas de lá: 0,94)
   try{LUG.malhas[id]=LUGX[id].partes.map((p,i)=>{const g=mod3dDecodificar(p);
+    if(p.e)for(let k=6;k<g.f.length;k+=11)g.f[k]=p.e;   // luminária acesa
+    if(sub)for(let k=7;k<g.f.length;k+=11)g.f[k]=0.94;
     if(p.t)return texMesh(g.f,g.uv,texModelo('lug_'+id+'_'+i,p.t,p.rep));
     const c=p.cor||[0.5,0.5,0.5];for(let k=3;k<g.f.length;k+=11){g.f[k]*=c[0];g.f[k+1]*=c[1];g.f[k+2]*=c[2];}return litMesh(g.f);});}
   catch(e){console.error('lugar '+id,e);}
   return LUG.malhas[id];}
 function lugM(L){return L.M||(L.M=mat(L.x,L.y,L.z,0,L.yaw,0));}
-function lugDesenhar(Pg,sombra,perto){if(typeof LUGX==='undefined')return;const ox=sombra?P.x:cam.pos[0],oz=sombra?P.z:cam.pos[2],py=sombra?P.y:cam.pos[1];if(py<SUB_FUNDO)return;
+function lugDesenhar(Pg,sombra,perto){if(typeof LUGX==='undefined')return;const ox=sombra?P.x:cam.pos[0],oz=sombra?P.z:cam.pos[2],py=sombra?P.y:cam.pos[1],emSub=py<SUB_FUNDO;
   const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);   // escaneado não tem "lado de trás" confiável: desenha os dois lados
-  for(const L of LUGARES){if(!LUGX[L.m])continue;const d=lugDist(L,ox,oz);
+  for(const L of LUGARES){if(!LUGX[L.m]||!!L.sub!==emSub)continue;const d=lugDist(L,ox,oz);
     if(!sombra&&d<L.dist+40)lugMontar(L.m);
     const ms=LUG.malhas[L.m];if(!ms)continue;const R=sombra?(perto?90:180):L.dist;if(d>R)continue;
-    const M=lugM(L);for(const m of ms)if(!m.tex||m.tex.pronta)drawStat(Pg,m,M);}
+    const M=lugM(L);for(const m of ms){if(m.tex&&!m.tex.pronta)continue;
+      if(sombra){gl.uniformMatrix4fv(Pg.u.uModel,false,M);gl.bindVertexArray(m.vao);gl.drawArrays(gl.TRIANGLES,0,m.count);}   // sombra: só a forma (o programa da sombra não lê a textura, então nem liga)
+      else drawStat(Pg,m,M);}}
   if(cf)gl.enable(gl.CULL_FACE);}
 DESENHO.opaco.push(Pg=>lugDesenhar(Pg,false));
 DESENHO.sombra.push((Pg,perto)=>lugDesenhar(Pg,true,perto));

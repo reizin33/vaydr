@@ -30,6 +30,11 @@ MODELOS = {
                      credito='Forest house ruin, de matousekfoto (CC BY 4.0)'),
     'carroDestruido': dict(zip=UP + 'destroyed_car_03__backrooms_car_gameready_ver.zip', tex=1024, alvo=15000, escala=1.35, chao='min',   # veio com 3,15 m
                      credito='Destroyed Car 03, de Renafox (CC BY 4.0)'),
+    # túnel do metrô (vai no subsolo, depois da linha da estação escondida): veio ~2,2x maior (21 m de largura); 0,45 deixa a bitola
+    # da linha e o túnel de duas vias com uns 9,5 m de largura e 7,4 m de altura. As luminárias (Material.004) acendem.
+    # Luminária, caixa dela (005), canos (006) e cabos (007) entram inteiros: simplificadas viravam cacos (manchas claras soltas na parede)
+    'tunelMetro': dict(zip=AT + '90b18db5-corrosed_subway_tunnel_gltf.zip', tex=2048, alvo=130000, escala=0.45, chao={'y': -0.01}, emissivo={'Material.004': 1.6},   # chão = topo do lastro (senão os trilhos viram parede)
+                     inteiro=['Material.004', 'Material.005', 'Material.006', 'Material.007'], credito='Corroded subway tunnel (Fab, licença Standard)'),
 }
 CT = {5126: ('<f4', 4), 5125: ('<u4', 4), 5123: ('<u2', 2), 5121: ('u1', 1), 5122: ('<i2', 2), 5120: ('i1', 1)}
 NC = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}
@@ -243,18 +248,21 @@ def converter(mid, cfg):
     Pall = np.concatenate([p['P'] for p in partes]) * cfg['escala']
     for p in partes: p['P'] = p['P'] * cfg['escala']
     tri = sum(len(p['I']) for p in partes)
-    if tri > cfg['alvo']:   # procura a célula que dá perto do alvo (busca binária)
+    # 'inteiro': materiais que não são simplificados (peça fina e comprida, como a luminária e os cabos do túnel, vira caco
+    # solto quando junta vértices; elas são leves e entram inteiras, e o resto é simplificado para caber no alvo)
+    dec = [p for p in partes if p['nome'] not in cfg.get('inteiro', [])]; fixos = tri - sum(len(p['I']) for p in dec)
+    if tri > cfg['alvo'] and dec:   # procura a célula que dá perto do alvo (busca binária)
         dim = (Pall.max(0) - Pall.min(0)).max(); a, b = dim / 4000, dim / 60
-        for p in partes: p['g'] = densidade_uv(p['P'], p['UV'], p['I']); p['carta'] = cartas(len(p['P']), p['I'])
+        for p in dec: p['g'] = densidade_uv(p['P'], p['UV'], p['I']); p['carta'] = cartas(len(p['P']), p['I'])
         for _ in range(14):
-            c = math.sqrt(a * b); ids, Pc = celulas(partes, c); t = sum(len(decimar(p['P'], p['UV'], p['I'], c, p['g'], p['carta'], q, Pc)[2]) for p, q in zip(partes, ids))
+            c = math.sqrt(a * b); ids, Pc = celulas(dec, c); t = fixos + sum(len(decimar(p['P'], p['UV'], p['I'], c, p['g'], p['carta'], q, Pc)[2]) for p, q in zip(dec, ids))
             if t > cfg['alvo']: a = c
             else: b = c
-        ids, Pc = celulas(partes, b)
-        for p, q in zip(partes, ids): p['P'], p['UV'], p['I'] = decimar(p['P'], p['UV'], p['I'], b, p['g'], p['carta'], q, Pc)
+        ids, Pc = celulas(dec, b)
+        for p, q in zip(dec, ids): p['P'], p['UV'], p['I'] = decimar(p['P'], p['UV'], p['I'], b, p['g'], p['carta'], q, Pc)
         Pall = np.concatenate([p['P'] for p in partes])
     lo, hi = Pall.min(0), Pall.max(0); cx, cz = (lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2
-    y0 = lo[1] if cfg['chao'] == 'min' else piso(partes, lo[1], hi[1]) if cfg['chao'] == 'piso' else np.percentile(Pall[:, 1], cfg['chao'])
+    y0 = lo[1] if cfg['chao'] == 'min' else piso(partes, lo[1], hi[1]) if cfg['chao'] == 'piso' else cfg['chao']['y'] * cfg['escala'] if isinstance(cfg['chao'], dict) else np.percentile(Pall[:, 1], cfg['chao'])
     out = {'tam': [round(float(hi[0] - lo[0]), 2), round(float(hi[1] - y0), 2), round(float(hi[2] - lo[2]), 2)], 'partes': [], 'credito': cfg['credito']}
     tri2 = 0; bytes_ = 0
     for p in partes:
@@ -264,6 +272,7 @@ def converter(mid, cfg):
         if p['img']:   # com textura
             q['t'], ts = textura(z, p, cfg['tex']); q['rep'] = bool(uv0.min() < -0.01 or (uv0 + uvS).max() > 1.01)
         else: q['cor'] = cor_parte(cfg, p)   # sem textura: cor no vértice (e o detalhe do jogo por cima)
+        if p['nome'] in cfg.get('emissivo', {}): q['e'] = cfg['emissivo'][p['nome']]   # brilho próprio (luminária acesa)
         out['partes'].append(q); tri2 += len(p['I']); bytes_ += len(b) + len(q.get('t', ''))
     out['col'] = colisao_lugar(out)
     print('%-18s %3d partes  %7d → %7d triângulos  tamanho %s m  %.1f MB  %d caixas de colisão' % (mid, len(partes), tri, tri2, out['tam'], bytes_ / 2**20, len(out['col'])), flush=True)
