@@ -157,8 +157,10 @@ function drawStat(Pg,mesh,M){gl.uniformMatrix4fv(Pg.u.uModel,false,M);gl.bindVer
 /* igual, mas escurecendo como interior (k de 0 a 1) quando a peça está dentro de prédio ou metrô */
 function drawStatI(Pg,mesh,M,k){if(k>0&&Pg.u.uIntO)gl.uniform1f(Pg.u.uIntO,k);drawStat(Pg,mesh,M);if(k>0&&Pg.u.uIntO)gl.uniform1f(Pg.u.uIntO,0);}
 /* golpe de cima na primeira pessoa: quanto a mão anda (x direita, y cima, z para trás), gira de lado (rz) e a mais na lâmina (rx)
-   no alto do preparo (sobe) e no fim da descida (desce) */
-const GOLPE_FP={k:-0.85,kd:-0.3,sobe:[0.08,0.3,0.15,0.4,0],desce:[-0.2,-0.12,-0.22,-0.3,0]};
+   no alto do preparo (sobe) e no fim da descida (desce). Ajuste de 12/11: a cabeça do machado acaba no meio da tela, um pouco
+   abaixo da mira (antes descia até a borda de baixo e quase sumia: só aparecia a ponta do cabo), e gira no cabo para a lâmina
+   aparecer de lado na batida (de costas ela fica fina como um prego) */
+const GOLPE_FP={k:-0.85,kd:0,sobe:[0.08,0.3,0.15,0.4,0],desce:[-0.22,0.08,-0.08,0.9,0.1]};
 function viewModel(o){const d=selDef(),id=selItem()?selItem().id:null;const a=P.acao;let sx=0,sy=0,kick=0,bob=Math.sin(P.ph*2)*0.012*P.amp,bobx=Math.cos(P.ph)*0.012*P.amp,gx=0,gy=0,gz=0,gr=0;
   if(a&&a.tipo==='golpe'){const s=clamp(a.t/a.dur,0,1);const w=s<0.4?-easeIO(s/0.4)*0.9:lerp(-0.9,1.2,easeOut(Math.min(1,(s-0.4)/0.25)))*(1-smooth(0.7,1,s));if(a.vertical)sx=w*(a.soco?1:w<0?GOLPE_FP.k:GOLPE_FP.kd);else sy=-w*1.2;
     /* v10.1, golpe de cima (machado, picareta): o giro estava ao contrário (a lâmina descia para fora da tela no preparo e subia no

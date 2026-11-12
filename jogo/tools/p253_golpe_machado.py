@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/'
 PAG = sys.argv[1] if len(sys.argv) > 1 else 'test.html'; SAI = sys.argv[2] if len(sys.argv) > 2 else 'shots/p253_golpe.png'
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
-FASES = [0.0, 0.25, 0.4, 0.52, 0.62, 0.8]
+FASES = [float(f) for f in os.environ['FASES'].split(',')] if os.environ.get('FASES') else [0.0, 0.25, 0.4, 0.52, 0.62, 0.8]   # FASES=0.52,0.62: só essas
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(args=ARGS); pg = await b.new_page(viewport={'width': 960, 'height': 540}); erros = []
