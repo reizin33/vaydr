@@ -22,8 +22,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DE: ${{ inputs.de }}
         run: |
-          gh release download "v${{ inputs.de }}" -R "${{ github.repository }}" -p "VAYDR-Setup-*.exe" -D velho
+          # a versão digitada só vale no formato número.número.número (ex.: 9.9.0) e nunca entra direto num comando
+          if ($env:DE -notmatch '^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,6}$') { throw "versão inválida: use número.número.número (ex.: 9.9.0)" }
+          gh release download "v$($env:DE)" -R "$env:REPO" -p "VAYDR-Setup-*.exe" -D velho
           $inst = Get-ChildItem velho\*.exe | Select-Object -First 1
           Write-Host "instalando $($inst.Name)"
           $p = Start-Process -FilePath $inst.FullName -ArgumentList "/S" -PassThru
@@ -68,13 +72,15 @@ jobs:
         env:
           VAYDR_TESTE_SAIDA: ${{ runner.temp }}\teste
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DE: ${{ inputs.de }}
         run: |
-          $nova = (gh release view -R "${{ github.repository }}" --json tagName --jq .tagName).TrimStart("v")
+          $nova = (gh release view -R "$env:REPO" --json tagName --jq .tagName).TrimStart("v")
           $p = Start-Process -FilePath $env:EXE -ArgumentList "--smoke=versao" -PassThru
           $null = $p.Handle
           $null = $p.WaitForExit(120000)
           $agora = (Get-Content "$env:VAYDR_TESTE_SAIDA\versao.txt").Trim()
-          Write-Host "antes: ${{ inputs.de }} · mais nova publicada: $nova · instalada agora: $agora"
+          Write-Host "antes: $($env:DE) · mais nova publicada: $nova · instalada agora: $agora"
           if ($agora -ne $nova) { throw "a versão instalada ($agora) não é a mais nova ($nova)" }
 
       - name: Continuar o jogo salvo na versão nova (o save passa de uma versão para a outra)
@@ -91,7 +97,7 @@ jobs:
 
       - name: Guardar o relatório
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: teste-atualizacao
           path: ${{ runner.temp }}\teste

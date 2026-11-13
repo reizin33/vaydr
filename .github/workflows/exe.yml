@@ -2,6 +2,14 @@
 # - Rodar à mão (aba Actions > "VAYDR para Windows" > Run workflow): sem versão só monta e testa; com versão (ex.: 9.9.0) também publica.
 # - Enviar uma etiqueta v9.9.0 também monta, testa e publica.
 # As instalações procuram atualização nas versões publicadas aqui (Releases).
+#
+# Segurança (13/11/2026, depois da revisão de fora):
+# - a versão digitada nunca entra direto num comando: passa por variável e só vale no formato número.número.número;
+# - a montagem e os testes só leem o repositório; só os dois passos do fim (mandar as fotos para o ramo testes-exe e
+#   publicar a versão) têm permissão de escrita, cada um no seu job;
+# - as ações do GitHub ficam presas a um commit (o comentário diz a versão), não a uma etiqueta que pode mudar;
+# - com desktop/package-lock.json no projeto, o Electron e o resto instalam sempre as mesmas versões (npm ci).
+# Só quem tem permissão de escrita no repositório consegue rodar este workflow.
 name: VAYDR para Windows
 
 on:
@@ -19,7 +27,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: exe-${{ github.ref }}
@@ -29,25 +37,38 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      versao: ${{ steps.v.outputs.versao }}
+      publicar: ${{ steps.v.outputs.publicar }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
 
       - name: Versão
         id: v
         shell: bash
+        env:
+          VERSAO_PEDIDA: ${{ inputs.versao }}
+          STEAM: ${{ inputs.steam }}
+          RODADA: ${{ github.run_number }}
         run: |
-          V="${{ inputs.versao }}"
+          V="$VERSAO_PEDIDA"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="${GITHUB_REF#refs/tags/v}"; fi
           PUB=sim
-          if [ -z "$V" ]; then V="0.0.${{ github.run_number }}"; PUB=nao; fi
-          if [ "${{ inputs.steam }}" = "true" ]; then PUB=nao; fi
+          if [ -z "$V" ]; then V="0.0.$RODADA"; PUB=nao; fi
+          # só vale número.número.número (ex.: 10.2.1); qualquer outra coisa para tudo aqui
+          if ! [[ "$V" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,6}$ ]]; then echo "::error::versão inválida: use número.número.número (ex.: 10.2.1)"; exit 1; fi
+          if [ "$STEAM" = "true" ]; then PUB=nao; fi
           echo "versao=$V" >> "$GITHUB_OUTPUT"
           echo "publicar=$PUB" >> "$GITHUB_OUTPUT"
-          echo "Versão $V · publicar: $PUB · steam: ${{ inputs.steam }}"
+          echo "Versão $V · publicar: $PUB · steam: $STEAM"
 
       - name: Juntar o jogo numa página
         working-directory: jogo
@@ -56,7 +77,10 @@ jobs:
 
       - name: Instalar o Electron
         working-directory: desktop
-        run: npm install --no-audit --no-fund
+        shell: bash
+        run: |
+          # com o arquivo de travamento: sempre as mesmas versões; sem ele (só até ele entrar no projeto), como antes
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
 
       - name: Pôr as fontes dentro da página
         working-directory: desktop
@@ -65,10 +89,13 @@ jobs:
       - name: Montar o instalador
         working-directory: desktop
         shell: bash
+        env:
+          VERSAO: ${{ steps.v.outputs.versao }}
+          STEAM: ${{ inputs.steam }}
         run: |
           EXTRA=""
-          if [ "${{ inputs.steam }}" = "true" ]; then EXTRA="-c.extraMetadata.vaydr.atualizacaoAutomatica=false"; fi
-          npx electron-builder --win --x64 --publish never -c.extraMetadata.version=${{ steps.v.outputs.versao }} $EXTRA
+          if [ "$STEAM" = "true" ]; then EXTRA="-c.extraMetadata.vaydr.atualizacaoAutomatica=false"; fi
+          npx electron-builder --win --x64 --publish never "-c.extraMetadata.version=$VERSAO" $EXTRA
           ls -la dist
 
       - name: "Teste 1: abrir, começar um jogo, salvar e fechar"
@@ -96,36 +123,25 @@ jobs:
           Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-2.json" -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { throw "teste 2 falhou (código $($p.ExitCode))" }
 
-      - name: Juntar o registro do jogo
+      - name: Juntar o registro do jogo, as fontes e o arquivo de travamento
         if: always()
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force teste | Out-Null
           Copy-Item "$env:APPDATA\VAYDR\vaydr.log" teste\ -ErrorAction SilentlyContinue
           Copy-Item "desktop\app\fontes.css" teste\ -ErrorAction SilentlyContinue
+          Copy-Item "desktop\package-lock.json" teste\ -ErrorAction SilentlyContinue
 
       - name: Guardar fotos e relatórios dos testes
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: testes-${{ steps.v.outputs.versao }}
           path: teste/
           if-no-files-found: warn
 
-      - name: Mandar fotos e relatórios para o ramo testes-exe (dá para conferir sem baixar artefato)
-        if: always()
-        shell: bash
-        run: |
-          cd teste || exit 0
-          git init -q -b testes-exe
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "testes do .exe: execução ${{ github.run_number }}, versão ${{ steps.v.outputs.versao }}"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" testes-exe
-
       - name: Guardar o instalador
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: instalador-${{ steps.v.outputs.versao }}${{ inputs.steam && '-steam' || '' }}
           path: |
@@ -133,14 +149,60 @@ jobs:
             desktop/dist/*.blockmap
             desktop/dist/latest.yml
 
-      - name: Publicar a versão (as instalações se atualizam a partir daqui)
-        if: steps.v.outputs.publicar == 'sim'
+  # as fotos e relatórios no ramo testes-exe (dá para conferir sem baixar artefato); roda mesmo se um teste falhou
+  fotos:
+    needs: windows
+    if: always() && needs.windows.outputs.versao != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: testes-${{ needs.windows.outputs.versao }}
+          path: teste
+      - name: Mandar fotos e relatórios para o ramo testes-exe
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RODADA: ${{ github.run_number }}
+          VERSAO: ${{ needs.windows.outputs.versao }}
         run: |
-          V="${{ steps.v.outputs.versao }}"
-          cd desktop/dist
-          gh release create "v$V" "VAYDR-Setup-$V.exe" "VAYDR-Setup-$V.exe.blockmap" latest.yml \
-            --target "$GITHUB_SHA" --title "VAYDR $V" \
+          cd teste || exit 0
+          git init -q -b testes-exe
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "testes do .exe: execução $RODADA, versão $VERSAO"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" testes-exe
+
+  # publicar a versão: só quando tem versão, os testes passaram e não é a montagem da Steam
+  publicar:
+    needs: windows
+    if: needs.windows.outputs.publicar == 'sim'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: instalador-${{ needs.windows.outputs.versao }}
+          path: dist
+      - name: Publicar a versão (as instalações se atualizam a partir daqui)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ALVO: ${{ github.sha }}
+          V: ${{ needs.windows.outputs.versao }}
+        run: |
+          [[ "$V" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,6}$ ]] || { echo "::error::versão inválida"; exit 1; }
+          cd dist
+          ls -la
+          gh release create "v$V" "VAYDR-Setup-$V.exe" "VAYDR-Setup-$V.exe.blockmap" latest.yml -R "$REPO" \
+            --target "$ALVO" --title "VAYDR $V" \
             --notes "Para jogar no Windows: baixe **VAYDR-Setup-$V.exe** e abra. Na primeira vez o Windows pode mostrar \"O Windows protegeu o computador\": clique em **Mais informações** e depois em **Executar assim mesmo**. Quem já tem o VAYDR instalado recebe esta versão sozinho."
