@@ -993,18 +993,22 @@ body.criativo .ad-selo{display:block}
 .cg-lema{margin:calc(25 * var(--k)) 0 0;font:700 max(10px,calc(14 * var(--k)))/1 var(--f-ui);letter-spacing:.34em;text-transform:uppercase;color:var(--ash)}
 .cg-prog{width:max(280px,calc(420 * var(--k)));margin-top:calc(64 * var(--k))}
 .cg-linha{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-.cg-linha .pular{font:800 max(10px,calc(11.5 * var(--k)))/1 var(--f-ui);letter-spacing:.2em;text-transform:uppercase;color:var(--bone)}
+.cg-linha .pular{font:800 max(10px,calc(12.5 * var(--k)))/1 var(--f-ui);letter-spacing:.23em;text-transform:uppercase;color:var(--bone);animation:cgPulso 2.4s ease-in-out infinite}
+@keyframes cgPulso{50%{opacity:.72}}
 .cg-linha .pular.pronto{animation:none;color:#81aa60}
 .cg-linha b{font:700 max(12px,calc(15 * var(--k)))/1 var(--f-display);color:var(--ember);font-variant-numeric:tabular-nums}
 .cg-barra{position:relative;height:3px;margin-top:calc(8 * var(--k));background:#2a2b2a;overflow:hidden}
-.cg-barra i{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(var(--p,0));background:linear-gradient(90deg,#e4712f,var(--ember));will-change:transform}
-.cg-etapas{display:flex;flex-wrap:wrap;gap:4px calc(16 * var(--k));margin:calc(10 * var(--k)) 0 0;padding:0;list-style:none;font:800 max(9px,calc(9.5 * var(--k)))/1 var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:#605f58}
+.cg-barra i{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(var(--p,0));background:linear-gradient(90deg,#e4712f,var(--ember));will-change:transform;
+  animation:cgInicio 3.5s cubic-bezier(.15,.6,.35,1) forwards}
+/* enquanto o navegador lê o código do jogo (antes da montagem começar) a barra já anda até 8%: essa parte é a leitura */
+@keyframes cgInicio{from{transform:scaleX(0)}to{transform:scaleX(.08)}}
+.cg-etapas{display:flex;flex-wrap:wrap;gap:4px calc(18 * var(--k));margin:calc(10 * var(--k)) 0 0;padding:0;list-style:none;font:800 max(9px,calc(10.5 * var(--k)))/1 var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:#605f58}
 .cg-etapas li.feita{color:#81aa60}
 .cg-etapas li.atual{color:var(--bone)}
 .cg-dica{width:max(300px,calc(458 * var(--k)));margin-top:calc(51 * var(--k));padding:calc(12 * var(--k)) calc(16 * var(--k));border-left:2px solid var(--ember);
   background:linear-gradient(90deg,rgba(255,138,61,.035),rgba(255,138,61,0));display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 calc(15 * var(--k));align-items:start}
 .cg-dica small{padding-top:.75em;font:800 max(8.5px,calc(9 * var(--k)))/1 var(--f-ui);letter-spacing:.32em;text-transform:uppercase;color:var(--ember)}
-.cg-dica p{margin:0;font:500 max(12.5px,calc(14 * var(--k)))/1.72 var(--f-ui);color:#cec6b5;text-wrap:pretty}
+.cg-dica p{margin:0;font:500 max(12.5px,calc(14 * var(--k)))/1.72 var(--f-ui);color:#d6cebd;text-wrap:pretty}
 .cg-dica p.entra{animation:cgDicaEntra .5s ease-out}
 @keyframes cgDicaEntra{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .cg-dica kbd{display:inline-block;margin:0 .08em;padding:0 .36em .04em;border:1px solid rgba(236,228,210,.28);border-radius:3px;background:rgba(236,228,210,.06);font:700 .9em/1.35 var(--f-ui);color:var(--bone)}
@@ -1023,7 +1027,7 @@ body.criativo .ad-selo{display:block}
   .cg-veu{background:linear-gradient(90deg,rgba(11,13,14,.94),rgba(11,13,14,.6))}
   .cg-col{left:max(16px,env(safe-area-inset-left,0px));width:calc(100% - 32px)}
   .cg-rodape{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));flex-wrap:wrap}}
-@media (prefers-reduced-motion:reduce){.cg-dica p.entra,.cg-status::before{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.cg-dica p.entra,.cg-status::before,.cg-linha .pular{animation:none!important}.cg-barra i{animation-duration:.01s}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">

@@ -39,9 +39,11 @@ function cargaTrocarDica(){const el=$('cg-dica');if(!el||CARGA.pronto)return;car
 /* a barra, a porcentagem e as etapas (feitas em verde, a de agora em destaque) */
 /* a barra desliza até o fim da etapa no tempo que ela deve levar: a animação roda fora do código do jogo (no compositor), então anda
    mesmo enquanto uma etapa longa segura o resto da página; se a etapa acabar antes, a próxima chamada põe a barra no lugar certo */
-function cargaProgresso(nome,f,ate,ms){f=Math.max(0,Math.min(1,+f||0));const p=Math.round(f*100);
-  const b=$('cg-barra');if(b){b.style.transition='none';b.style.setProperty('--p',f.toFixed(4));
-    if(ate>f&&ms>0&&!CARGA.calma){void b.offsetWidth;b.style.transition='transform '+Math.round(Math.min(ms,120000))+'ms linear';b.style.setProperty('--p',Math.min(1,ate).toFixed(4));}}
+/* os primeiros 8% são a leitura do código do jogo (a barra chega neles sozinha, pelo CSS); a montagem vai de 8% a 100% */
+const CARGA_LEITURA=0.08;
+function cargaProgresso(nome,f,ate,ms){f=Math.max(0,Math.min(1,+f||0));const g=x=>CARGA_LEITURA+(1-CARGA_LEITURA)*Math.max(0,Math.min(1,x)),p=Math.round(g(f)*100);
+  const b=$('cg-barra');if(b){b.style.animation='none';b.style.transition='none';b.style.setProperty('--p',g(f).toFixed(4));
+    if(ate>f&&ms>0&&!CARGA.calma){void b.offsetWidth;b.style.transition='transform '+Math.round(Math.min(ms,120000))+'ms linear';b.style.setProperty('--p',g(ate).toFixed(4));}}
   const t=$('cg-pct');if(t)t.textContent=p+'%';
   const pr=$('cg-prog');if(pr)pr.setAttribute('aria-valuenow',String(p));
   const i=nome==='fim'?CARGA.etapas.length:CARGA.etapas.indexOf(nome);
