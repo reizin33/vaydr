@@ -74,7 +74,9 @@ function montarGigante(T){colCircle(T.x,T.z,T.R*0.98,{gigante:T});
   for(let i=0;i+1<gs.length;i++){const b=gs[i],c=gs[i+1];let a0=b.a-0.3,a1=c.a+0.25;while(a1-a0>Math.PI)a1-=6.283;while(a0-a1>Math.PI)a1+=6.283;
     const v=viaHelice(T.x,T.z,raio,a0,a1,topoGalho(b,0.12),topoGalho(c,0.12),sair(b,1.0),sair(c,1.1),'g'+T.id);T.vias.push(v);VIAS.push(v);}}
 /* desenho de uma gigante: tronco com casca irregular, raízes, galhos grossos e finos, copa em blocos de folhas e cipós nas rotas */
-function geoGigante(T){const g=new GB(1<<13,8),R=rng(100+T.id*17),cas=lin(0x4a3423),cas2=lin(0x5c4330),musgo=lin(0x3d5229),folha=[lin(0x2c4a22),lin(0x35562a),lin(0x2a4220),lin(0x41602f)];
+/* semCopa: só a madeira (tronco, raízes, galhos e cipós); as folhas vão para uma geometria de descarte, para o sorteio (R) ser o
+   mesmo e a madeira sair idêntica. A copa de verdade, nesse caso, vem da mata nova (62y_mata.js). */
+function geoGigante(T,semCopa){const g=new GB(1<<13,8),gf=semCopa?new GB(1<<13,8):g,R=rng(100+T.id*17),cas=lin(0x4a3423),cas2=lin(0x5c4330),musgo=lin(0x3d5229),folha=[lin(0x2c4a22),lin(0x35562a),lin(0x2a4220),lin(0x41602f)];
   const loc=(x,y,z)=>[x-T.x,y-T.y,z-T.z];
   // tronco: perfil que alarga na base e afina no alto
   const H=T.H,Rt=T.R,prof=[[Rt*1.45,0],[Rt*1.12,0.6],[Rt,1.6],[Rt*0.92,H*0.25],[Rt*0.78,H*0.45],[Rt*0.62,H*0.62],[Rt*0.45,H*0.78],[Rt*0.25,H*0.92],[0,H]];
@@ -88,10 +90,10 @@ function geoGigante(T){const g=new GB(1<<13,8),R=rng(100+T.id*17),cas=lin(0x4a34
     add(g,cylTris(b.r1,b.r0,L,9),alignY(a[0],a[1],a[2],c[0]-a[0],c[1]-a[1],c[2]-a[2]),cas,{j:0.12,rnd:R});
     const dx=(c[0]-a[0])/L,dy=(c[1]-a[1])/L,dz=(c[2]-a[2])/L,e=[c[0]+dx*2.5,c[1]+dy*2.5+1.3,c[2]+dz*2.5];add(g,cylTris(0.05,b.r1,1.9,6),alignY(c[0],c[1],c[2],dx,dy+0.3,dz),cas,{j:0.12,rnd:R});
     for(let k=0;k<3;k++){const t=0.35+k*0.25,p=[a[0]+(c[0]-a[0])*t,a[1]+(c[1]-a[1])*t,a[2]+(c[2]-a[2])*t],side=k%2?1:-1;add(g,cylTris(0.03,0.08,1.5,5),alignY(p[0],p[1]+0.1,p[2],-dz*side*1.2,0.6,dx*side*1.2),cas2,{j:0.15,rnd:R});
-      add(g,icoTris(0.45+R()*0.25,0.35,R),mat(p[0]-dz*side*1.55,p[1]+0.85,p[2]+dx*side*1.55,0,0,0,1,0.7,1),folha[k%4],{j:0.18,rnd:R});}
-    add(g,icoTris(1.3+R()*0.5,0.35,R),mat(e[0],e[1]+0.4,e[2],0,0,0,1.1,0.75,1.1),folha[Math.floor(R()*4)],{j:0.18,rnd:R});}
+      add(gf,icoTris(0.45+R()*0.25,0.35,R),mat(p[0]-dz*side*1.55,p[1]+0.85,p[2]+dx*side*1.55,0,0,0,1,0.7,1),folha[k%4],{j:0.18,rnd:R});}
+    add(gf,icoTris(1.3+R()*0.5,0.35,R),mat(e[0],e[1]+0.4,e[2],0,0,0,1.1,0.75,1.1),folha[Math.floor(R()*4)],{j:0.18,rnd:R});}
   // copa: blocos grandes de folhas em volta do alto
-  for(let k=0;k<11;k++){const a=R()*6.283,rr=1.5+R()*4.2,y=H*(0.62+R()*0.34);add(g,icoTris(2.6+R()*1.8,0.32,R),mat(Math.cos(a)*rr,y,Math.sin(a)*rr,0,R()*6,0,1.15,0.72,1.15),folha[k%4],{j:0.16,rnd:R});}
+  for(let k=0;k<11;k++){const a=R()*6.283,rr=1.5+R()*4.2,y=H*(0.62+R()*0.34);add(gf,icoTris(2.6+R()*1.8,0.32,R),mat(Math.cos(a)*rr,y,Math.sin(a)*rr,0,R()*6,0,1.15,0.72,1.15),folha[k%4],{j:0.16,rnd:R});}
   for(let k=0;k<6;k++){const a=R()*6.283,y=H*(0.55+R()*0.3),rr=Rt*0.5;add(g,cylTris(0.08,0.28,4+R()*2,6),alignY(Math.cos(a)*rr,y,Math.sin(a)*rr,Math.cos(a),0.6,Math.sin(a)),cas,{j:0.1,rnd:R});}
   // cipós marcando onde dá para subir
   for(const v of T.vias){const n=Math.max(8,Math.round(v.altura()*2.2));let p0=v.pos(0);for(let k=1;k<=n;k++){const p1=v.pos(k/n);const a=loc(p0[0],p0[1],p0[2]),b=loc(p1[0],p1[1],p1[2]);

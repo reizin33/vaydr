@@ -11,7 +11,7 @@ const GRAMA={v:[],ok:false,frac:0.85,peso:[0.30,0.20,0.15,0.35],tex:null};   // 
 let GRAMA_INFO=null;
 function gramaHash(x,z){const s=Math.sin(x*12.9898+z*78.233)*43758.5453;return s-Math.floor(s);}
 function gramaCor(f){const n=f.length/11;let ym=0.01;for(let i=0;i<n;i++)ym=Math.max(ym,f[i*11+1]);
-  for(let i=0;i<n;i++){const a=i*11,k=0.7+0.6*f[a+1]/ym;f[a+3]=2.2*k;f[a+4]=4.1*k;f[a+5]=1.7*k;}}
+  for(let i=0;i<n;i++){const a=i*11,h=f[a+1]/ym,k=0.42+0.78*h;f[a+3]=1.75*k;f[a+4]=2.85*k;f[a+5]=1.3*k;}}   // 12/11: menos limão e o pé mais escuro (some no chão, não parece colado)
 function gramaMontar(){GRAMA.ok=false;GRAMA.v=[];if(typeof GRAMA3D==='undefined'||!MESH.grass)return;
   const tex=mod3dTextura('grama',GRAMA3D.t);GRAMA.tex=tex;const tris=[];
   for(let i=0;i<GRAMA3D.v.length;i++){const g=mod3dDecodificar({b:GRAMA3D.v[i]});gramaCor(g.f);const m=instMesh(g.f,MESH.grass.max);

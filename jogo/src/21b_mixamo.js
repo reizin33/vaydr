@@ -76,6 +76,9 @@ gl_Position=uViewProj*w;}`;
 const SK_FS=`precision highp float;precision highp sampler2DShadow;
 in vec3 vW,vN;in vec2 vUV;in float vInt;
 uniform sampler2D uAlb,uMask;uniform float uUseMask,uTexK,uEmis,uPe,uZumbi;uniform vec3 uTint,uRim;
+#ifndef CASCA
+uniform sampler2D uNrmT,uRugT;uniform float uUseNrm;
+#endif
 ${GLSL_LUZ}
 out vec4 o;
 #ifdef CASCA
@@ -95,13 +98,20 @@ if(uZumbi>0.5){float m1=texture(uNoise,vUV*5.0+0.3).r,m2=texture(uNoise,vUV*13.0
   al=mix(al,al*vec3(0.78,0.9,0.72),smoothstep(0.45,0.75,m1)*0.6);al=mix(al,vec3(0.16,0.03,0.02),smoothstep(0.7,0.9,m2)*0.5);}
 #endif
 vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;
+float rug=-1.0;
 #ifndef CASCA
+/* relevo da pele e da roupa (mapa de normais do modelo, quadro tirado das derivadas da posição e da UV, convenção glTF) */
+if(uUseNrm>0.5){vec3 dp1=dFdx(vW),dp2=dFdy(vW);vec2 du1=dFdx(vUV),du2=dFdy(vUV);float det=du1.x*du2.y-du2.x*du1.y;
+  if(abs(det)>1e-12){vec3 tt=(du2.y*dp1-du1.y*dp2)/det;tt=tt-n*dot(n,tt);float lt=length(tt);
+    if(lt>1e-8){tt/=lt;vec3 bv=(du1.x*dp2-du2.x*dp1)/det;vec3 bb=cross(n,tt)*(dot(cross(n,tt),bv)>0.0?-1.0:1.0);
+      vec3 tn=texture(uNrmT,vUV).xyz*2.0-1.0;n=normalize(mat3(tt,bb,n)*tn);}}
+  rug=texture(uRugT,vUV).r;}
 /* contato com o chão: pés e canelas um pouco mais escuros (o personagem não parece flutuar) */
 al*=mix(0.72,1.0,smoothstep(0.0,0.55,vW.y-uPe));
 #endif
 gInt=clamp(vInt,0.0,1.0);vec3 L=luz(vW,n);
 /* brilho fraco do sol na pele e no tecido, com a sombra */
-{vec3 V=normalize(uCam-vW),H=normalize(V+uDirD);L+=uDirC*pow(max(dot(n,H),0.0),26.0)*0.1*(1.0-gInt)*sombra(vW,n);}
+{vec3 V=normalize(uCam-vW),H=normalize(V+uDirD);float ex=rug<0.0?26.0:mix(52.0,7.0,rug),kk=rug<0.0?0.1:mix(0.3,0.045,rug);L+=uDirC*pow(max(dot(n,H),0.0),ex)*kk*(1.0-gInt)*sombra(vW,n);}
 L+=uRim*pow(1.0-abs(dot(n,normalize(uCam-vW))),3.0)*(1.0-gInt);
 o=acabar(al*L,vW,0.0);}`;
 let PSK=null,PDSK=null,PSKC=null;
@@ -112,10 +122,11 @@ const SK_CASCAS={
   calcaCouro:[{sub:'pernas',inf:0.006,cor:0x6b4a30,pelo:0}],
   botasCouro:[{sub:'pes',inf:0.011,cor:0x5a3a24,pelo:0}],
   gorroPele:[{sub:'cabeca',inf:0.024,cor:0x8c6b4a,pelo:0.55},{sub:'cabecaAba',inf:0.034,cor:0xd6c29c,pelo:1}]};
-function skSubconjuntos(t,vb,idx){const nv=vb.length/28,dv=new DataView(vb.buffer,vb.byteOffset,vb.byteLength),dom=new Uint8Array(nv),X=new Float32Array(nv),Y=new Float32Array(nv),Z=new Float32Array(nv);
+function skSubconjuntos(t,vb,idx,maoA){const nv=vb.length/28,dv=new DataView(vb.buffer,vb.byteOffset,vb.byteLength),dom=new Uint8Array(nv),X=new Float32Array(nv),Y=new Float32Array(nv),Z=new Float32Array(nv);
   for(let i=0;i<nv;i++){const o=i*28;X[i]=dv.getFloat32(o,true);Y[i]=dv.getFloat32(o+4,true);Z[i]=dv.getFloat32(o+8,true);let bw=-1,bb=0;for(let k=0;k<4;k++){const w=vb[o+24+k];if(w>bw){bw=w;bb=vb[o+20+k];}}dom[i]=bb;}
   const K=SKI,hip=t.hip,neck=t.pb[K.Neck*3+1],head=t.pb[K.Head*3+1],joelho=t.pb[K.LeftLeg*3+1],em=(i,l)=>l.includes(dom[i]);
-  const dHand=i=>Math.min(Math.hypot(X[i]-t.pb[K.LeftHand*3],Y[i]-t.pb[K.LeftHand*3+1],Z[i]-t.pb[K.LeftHand*3+2]),Math.hypot(X[i]-t.pb[K.RightHand*3],Y[i]-t.pb[K.RightHand*3+1],Z[i]-t.pb[K.RightHand*3+2]));
+  const mL=maoA?maoA.slice(0,3):[t.pb[K.LeftHand*3],t.pb[K.LeftHand*3+1],t.pb[K.LeftHand*3+2]],mR=maoA?maoA.slice(3,6):[t.pb[K.RightHand*3],t.pb[K.RightHand*3+1],t.pb[K.RightHand*3+2]];
+  const dHand=i=>Math.min(Math.hypot(X[i]-mL[0],Y[i]-mL[1],Z[i]-mL[2]),Math.hypot(X[i]-mR[0],Y[i]-mR[1],Z[i]-mR[2]));
   const tronco=[K.Spine,K.Spine1,K.Spine2,K.LeftShoulder,K.RightShoulder,K.LeftArm,K.RightArm];
   const curto=i=>em(i,tronco)||(dom[i]===K.Hips&&Y[i]>hip+0.04)||(dom[i]===K.Neck&&Y[i]<neck+0.02);
   const longo=i=>curto(i)||em(i,[K.LeftForeArm,K.RightForeArm])&&dHand(i)>0.025||(dom[i]===K.Hips&&Y[i]>hip-0.14)||(em(i,[K.LeftUpLeg,K.RightUpLeg])&&Y[i]>hip-0.2);
@@ -129,7 +140,8 @@ function skSubconjuntos(t,vb,idx){const nv=vb.length/28,dv=new DataView(vb.buffe
     rosto:tris(i=>(dom[i]===K.Head||dom[i]===K.Neck)&&Y[i]>neck-0.005&&Y[i]<head+0.055),
     maos:tris(i=>em(i,[K.LeftHand,K.RightHand])||em(i,[K.LeftForeArm,K.RightForeArm])&&dHand(i)<0.06),
     pernasCurtas:tris(i=>(em(i,[K.LeftUpLeg,K.RightUpLeg])&&Y[i]>joelho+0.1)||(dom[i]===K.Hips&&Y[i]<=hip+0.06)),
-    cinto:tris(i=>em(i,[K.Hips,K.Spine,K.LeftUpLeg,K.RightUpLeg])&&Y[i]>hip+0.0&&Y[i]<hip+0.085)};}
+    cinto:tris(i=>em(i,[K.Hips,K.Spine,K.LeftUpLeg,K.RightUpLeg])&&Y[i]>hip+0.0&&Y[i]<hip+0.085),
+    mangaLonga:tris(i=>curto(i)||em(i,[K.LeftForeArm,K.RightForeArm])&&dHand(i)>0.03)};}
 /* textura nova é montada na unidade 8 (nenhum sampler lê essa) e a unidade ativa de antes volta no fim. Antes ela entrava na
    unidade ativa, que no meio do desenho é a 0, a da sombra: os lugares montam quando alguém chega perto (no meio do desenho),
    a sombra saía da unidade 0 e o desenho seguinte dava "Mismatch between texture format and sampler type". O retorno de
@@ -151,13 +163,13 @@ function skMalha(t){const d=SKD[t.nome],vb=b64bytes(d.vb),ib=b64bytes(d.ib);
   gl.enableVertexAttribArray(7);gl.vertexAttribIPointer(7,4,gl.UNSIGNED_BYTE,28,20);
   gl.enableVertexAttribArray(8);gl.vertexAttribPointer(8,4,gl.UNSIGNED_BYTE,true,28,24);
   const idx=d.i32?new Uint32Array(ib.buffer):new Uint16Array(ib.buffer);let todos=idx;t.sub={};
-  if(t.nome==='akai'||t.nome==='yaku'){const S=skSubconjuntos(t,vb,idx);let n=idx.length;for(const k in S)n+=S[k].length;todos=new (d.i32?Uint32Array:Uint16Array)(n);todos.set(idx);let o=idx.length;
+  if(t.nome==='akai'||t.nome==='yaku'||t.nome==='surv'){const S=skSubconjuntos(t,vb,idx,d.maoA);let n=idx.length;for(const k in S)n+=S[k].length;todos=new (d.i32?Uint32Array:Uint16Array)(n);todos.set(idx);let o=idx.length;
     for(const k in S){todos.set(S[k],o);t.sub[k]={off:o*(d.i32?4:2),n:S[k].length};o+=S[k].length;}}
   const e=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,e);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,todos,gl.STATIC_DRAW);
   gl.bindVertexArray(null);t.mesh={vao,count:d.ni,tipo:d.i32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT};
-  t.tex=skTextura(d.tex,true);if(d.mask)t.mask=skTextura(d.mask,false);t.pronto=true;}
+  t.tex=skTextura(d.tex,true);if(d.mask)t.mask=skTextura(d.mask,false);if(d.nrm){t.nrm=skTextura(d.nrm,false);t.rug=skTextura(d.rug,false);}t.pronto=true;}
 function skInit(){if(PSK)return;PSK=program(SK_VS,SK_FS,GDEF);PDSK=program(SK_VS,DEPTH_FS,'#define PROF\n');PSKC=program(SK_VS,SK_FS,GDEF+'#define CASCA\n');
-  for(const n of['akai','yaku'])skMalha(skTipo(n));for(const n in SKCLIP)skClip(n);}
+  for(const n of['akai','yaku','surv'])if(SKD[n])skMalha(skTipo(n));for(const n in SKCLIP)skClip(n);}
 
 /* ---------- estado por personagem ---------- */
 function skNovo(tipo){return{t:tipo,D:new Float32Array(SK_N*4),Dp:new Float32Array(SK_N*4),hip:[0,tipo.hip,0],skin:new Float32Array(SK_N*16),G:new Float32Array(SK_N*16),
@@ -184,6 +196,9 @@ function skDaPose(ch,t,D){const r=ch.r;
 /* calcula a pose final, as matrizes da pele e os quadros de encaixe (mão, peito, cabeça) que armas e roupas usam */
 function skPose(ch,dt){const s=ch.sk,t=s.t;
   skDaPose(ch,t,s.Dp);let hx=0,hy=t.hip+(ch.hipY||0)*(t.hip/0.92),hz=0;
+  /* locomoção do sobrevivente (62z): pose dos clipes misturados, por osso (braços ficam com o jogo quando há algo na mão) */
+  if(s.loco&&s.loco.w>0.001){const L=s.loco,w=L.w;for(let b=0;b<SK_N;b++){const wb=w*L.m[b];if(wb>0.001)qnlerp(s.Dp,b*4,s.Dp,b*4,L.D,b*4,wb);}
+    hy=lerp(hy,t.hip+L.hy*(t.hip/SKT.akai.hip)+(ch.hipY||0)*(t.hip/0.92)*L.hyJogo,w);hx=lerp(hx,L.hx*(t.hip/SKT.akai.hip),w);hz=lerp(hz,L.hz*(t.hip/SKT.akai.hip),w);}
   // clipe por cima, com mistura (rot gira a animação inteira em torno do eixo vertical)
   if(s.clip){s.cw=approach(s.cw,s.cwAlvo,dt*s.cmix);
     if(s.cw<=0.001&&s.cwAlvo<=0){s.clip=null;}
@@ -220,12 +235,13 @@ function skDesenhar(chars){let ok=false;
     if(!ok){setLit(PSK);gl.disable(gl.CULL_FACE);gl.uniform1f(PSK.u.uTexK,1.0);ok=true;}
     const t=c.sk.t;gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,t.tex);gl.uniform1i(PSK.u.uAlb,3);
     gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,t.mask||t.tex);gl.uniform1i(PSK.u.uMask,4);gl.uniform1f(PSK.u.uUseMask,t.mask?1:0);
+    if(PSK.u.uNrmT){gl.activeTexture(gl.TEXTURE9);gl.bindTexture(gl.TEXTURE_2D,t.nrm||t.tex);gl.uniform1i(PSK.u.uNrmT,9);gl.activeTexture(gl.TEXTURE10);gl.bindTexture(gl.TEXTURE_2D,t.rug||t.tex);gl.uniform1i(PSK.u.uRugT,10);gl.uniform1f(PSK.u.uUseNrm,t.nrm?1:0);}
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform3fv(PSK.u.uTint,c.tint||[1,1,1]);gl.uniform1f(PSK.u.uIntS,interiorEm(c.x,c.y+0.3,c.z));gl.uniform1f(PSK.u.uPe,c.y||0);gl.uniform1f(PSK.u.uZumbi,c.zumbi?1:0);skDesenharUm(PSK,c);}
   if(ok){gl.uniform1f(PSK.u.uIntS,0);skCascas();skCascasNpc(chars);gl.enable(gl.CULL_FACE);}}
 /* roupas vestidas pelo jogador, por cima do corpo */
 function skCascas(){const c=P.ch;if(!c||!c.sk||!c.sk.t.pronto||c.proc||!P.roupa||cfg.cam==='1'||camDist<0.75||CARRO.ativo)return;const t=c.sk.t;let ok=false;
-  for(const slot of ROUPA_SLOTS){const id=P.roupa[slot],L=id&&SK_CASCAS[id];if(!L)continue;
+  const TAB=t.cascas||SK_CASCAS;for(const slot of ROUPA_SLOTS){const id=P.roupa[slot],L=id&&TAB[id];if(!L)continue;
     if(!ok){setLit(PSKC);gl.uniformMatrix4fv(PSKC.u.uSk,false,c.sk.skin);gl.uniform1f(PSKC.u.uIntS,interiorEm(c.x,c.y+0.3,c.z));gl.uniform3fv(PSKC.u.uTint,c.tint||[1,1,1]);gl.bindVertexArray(t.mesh.vao);ok=true;}
     for(const k of L){const sb=t.sub[k.sub];if(!sb||!sb.n)continue;gl.uniform1f(PSKC.u.uInfla,k.inf);gl.uniform3fv(PSKC.u.uCor,k.lin||(k.lin=lin(k.cor)));gl.uniform1f(PSKC.u.uPelo,k.pelo);
       gl.drawElements(gl.TRIANGLES,sb.n,t.mesh.tipo,sb.off);}}
