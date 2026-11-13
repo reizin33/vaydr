@@ -40,6 +40,7 @@ async def main():
             await pg.evaluate("""([x,z,tx,tz,pitch,cam,y])=>{const n=__nnc,P=n.P,X=s=>n.ev(s);n.cfg.cam=cam;window.__fixaY=y;P.x=x;P.z=z;P.y=(y===null?X('ground')(x,z):y);
               P.vx=P.vz=P.vy=0;P.noChao=(y===null);P.yaw=Math.atan2(tx-x,tz-z);P.body=P.yaw;P.pitch=pitch;X('rebuildVeg')(true);X('rebuildGrass')();}""", [x, z, tx, tz, pitch, cam, y])
         async def foto(nome, oque, espera=5000):
+            if os.environ.get('SO') and nome not in os.environ['SO'].split(','): return   # SO=nome1,nome2: só essas fotos (para o depois nos mesmos ângulos)
             await pg.wait_for_timeout(espera); await pg.evaluate("()=>{__nnc.ev('rebuildVeg')(true);__nnc.ev('rebuildGrass')();}"); await pg.wait_for_timeout(1500)
             await pg.screenshot(path=OUT + PRE + '_' + nome + '.png', timeout=600000)
             rel['fotos'].append({'nome': nome, 'mostra': oque}); print('foto', nome, '%.0fs' % (time.time() - t0), flush=True)
