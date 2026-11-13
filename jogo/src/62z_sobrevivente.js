@@ -63,12 +63,14 @@ function survLoco(ch,dt){const s=ch.sk;
   const b=P.body??P.yaw,fr=(P.vx*Math.sin(b)+P.vz*Math.cos(b))/(ch.s||1)/esc,lat=(P.vx*Math.cos(b)-P.vz*Math.sin(b))/(ch.s||1)/esc;
   const ferido=(P.vida<28)||(typeof pernaRuim==='function'&&pernaRuim());
   // no ar: pulo (uma vez) e depois caindo; pouso forte (a queda machucou): queda
-  if(!P.noChao){SURV.ar+=dt;if(SURV.pulo>=0)SURV.pulo+=dt;}else{SURV.ar=0;SURV.pulo=-1;}
+  // no palco da criação o corpo não tem física: conta como no chão (sem isso ele "caía" parado no ar)
+  const chao=P.noChao||G.modo==='criacao';
+  if(!chao){SURV.ar+=dt;if(SURV.pulo>=0)SURV.pulo+=dt;}else{SURV.ar=0;SURV.pulo=-1;}
   if(SURV.queda>=0){SURV.queda+=dt;if(SURV.queda>survDur('sQueda')-0.05||(SURV.queda>0.9&&sp>0.6))SURV.queda=-1;}
   survZerar(L);let estado;
   if(SURV.queda>=0){estado='queda';survSoma(L,'sQueda',SURV.queda,1);}
-  else if(!P.noChao&&SURV.pulo>=0&&SURV.pulo<survDur('sPulo')*0.55){estado='pulo';survSoma(L,'sPulo',0.1+SURV.pulo,1);}
-  else if(!P.noChao&&SURV.ar>0.28){estado='caindo';SURV.faseP+=dt;survSoma(L,'sCaindo',SURV.faseP%survDur('sCaindo'),1);}
+  else if(!chao&&SURV.pulo>=0&&SURV.pulo<survDur('sPulo')*0.55){estado='pulo';survSoma(L,'sPulo',0.1+SURV.pulo,1);}
+  else if(!chao&&SURV.ar>0.28){estado='caindo';SURV.faseP+=dt;survSoma(L,'sCaindo',SURV.faseP%survDur('sCaindo'),1);}
   else{
     // no chão (ou acabou de sair dele): parado e passos misturados pela velocidade e pela direção
     const ag=P.agachado,nP=ag?'sAgachado':ferido?'sFeridoParado':(P.energia<25||SURV.cansado>0?'sRespira':'sParado');

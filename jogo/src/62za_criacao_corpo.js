@@ -56,3 +56,14 @@ if(typeof pfAvatar==='function'){const _pa=pfAvatar;pfAvatar=function(p){const a
       if(G.aparencia)G.aparencia.corpo=c;if(MESH.jogador&&MESH.jogador.ap)MESH.jogador.ap.corpo=c;survMarcaAjuste();});}}
 survMarcaAjuste=function(){const el=$('aj-personagem');if(!el)return;const ap=G.aparencia||(MESH.jogador&&MESH.jogador.ap),c=corpoDe(ap);
   el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.v==='classico'?'personalizado':'sobrevivente')===c)));};
+/* câmera do palco e das fotos (retrato e as três vistas) com o sobrevivente: o enquadramento usava a cabeça do boneco de partes,
+   mais baixa que a dele (a cabeça saía cortada em cima). Mesma conta da criaCamera, com o alto e a cabeça do corpo dele */
+{const _cm=criaCamera;criaCamera=function(modo,hN){if(!P.ch||!P.ch.surv||typeof SKT==='undefined'||!SKT.surv)return _cm.apply(this,arguments);
+  const s=P.ch.s||1;poseBones(P.ch);const topo=P.y+(SKT.surv.alt||1.87)*s+0.02*s,pe=P.y,cab=topo-0.16*s,fy=0.6,th=Math.tan(fy/2),asp=W/H;let ang=0,Hc,cy,nx=0,ny=0;
+  if(modo==='palco'){ang=CRIA.ang;const r=criaFoco();nx=(r.x+r.w/2)/W*2-1;ny=1-(r.y+r.h/2)/H*2;hN=2*r.h/H*0.97;
+    Hc=lerp(topo-pe+0.06,0.8*s,CRIA.zoom);cy=lerp((topo+pe)/2,cab-0.13*s,CRIA.zoom);}
+  else if(modo==='retrato'){ang=0.42;Hc=0.47*s;cy=cab-0.06*s;}
+  else{ang=modo==='costas'?Math.PI:modo==='lado'?Math.PI/2:0;Hc=topo-pe+0.1;cy=(topo+pe)/2;}
+  CRIA.luz=ang;const D=Hc/(hN*th),b=P.ch.yaw+ang,alt=modo==='retrato'?0.03:Math.min(0.3,D*0.045),pos=[P.x+Math.sin(b)*D,cy+alt,P.z+Math.cos(b)*D],c=[P.x,cy,P.z];
+  cam.fov=fy;criaOlhar(pos,c);
+  if(nx||ny){const ax=nx*D*th*asp,ay=ny*D*th;criaOlhar(pos,[c[0]-cam.right[0]*ax-cam.up[0]*ay,c[1]-cam.right[1]*ax-cam.up[1]*ay,c[2]-cam.right[2]*ax-cam.up[2]*ay]);}};}
