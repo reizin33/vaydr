@@ -5,7 +5,8 @@
    Embaixo, a versão e, no .exe, o que a atualização automática está fazendo (procurando, baixando com a porcentagem,
    pronta, em dia, sem internet). A montagem vai por etapas (montarMundoPorEtapas, 50_render.js) e a tela anda entre
    uma e outra; boot() chama cargaProgresso antes de cada etapa e cargaPronto no fim. */
-const CARGA={etapas:['terreno','mata','cidade','lugares','sons'],dica:-1,troca:null,pronto:false};
+const CARGA={etapas:['terreno','mata','cidade','lugares','sons'],dica:-1,troca:null,pronto:false,
+  calma:typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches};   // menos movimento: a barra só pula de etapa em etapa
 /* as dicas: só o que o jogo faz de verdade (conferido na ajuda, nos avisos do jogo e nos controles). {acao} vira a tecla
    dessa ação do jeito que a pessoa deixou nos controles; as marcadas com 1 só valem com teclado */
 const CARGA_DICAS=[
@@ -36,8 +37,11 @@ function cargaDica(){const el=$('cg-dica'),L=CARGA_DICAS.filter(d=>!(d[1]&&touch
    tempo marcado deixava a dica sumida enquanto uma etapa longa rodava) */
 function cargaTrocarDica(){const el=$('cg-dica');if(!el||CARGA.pronto)return;cargaDica();el.classList.remove('entra');void el.offsetWidth;el.classList.add('entra');}
 /* a barra, a porcentagem e as etapas (feitas em verde, a de agora em destaque) */
-function cargaProgresso(nome,f){f=Math.max(0,Math.min(1,+f||0));const p=Math.round(f*100);
-  const b=$('cg-barra');if(b)b.style.setProperty('--p',f.toFixed(4));
+/* a barra desliza até o fim da etapa no tempo que ela deve levar: a animação roda fora do código do jogo (no compositor), então anda
+   mesmo enquanto uma etapa longa segura o resto da página; se a etapa acabar antes, a próxima chamada põe a barra no lugar certo */
+function cargaProgresso(nome,f,ate,ms){f=Math.max(0,Math.min(1,+f||0));const p=Math.round(f*100);
+  const b=$('cg-barra');if(b){b.style.transition='none';b.style.setProperty('--p',f.toFixed(4));
+    if(ate>f&&ms>0&&!CARGA.calma){void b.offsetWidth;b.style.transition='transform '+Math.round(Math.min(ms,120000))+'ms linear';b.style.setProperty('--p',Math.min(1,ate).toFixed(4));}}
   const t=$('cg-pct');if(t)t.textContent=p+'%';
   const pr=$('cg-prog');if(pr)pr.setAttribute('aria-valuenow',String(p));
   const i=nome==='fim'?CARGA.etapas.length:CARGA.etapas.indexOf(nome);

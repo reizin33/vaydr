@@ -105,11 +105,12 @@ function initMeshes(){for(const e of etapasMalhasEmOrdem())e[2]();}
 /* um quadro para a tela de carregamento aparecer; com a janela escondida (minimizada) não tem quadro: segue depois de 100 ms */
 function quadroDeCarga(){return new Promise(r=>{let ok=false;const ir=()=>{if(!ok){ok=true;r();}};requestAnimationFrame(()=>setTimeout(ir,0));setTimeout(ir,100);});}
 /* a barra aprende com o computador: ao fim de cada montagem fica guardado quanto cada etapa levou neste PC, e na próxima a barra
-   anda no ritmo de verdade dele. Se a lista de etapas mudou (versão nova), vale uma vez o peso de fábrica */
+   anda no ritmo de verdade dele. Se a lista de etapas mudou (versão nova), vale uma vez o peso de fábrica. aviso(etapa, onde a barra
+   está, onde ela chega no fim da etapa, quanto tempo a etapa deve levar em ms): a tela desliza a barra durante a etapa */
 async function montarMundoPorEtapas(aviso){const L=etapasMalhasEmOrdem(),chaves=L.map((e,i)=>e[3]||String(i)).join('|'),sv=store.get('vaydr_carga_v1'),
   aprendeu=!!(sv&&sv.chaves===chaves&&Array.isArray(sv.ms)&&sv.ms.length===L.length),peso=L.map((e,i)=>aprendeu?Math.max(4,+sv.ms[i]||0):e[1]),
   tot=peso.reduce((s,p)=>s+p,0),tempos=[],ini=performance.now();let feito=0,ult=0;
-  for(let i=0;i<L.length;i++){const[nome,p0,f]=L[i];aviso(nome,feito/tot);
+  for(let i=0;i<L.length;i++){const[nome,p0,f]=L[i];aviso(nome,feito/tot,(feito+peso[i])/tot,aprendeu?peso[i]:peso[i]*120);
     if(!document.hidden&&performance.now()-ult>40){await quadroDeCarga();ult=performance.now();}
     const t0=performance.now();f();tempos.push([nome,p0,Math.round(performance.now()-t0),L[i][3]||'']);feito+=peso[i];}
   aviso('fim',1);store.set('vaydr_carga_v1',{chaves,ms:tempos.map(t=>t[2])});
