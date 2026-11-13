@@ -56,19 +56,21 @@ function survCiclo(n){const c=SKCLIP[n],v=c&&c.vel?Math.hypot(c.vel[0],c.vel[2])
 function survLoco(ch,dt){const s=ch.sk;
   if(!s.loco)s.loco={D:new Float32Array(SK_N*4),m:new Float32Array(SK_N).fill(1),w:0,hy:0,hx:0,hz:0,hyJogo:0,n:0};
   const L=s.loco;
-  const livre=P.alive&&!(CARRO&&CARRO.ativo)&&!P.montado&&!P.nada&&!P.escala&&!P.muro&&!P.rola&&!P.dorme&&!P.anim&&!(P.ch.sk.clip&&P.ch.sk.cwAlvo>0);
+  const livre=(P.alive||G.modo==='criacao')&&!(CARRO&&CARRO.ativo)&&!P.montado&&!P.nada&&!P.escala&&!P.muro&&!P.rola&&!P.dorme&&!P.anim&&!(P.ch.sk.clip&&P.ch.sk.cwAlvo>0);
   L.w=approach(L.w,livre?1:0,dt*(livre?5:9));
   if(L.w<=0.001){SURV.estado='';return;}
   const esc=s.t.hip/SKT.akai.hip,sp=Math.hypot(P.vx||0,P.vz||0)/(ch.s||1)/esc;     // velocidade na escala do Akai
   const b=P.body??P.yaw,fr=(P.vx*Math.sin(b)+P.vz*Math.cos(b))/(ch.s||1)/esc,lat=(P.vx*Math.cos(b)-P.vz*Math.sin(b))/(ch.s||1)/esc;
   const ferido=(P.vida<28)||(typeof pernaRuim==='function'&&pernaRuim());
   // no ar: pulo (uma vez) e depois caindo; pouso forte (a queda machucou): queda
-  if(!P.noChao){SURV.ar+=dt;if(SURV.pulo>=0)SURV.pulo+=dt;}else{SURV.ar=0;SURV.pulo=-1;}
+  // no palco da criação o corpo não tem física: conta como no chão (sem isso ele "caía" parado no ar)
+  const chao=P.noChao||G.modo==='criacao';
+  if(!chao){SURV.ar+=dt;if(SURV.pulo>=0)SURV.pulo+=dt;}else{SURV.ar=0;SURV.pulo=-1;}
   if(SURV.queda>=0){SURV.queda+=dt;if(SURV.queda>survDur('sQueda')-0.05||(SURV.queda>0.9&&sp>0.6))SURV.queda=-1;}
   survZerar(L);let estado;
   if(SURV.queda>=0){estado='queda';survSoma(L,'sQueda',SURV.queda,1);}
-  else if(!P.noChao&&SURV.pulo>=0&&SURV.pulo<survDur('sPulo')*0.55){estado='pulo';survSoma(L,'sPulo',0.1+SURV.pulo,1);}
-  else if(!P.noChao&&SURV.ar>0.28){estado='caindo';SURV.faseP+=dt;survSoma(L,'sCaindo',SURV.faseP%survDur('sCaindo'),1);}
+  else if(!chao&&SURV.pulo>=0&&SURV.pulo<survDur('sPulo')*0.55){estado='pulo';survSoma(L,'sPulo',0.1+SURV.pulo,1);}
+  else if(!chao&&SURV.ar>0.28){estado='caindo';SURV.faseP+=dt;survSoma(L,'sCaindo',SURV.faseP%survDur('sCaindo'),1);}
   else{
     // no chão (ou acabou de sair dele): parado e passos misturados pela velocidade e pela direção
     const ag=P.agachado,nP=ag?'sAgachado':ferido?'sFeridoParado':(P.energia<25||SURV.cansado>0?'sRespira':'sParado');
