@@ -23,6 +23,10 @@ async def run(plan):
             pg.on('console', lambda m, logs=logs: logs.append(f'{m.type}: {m.text}') if m.type in ('error','warning') else None)
             pg.on('pageerror', lambda e, logs=logs: logs.append(f'PAGEERROR: {e}'))
             await pg.goto(PAGE,wait_until='domcontentloaded',timeout=180000)
+            # desde a 10.2.1 a montagem do mundo vai por etapas (a tela de carregamento anda entre elas) e a página responde no meio dela:
+            # os roteiros começam depois da montagem, como antes (quando ela segurava a página até o fim). Versões antigas não têm a marca.
+            try: await pg.wait_for_function("()=>window.__bootFeito!==false",timeout=600000,polling=250)
+            except Exception as e: logs.append(f'montagem do mundo não terminou: {e}')
             for i,st in enumerate(steps):
                 k=st[0]
                 # SEMFOTO=1: pula as fotos (e a espera logo antes delas); as conferências continuam todas

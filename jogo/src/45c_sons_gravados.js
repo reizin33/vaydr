@@ -39,11 +39,16 @@ function sgravTocar(nome,extra,out,t,ctx,eco,pn){const e=sgravEscolha(nome,extra
   if(e.eco)eco(e.eco);
   return true;}
 /* carrega o banco quando o som do jogo nasce (precisa do AudioContext); não trava nada: decodifica em segundo plano */
+/* a etapa "Sons" da tela de carregamento (13/11/2026) já tira os sons do texto (base64) para bytes; no primeiro clique
+   (audioInit) só falta o navegador decodificar o áudio. Sem o preparo, a conversão é feita aqui, como antes */
+function sgravBytes(uri){const bin=atob(uri.slice(uri.indexOf(',')+1)),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+function sgravPreparar(){if(SGRAV.pre||SGRAV.carregando||typeof SOM_DADOS==='undefined')return;const pre={};
+  for(const k in SOM_DADOS)pre[k]=SOM_DADOS[k].map(uri=>{try{return sgravBytes(uri);}catch(_){return null;}});SGRAV.pre=pre;}
 function sgravCarregar(){const ctx=AU.ctx;if(!ctx||SGRAV.carregando||typeof SOM_DADOS==='undefined')return;SGRAV.carregando=true;
-  const tarefas=[];
-  for(const k in SOM_DADOS){SGRAV.buf[k]=[];for(const uri of SOM_DADOS[k])tarefas.push(new Promise(fim=>{try{
-    const bin=atob(uri.slice(uri.indexOf(',')+1)),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+  const tarefas=[],pre=SGRAV.pre;SGRAV.pre=null;
+  for(const k in SOM_DADOS){SGRAV.buf[k]=[];SOM_DADOS[k].forEach((uri,j)=>tarefas.push(new Promise(fim=>{try{
+    const u=(pre&&pre[k]&&pre[k][j])||sgravBytes(uri);
     let feito=false;const ok=b=>{if(feito)return;feito=true;SGRAV.buf[k].push(b);fim();},erro=()=>{if(feito)return;feito=true;fim();};
-    const p=ctx.decodeAudioData(u.buffer,ok,erro);if(p&&p.then)p.then(ok,erro);}catch(_){fim();}}));}
+    const p=ctx.decodeAudioData(u.buffer,ok,erro);if(p&&p.then)p.then(ok,erro);}catch(_){fim();}})));}
   Promise.all(tarefas).then(()=>{SGRAV.pronto=true;});}
 {const _ai=audioInit;audioInit=function(){_ai.apply(this,arguments);try{sgravCarregar();}catch(e){console.error('sons gravados',e);}};}

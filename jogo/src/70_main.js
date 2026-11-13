@@ -32,7 +32,8 @@ function frame(now){const dt=Math.min(0.05,Math.max(0,(now-last)/1000)||0.016);l
   }catch(err){console.error(err);}
   if(TESTE&&window.__perf){window.__perf.total=(window.__perf.total||0)+performance.now()-TF0;}
   requestAnimationFrame(frame);}
-const TESTE=location.hash.startsWith('#teste');if(location.hash.includes('rapido')){window.__semRender=true;window.__turbo=6;}
+const TESTE=location.hash.startsWith('#teste');if(TESTE)window.__bootFeito=false;   // os testes (run.py) esperam a montagem do mundo terminar
+if(location.hash.includes('rapido')){window.__semRender=true;window.__turbo=6;}
 let contT=0;
 function passoJogo(dt){G.t+=dt;if(TESTE&&window.__cadaPasso)window.__cadaPasso(dt);updateClock(dt);computeEnv();updatePlayer(dt);updateCarro(dt);updateBichos(dt);updateCao(dt);updateOlhos(dt);updateVulto(dt);updateSustosMata(dt);updateCaixas(dt);updateLanterna(dt);
   updateEnergia(dt);updateAlarme(dt);updateInfestacao(dt);updateHordas(dt);updateAtracao(dt);updateFumaca(dt);updateChegada(dt);updateManchas(dt);contT-=dt;if(contT<=0){contT=2;updateConts();}const horda=updateZombies(dt);updateSobrev(dt);updateArmas2(dt);updateChefe(dt);updateAmbiente(dt);updateBase(dt);updateZumbis2(dt);updateArmas3(dt);updateLesoes(dt);updateEfeitos(dt);updateHistoria(dt);passosNovos(dt);updateFx(dt);if(OBRA.ativo)obraAlvo();
@@ -41,9 +42,10 @@ function cenaMenu(){G.hora=20.9;P.alive=false;P.x=SPAWN[0];P.z=SPAWN[1];P.y=grou
   for(const a of BARRICADE_ARC.angs){const p=a*Math.PI/180;criarObra('barricada',BARRICADE_ARC.r*Math.sin(p),-BARRICADE_ARC.r*Math.cos(p),-p);}criarObra('portao',0,-BARRICADE_ARC.r,0);
   for(let i=0;i<6;i++){const a=-Math.PI/2+(i-2.5)*0.25,r=26+Math.random()*10;criarZ(i===2?'brute':i===4?'screamer':'walker',Math.cos(a)*r,Math.sin(a)*r,{noturno:true,st:'marcha'});}
   P.ch.x=P.x;P.ch.z=P.z;P.ch.y=P.y;P.ch.yaw=Math.PI;poseLoco(P.ch.r,0,0,0,false);}
-function boot(){body.dataset.tela=cfg.tela;
-  try{dpr=Math.min(window.devicePixelRatio||1,GRAF[cfg.graf].dpr);initGL();if(!GRAF[cfg.graf])cfg.graf='alto';if(cfg.graf==='ultra'&&!cfg.grafManual)cfg.graf='alto';if(GRAF[cfg.graf].sombra&&(GRAF[cfg.graf].sombra!==SHADOW.size||!!GRAF[cfg.graf].casc!==SHADOW.casc))makeShadow(GRAF[cfg.graf].sombra,!!GRAF[cfg.graf].casc);initMeshes();}
-  catch(e){console.error(e);$('falha').hidden=false;$('t-titulo').hidden=true;return;}
+/* a montagem do mundo vai por etapas (13/11/2026): a tela de carregamento (69_carregamento.js) anda entre uma e outra */
+async function boot(){body.dataset.tela=cfg.tela;
+  try{dpr=Math.min(window.devicePixelRatio||1,GRAF[cfg.graf].dpr);initGL();if(!GRAF[cfg.graf])cfg.graf='alto';if(cfg.graf==='ultra'&&!cfg.grafManual)cfg.graf='alto';if(GRAF[cfg.graf].sombra&&(GRAF[cfg.graf].sombra!==SHADOW.size||!!GRAF[cfg.graf].casc!==SHADOW.casc))makeShadow(GRAF[cfg.graf].sombra,!!GRAF[cfg.graf].casc);await montarMundoPorEtapas(cargaProgresso);}
+  catch(e){console.error(e);$('falha').hidden=false;$('t-titulo').hidden=true;if(TESTE)window.__bootFeito=true;return;}
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();if(glPerdido)return;glPerdido=true;
     try{if(G.modo==='mochila')fecharMochila();if(G.modo==='jogo'||G.modo==='pausa'){salvarJogo();try{sessionStorage.setItem('nnc_voltar','1');}catch(_){}}}catch(_){}
     const f=$('falha');f.innerHTML='O vídeo do navegador reiniciou. Seu jogo foi salvo.<br><button class="btn prim" type="button" id="falha-ok" style="margin-top:12px">Continuar</button>';f.hidden=false;$('falha-ok').onclick=()=>location.reload();});
@@ -54,7 +56,7 @@ function boot(){body.dataset.tela=cfg.tela;
   try{if(hot&&typeof hot.snapshot==='function')hot.snapshot(()=>({jogando:G.modo==='jogo'||G.modo==='pausa'}));}catch(_){}
   let volta=false;try{volta=sessionStorage.getItem('nnc_voltar')==='1';sessionStorage.removeItem('nnc_voltar');}catch(_){}
   const voltar=((hot&&hot.data&&hot.data.jogando)||volta)&&temSave();
-  $('carregando').textContent=touch?'Toque para começar':'Clique para começar';
+  cargaPronto();if(TESTE)window.__bootFeito=true;
   last=performance.now();requestAnimationFrame(frame);
   if(voltar&&carregarJogo()){jogar();return;}
   setTimeout(()=>{if(G.modo==='carregando')mostrarMenu();},900);}

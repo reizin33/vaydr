@@ -2,6 +2,11 @@ import glob, os, subprocess, sys
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, 'src')
 page = open(os.path.join(SRC, 'page.html'), encoding='utf-8').read()
+# a foto da tela de carregamento (o sobrevivente de mochila, a mesma do lobby em 21g_lobby_dados.js) vai direto no HTML:
+# assim ela já está na página antes de o código do jogo rodar
+import re
+_lob = re.search(r'multi:"(data:image/jpeg;base64,[A-Za-z0-9+/=]+)"', open(os.path.join(SRC, '21g_lobby_dados.js'), encoding='utf-8').read())
+page = page.replace('__IMG_CARGA__', _lob.group(1) if _lob else '')
 js = '\n'.join(open(f, encoding='utf-8').read() for f in sorted(glob.glob(os.path.join(SRC, '*.js'))))
 out = page.replace('/*__JS__*/', js)
 SAIDA = os.environ.get('SAIDA')   # SAIDA=test_dev.html: só gera esse arquivo (para testar sem mexer no test.html nem no site)

@@ -31,4 +31,4 @@ function mod3dAplicar(){if(typeof MOD3D==='undefined'||!MESH.arma)return;
   for(const id in MOD3D){const d=MOD3D[id],g=mod3dDecodificar(d),m=texMesh(g.f,g.uv,mod3dTextura(id,d.t));m.mod3d=id;
     const velho=MESH.arma[id];if(velho&&!velho.mod3d)liberarMesh(velho);MESH.arma[id]=m;MOD3D_INFO[id]={tri:g.nt,vert:g.nv,min:g.lo,max:g.hi};}
   if(MOD3D.pistola&&MOD3D.pistola.boca){WGRIP.pistola[0]=MOD3D.pistola.boca[0];WGRIP.pistola[1]=MOD3D.pistola.boca[1];WGRIP.pistola[2]=MOD3D.pistola.boca[2];}}
-{const _im=initMeshes;initMeshes=function(){const r=_im.apply(this,arguments);mod3dAplicar();return r;};}
+etapaMalha('fim','lugares',1,()=>mod3dAplicar());   /* (antes embrulhava initMeshes; 13/11: etapa da montagem) */

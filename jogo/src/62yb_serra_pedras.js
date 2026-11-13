@@ -37,7 +37,7 @@ function svpMontar(){SVP.ok=false;SVP.tipos=[];if(typeof MATA==='undefined')retu
   if(MATA.pedras_musgo){const pc=MATA.pedras_musgo.pecas.slice().sort((a,b)=>(b.hi[0]-b.lo[0])*(b.hi[2]-b.lo[2])-(a.hi[0]-a.lo[0])*(a.hi[2]-a.lo[2])).slice(0,7);
     for(const p of pc){const ms=mk(MATA.pedras_musgo,[p],340);SVP.pedras.push({perto:ms,longe:ms,k:1.6/Math.max(0.05,p.hi[0]-p.lo[0],p.hi[2]-p.lo[2])});}}
   SVP.ok=SVP.tipos.length>0;}
-{const _im=initMeshes;initMeshes=function(){const r=_im.apply(this,arguments);try{svpMontar();}catch(e){console.error('serra (pedras)',e);SVP.ok=false;}return r;};}
+etapaMalha('mata','mata',2,()=>{try{svpMontar();}catch(e){console.error('serra (pedras)',e);SVP.ok=false;}});
 function svpProntas(){const L=[...SVP.tipos,...SVP.pedras];for(const t of L)for(const m of[...t.perto,...t.longe])if(!m.texP.pronta)return false;return L.length>0;}
 function svpDistribuir(){if(!SVP.ok)return;const L=[...SVP.tipos,...SVP.pedras];for(const t of L)for(const m of[...t.perto,...t.longe])m.n=0;
   const tmp=new Float32Array(8),put=(ms,q,k)=>{tmp[0]=q.x;tmp[1]=q.y;tmp[2]=q.z;tmp[3]=q.r;tmp[4]=q.s*(k||1);tmp[5]=tmp[6]=tmp[7]=q.t;for(const m of ms)copiarInst(m,tmp,0);};

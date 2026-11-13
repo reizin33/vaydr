@@ -62,30 +62,52 @@ function buildFire(){const g=new GB(512,8),R=rng(31),bones=[];
   L.forEach((l,i)=>{add(g,cylTris(0,l[0],l[1],5,{phase:R()*6}),ID,lin(l[2]),{b:i,e:l[3]});const a=i/L.length*6.283,r=i<3?0.13:i<5?0.06:0.02;bones.push([Math.cos(a)*r,Math.sin(a)*r,R()*6.283,l[1]]);});
   return{mesh:litMesh(g.data()),bones,m:new Float32Array(192)};}
 let FIREM=null;
-function initMeshes(){
-  const w=buildWorld();MESH.world=litMesh(w.data);MESH.world.casters=w.casterVerts;MESH.sil=unMesh(w.sil);MESH.towerSil=unMesh(w.towerSil);MESH.tower=litMesh(w.tower);
-  const V=vegGeometry();const inst=(k,max)=>instMesh(V[k],max);
+/* a montagem do mundo por etapas (13/11/2026): cada etapa é [nome na tela de carregamento, peso (o tempo dela, mais ou menos),
+   função]. initMeshes() roda todas de uma vez, como antes; boot() roda uma por vez (montarMundoPorEtapas) e a tela de
+   carregamento mostra a etapa e a porcentagem de verdade entre uma e outra. Os módulos de depois põem as etapas deles com
+   etapaMalha(fase,nome,peso,f): fase 'mata' (logo depois da mata do jogo) ou 'fim' (depois de tudo, como era o initMeshes
+   embrulhado). */
+const ETAPAS_MALHAS={mata:[],fim:[]};
+function etapaMalha(fase,nome,peso,f){ETAPAS_MALHAS[fase].push([nome,peso,f]);}
+function etapasMalhasEmOrdem(){const L=[];
+  L.push(['terreno',30,()=>{const w=buildWorld();MESH.world=litMesh(w.data);MESH.world.casters=w.casterVerts;MESH.sil=unMesh(w.sil);MESH.towerSil=unMesh(w.towerSil);MESH.tower=litMesh(w.tower);}]);
+  L.push(['mata',8,()=>{const V=vegGeometry();const inst=(k,max)=>instMesh(V[k],max);
   MESH.pine=inst('pine',3200);MESH.round=inst('round',1600);MESH.dead=inst('dead',700);MESH.stump=inst('stump',3000);MESH.birch=inst('birch',1000);
   MESH.pineN=inst('pineHi',900);MESH.roundN=inst('roundHi',520);MESH.deadN=inst('deadHi',260);MESH.birchN=inst('birchHi',360);MESH.flor=inst('flor',3600);
   MESH.rock=inst('rock',220);MESH.bush=inst('bush',480);MESH.berries=inst('berries',480);
   MESH.samambaia=inst('samambaia',2500);MESH.folhas=inst('folhas',2700);for(const T of GIGANTES){T.mesh=litMesh(geoGigante(T));T.meshM=litMesh(geoGigante(T,true));}
   MESH.pedra=inst('pedra',200);MESH.galho=inst('galho',200);MESH.cogumelo=inst('cogumelo',100);MESH.fibra=inst('fibra',200);MESH.grass=inst('grass',4600);
-  for(const[k,v]of[['pine',0.0035],['pineN',0.0035],['round',0.006],['roundN',0.006],['birch',0.006],['birchN',0.006],['dead',0.002],['deadN',0.002],['bush',0.035],['berries',0.035],['grass',0.42],['fibra',0.18],['flor',0.5],['samambaia',0.12]])MESH[k].sway=v;
-  const Wg=weaponGeometry();MESH.arma={};for(const k in Wg)MESH.arma[k]=litMesh(Wg[k]);
+  for(const[k,v]of[['pine',0.0035],['pineN',0.0035],['round',0.006],['roundN',0.006],['birch',0.006],['birchN',0.006],['dead',0.002],['deadN',0.002],['bush',0.035],['berries',0.035],['grass',0.42],['fibra',0.18],['flor',0.5],['samambaia',0.12]])MESH[k].sway=v;}]);
+  for(const e of ETAPAS_MALHAS.mata)L.push(e);
+  L.push(['cidade',8,()=>{const Wg=weaponGeometry();MESH.arma={};for(const k in Wg)MESH.arma[k]=litMesh(Wg[k]);
   const Og=obraGeometry();MESH.obra={};for(const k in Og)MESH.obra[k]=litMesh(Og[k]);
   const Xg=extraGeometry();for(const k in Xg)MESH[k]=litMesh(Xg[k]);
   {const cg=carroGeometry();MESH.carro=litMesh(cg.body);MESH.roda=litMesh(cg.roda);}
-  initCidadeMeshes();
-  FIREM=buildFire();MESH.ter=terMesh(terrainData());makeSplatTex(splatData(),SPLAT_S);
-  skInit();
+  initCidadeMeshes();}]);
+  L.push(['cidade',8,()=>{FIREM=buildFire();MESH.ter=terMesh(terrainData());makeSplatTex(splatData(),SPLAT_S);}]);
+  L.push(['lugares',8,()=>{skInit();
   const sv=survivorSpec();MESH.surv={mesh:litMesh(buildHuman(sv,survivorExtras)),bones:bonesOf(sv),sk:SKT.akai};P.ch=newChar(MESH.surv,1);
   MESH.roupa={};for(const id in ITEMS)if(ITEMS[id].tipo==='roupa')MESH.roupa[id]=litMesh(roupaGeometry(sv,id));
   MESH.roupaSK={};for(const id of['mochila','mochilaRef','mochilaPequena','mochilaExpedicao'])MESH.roupaSK[id]=litMesh(roupaGeometry(sv,id,{semAlca:true,dz:0.085,dy:0.02}));
-  aplicarAparencia(APAR_PADRAO);
-  const mkZ=(t,seed)=>{const sp=zombieSpec(t,seed);return{mesh:litMesh(buildHuman(sp,zombieExtras)),bones:bonesOf(sp),sk:SKT.yaku};};
+  aplicarAparencia(APAR_PADRAO);}]);
+  L.push(['lugares',8,()=>{const mkZ=(t,seed)=>{const sp=zombieSpec(t,seed);return{mesh:litMesh(buildHuman(sp,zombieExtras)),bones:bonesOf(sp),sk:SKT.yaku};};
   ZMESH.walker=[mkZ('walker',11),mkZ('walker',12),mkZ('walker',13),mkZ('walker',14),mkZ('walker',19),mkZ('walker',23)];
   faunaMalhas();ZMESH.cao=buildCao();CAO.ch=newChar(ZMESH.cao,1);caoInicio();
-  VULTO.ch=newChar(ZMESH.walker[3],1.08);VULTO.ch.vis=false;ZMESH.runner=[mkZ('runner',15),mkZ('runner',21)];ZMESH.brute=[mkZ('brute',16)];ZMESH.screamer=[mkZ('screamer',17)];zumbis2Meshes();armas3Meshes();efeitosMeshes();baseMilitarGeo();baseMilitarMontar();for(const f of INIT_MALHAS){try{f();}catch(e){console.error('malha',f.name,e);}}}
+  VULTO.ch=newChar(ZMESH.walker[3],1.08);VULTO.ch.vis=false;ZMESH.runner=[mkZ('runner',15),mkZ('runner',21)];ZMESH.brute=[mkZ('brute',16)];ZMESH.screamer=[mkZ('screamer',17)];zumbis2Meshes();armas3Meshes();efeitosMeshes();baseMilitarGeo();baseMilitarMontar();}]);
+  for(const f of INIT_MALHAS)L.push(['lugares',1,()=>{try{f();}catch(e){console.error('malha',f.name,e);}}]);
+  for(const e of ETAPAS_MALHAS.fim)L.push(e);
+  return L;}
+function initMeshes(){for(const e of etapasMalhasEmOrdem())e[2]();}
+/* a mesma montagem com uma pausa de um quadro quando passa de 40 ms sem pausa: a tela de carregamento se redesenha.
+   aviso(etapa,fração) vem antes de cada etapa e no fim ('fim',1). No modo de teste, window.__etapasTempo guarda quanto cada
+   etapa levou (para acertar os pesos) */
+/* um quadro para a tela de carregamento aparecer; com a janela escondida (minimizada) não tem quadro: segue depois de 100 ms */
+function quadroDeCarga(){return new Promise(r=>{let ok=false;const ir=()=>{if(!ok){ok=true;r();}};requestAnimationFrame(()=>setTimeout(ir,0));setTimeout(ir,100);});}
+async function montarMundoPorEtapas(aviso){const L=etapasMalhasEmOrdem(),tot=L.reduce((s,e)=>s+e[1],0),tempos=[],ini=performance.now();let feito=0,ult=0;
+  for(const[nome,peso,f]of L){aviso(nome,feito/tot);
+    if(!document.hidden&&performance.now()-ult>40){await quadroDeCarga();ult=performance.now();}
+    const t0=performance.now();f();tempos.push([nome,peso,Math.round(performance.now()-t0)]);feito+=peso;}
+  aviso('fim',1);if(TESTE){window.__etapasTempo=tempos;window.__etapasTotal=Math.round(performance.now()-ini);}}
 function buildWorld(){const C=new GB(1<<16,8),N=new GB(1<<16,8),TWR=new GB(1<<12,8),R=rng(20261026);
   gerarCidade();
   clearingProps(C,N,R);gasStation(C,N,R);farm(C,N,R);village(C,N,R);sitios(C,N,R);towerSite(C,N,R,TWR);

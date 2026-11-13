@@ -44,7 +44,7 @@ function mataMontar(){MATAV.ok=false;MATAV.esp=[];if(typeof MATA==='undefined'||
   MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='ilha1');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
   MATAV.ok=MATAV.esp.length>0;MATAV.info={especies:MATAV.esp.map(e=>({id:e.id,escala:+e.k.toFixed(3),altura:+(e.lim.hi[1]).toFixed(2),
     tri:e.lods.map(L=>L.reduce((s,p)=>s+p.m.tri,0))})),alturaRedonda:+hR.toFixed(2)};}
-{const _im=initMeshes;initMeshes=function(){const r=_im.apply(this,arguments);try{mataMontar();}catch(e){console.error('mata nova',e);MATAV.erro=String(e);MATAV.ok=false;}return r;};}
+etapaMalha('mata','mata',8,()=>{try{mataMontar();}catch(e){console.error('mata nova',e);MATAV.erro=String(e);MATAV.ok=false;}});
 /* as árvores de perto (redondas e bétulas) vão para a espécie de cada uma: de perto o LOD0, até o fim do "perto" o LOD1 */
 function mataDistribuir(){if(!MATAV.ok)return;const R0=(MATA_R0[cfg.graf]??22)**2,R1=(MATA_R1[cfg.graf]??60)**2,liga=mataLigada()&&mataProntas(),tmp=MATAV.tmp||(MATAV.tmp=new Float32Array(8));
   for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)p.m.n=0;MATAV.restoR.n=0;MATAV.restoB.n=0;if(MATAV.restoP)MATAV.restoP.n=0;MATAV.nExtra=0;

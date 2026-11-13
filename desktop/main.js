@@ -71,25 +71,42 @@ function salvarAntes() {
 }
 
 /* ---------- atualização automática ---------- */
-let atualizador = null, versaoBaixada = null;
+let atualizador = null, versaoBaixada = null, versaoNova = null, ultimoPct = -1;
 function avisarAtualizacao() {
   if (versaoBaixada && win && !win.isDestroyed()) win.webContents.send('vaydr:atualizacao-pronta', versaoBaixada);
 }
+/* o que a atualização está fazendo, para a tela de carregamento do jogo (10.2.1): procurando, baixando (com a porcentagem),
+   pronta, em dia, sem internet ou erro. A página lê o estado ao abrir (vaydr:atualizacao-estado?) e recebe as mudanças */
+let estadoAtualizacao = { estado: ATUALIZA ? 'esperando' : 'desligada', atual: app.getVersion() };
+function mudarEstadoAtualizacao(o) {
+  estadoAtualizacao = Object.assign({ atual: app.getVersion() }, o);
+  if (win && !win.isDestroyed()) win.webContents.send('vaydr:atualizacao-estado', estadoAtualizacao);
+}
+const ERRO_DE_REDE = /ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ERR_NETWORK|ERR_CONNECTION|ERR_ADDRESS_UNREACHABLE|ERR_PROXY|ERR_TIMED_OUT|ERR_NAME_RESOLUTION|ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|getaddrinfo|socket hang up/i;
+function semInternet(e) {
+  try { if (typeof net.isOnline === 'function' && !net.isOnline()) return true; } catch (_) {}
+  return ERRO_DE_REDE.test(String((e && (e.message || e.code)) || e || ''));
+}
 function iniciarAtualizacao() {
   if (!ATUALIZA) { log('atualização automática desligada', { empacotado: app.isPackaged, ligada: ATUALIZA_LIGADA, smoke: SMOKE }); return; }
-  try { atualizador = require('electron-updater').autoUpdater; } catch (e) { log('sem electron-updater', e.message); return; }
+  try { atualizador = require('electron-updater').autoUpdater; } catch (e) { log('sem electron-updater', e.message); mudarEstadoAtualizacao({ estado: 'desligada' }); return; }
   atualizador.autoDownload = true;
   atualizador.autoInstallOnAppQuit = true;
   atualizador.logger = { info: (m) => log('[atualização]', String(m)), warn: (m) => log('[atualização] aviso', String(m)), error: (m) => log('[atualização] erro', String(m)), debug: () => {} };
   const ev = (nome, valor) => { testes.eventos.push({ nome, valor, t: Date.now() }); if (SMOKE === 'atualizacao') fumacaAtualizacao(nome, valor); };
-  atualizador.on('checking-for-update', () => ev('procurando'));
-  atualizador.on('update-available', (i) => ev('tem-versao-nova', i && i.version));
-  atualizador.on('update-not-available', (i) => ev('sem-versao-nova', i && i.version));
-  atualizador.on('download-progress', (p) => { if (Math.round(p.percent) % 25 === 0) ev('baixando', Math.round(p.percent)); });
-  atualizador.on('update-downloaded', (i) => { versaoBaixada = i.version; log('versão nova baixada', i.version); ev('baixou', i.version); avisarAtualizacao(); });
-  atualizador.on('error', (e) => ev('erro', e && e.message));
+  atualizador.on('checking-for-update', () => { ev('procurando'); if (!versaoBaixada) mudarEstadoAtualizacao({ estado: 'procurando' }); });
+  atualizador.on('update-available', (i) => { ev('tem-versao-nova', i && i.version); versaoNova = i && i.version; ultimoPct = -1; mudarEstadoAtualizacao({ estado: 'baixando', versao: versaoNova, pct: 0 }); });
+  atualizador.on('update-not-available', (i) => { ev('sem-versao-nova', i && i.version); if (!versaoBaixada) mudarEstadoAtualizacao({ estado: 'em-dia' }); });
+  atualizador.on('download-progress', (p) => {
+    if (Math.round(p.percent) % 25 === 0) ev('baixando', Math.round(p.percent));
+    const pct = Math.max(0, Math.min(100, Math.floor(p.percent || 0)));
+    if (pct !== ultimoPct) { ultimoPct = pct; mudarEstadoAtualizacao({ estado: 'baixando', versao: versaoNova, pct }); }
+  });
+  atualizador.on('update-downloaded', (i) => { versaoBaixada = i.version; log('versão nova baixada', i.version); ev('baixou', i.version); mudarEstadoAtualizacao({ estado: 'pronta', versao: i.version }); avisarAtualizacao(); });
+  atualizador.on('error', (e) => { ev('erro', e && e.message); if (!versaoBaixada) mudarEstadoAtualizacao({ estado: semInternet(e) ? 'sem-internet' : 'erro' }); });
   const procurar = () => atualizador.checkForUpdates().catch((e) => log('procurar atualização falhou', e && e.message));
-  setTimeout(procurar, SMOKE ? 300 : 8000);
+  // procura logo ao abrir (antes eram 8 s): a tela de carregamento mostra o que está acontecendo
+  setTimeout(procurar, SMOKE ? 300 : 2000);
   if (!SMOKE) setInterval(procurar, 4 * 3600 * 1000);
 }
 
@@ -163,6 +180,7 @@ function prepararDownloads() {
 /* ---------- conversa com a página (preload.js) ---------- */
 const daPagina = (e) => { try { return new URL(e.senderFrame.url).protocol === 'vaydr:'; } catch (_) { return false; } };
 ipcMain.on('vaydr:versao', (e) => { e.returnValue = app.getVersion(); });
+ipcMain.on('vaydr:atualizacao-estado?', (e) => { e.returnValue = estadoAtualizacao; });
 ipcMain.on('vaydr:sair', (e) => { if (daPagina(e) && win) win.close(); });
 // Configurações > Resolução > Modo de tela (o mesmo que F11 e Alt+Enter; a escolha fica lembrada como sempre)
 ipcMain.on('vaydr:tela-cheia', (e, ligar) => { if (daPagina(e) && win) win.setFullScreen(!!ligar); });
@@ -191,6 +209,11 @@ async function fumaca() {
   const foto = async (nome) => { const img = await win.webContents.capturePage(); fs.writeFileSync(path.join(SAIDA, nome + '.png'), img.toPNG()); };
   const erros = () => testes.eventos.filter((e) => e.nome === 'erro-pagina');
   rel.gpu = app.getGPUFeatureStatus();
+  // a tela de carregamento (10.2.1): uma foto no meio da montagem do mundo, com a etapa, a porcentagem e a dica
+  const carga = await esperar("typeof window.__cargaPct==='number'&&window.__cargaPct>=0.3", 120000);
+  await foto(SMOKE === '1' ? '0-carregando' : '0-carregando-reaberto');
+  passo('tela de carregamento', { ok: carga, pct: await js('Math.round((window.__cargaPct||0)*100)'), etapa: await js("String(window.__cargaEtapa||'')"),
+    status: await js("(document.getElementById('cg-status')||{}).textContent||''"), dica: await js("(document.getElementById('cg-dica')||{}).textContent||''") });
   const menu = await esperar("!!document.getElementById('t-menu')&&!document.getElementById('t-menu').hidden&&typeof __nnc!=='undefined'", 180000);
   await dormir(2500);
   passo('menu apareceu', { ok: menu, gl: await js(INFO_GL), versaoNoMenu: await js("document.querySelector('#t-menu .versao').textContent"), botaoSair: await js("!!document.getElementById('m-sair')") });

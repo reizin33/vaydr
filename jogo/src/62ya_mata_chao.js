@@ -39,7 +39,7 @@ function mchMontar(){MCH.ok=false;if(typeof MATA==='undefined'||!MESH.samambaia|
     for(const v of A.variantes){const x=mchVariante(A,v.partes,MESH.bush.max,alt/Math.max(0.1,v.hi[1]-v.lo[1]),0,0,[0.95,1,0.93]);for(const m of x.ms)m.sway=MESH.bush.sway||0.03;MCH.moitas.push(x);}}}
   info.moitas=MCH.moitas.length;
   MCH.ok=MCH.fet.length>0||MCH.pedras.length>0||MCH.plantas.length>0||MCH.moitas.length>0;MCH.info=info;}
-{const _im=initMeshes;initMeshes=function(){const r=_im.apply(this,arguments);try{mchMontar();}catch(e){console.error('mata (chão)',e);MCH.ok=false;MCH.erro=String(e);}return r;};}
+etapaMalha('mata','mata',3,()=>{try{mchMontar();}catch(e){console.error('mata (chão)',e);MCH.ok=false;MCH.erro=String(e);}});
 /* onde nasce a folhagem nova: em volta dos troncos das árvores da mata (sorteio fixo: o mesmo mundo, a mesma mata) */
 function mchSemear(){MCH_PL.length=0;const R=rng(61031),n=MCH.plantas.length||12;let tent=0;
   for(const t of TREES){if(t.agua||!t.alive||t.alto||t.anel||t.serra)continue;if(R()>0.42)continue;
