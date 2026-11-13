@@ -32,8 +32,14 @@ async def run(plan):
                 elif k in('click','tap'):
                     # versão 10: "Novo mundo" (#m-novo) fica na tela Jogar sozinho; os testes antigos clicam nele direto do menu
                     if st[1]=='#m-novo':
+                        # o jogo pode ainda estar carregando (os roteiros esperam só 2 s): espera o menu antes de abrir Jogar sozinho
+                        try: await pg.wait_for_function("typeof __nnc!=='undefined'&&__nnc.G&&__nnc.G.modo==='menu'",timeout=120000,polling=250)
+                        except Exception: pass
                         await pg.evaluate("()=>{const b=document.getElementById('m-novo');if(b&&!b.offsetParent){try{__nnc.ev('pfAbrirSozinho')()}catch(e){}}}")
-                    await (pg.click(st[1],timeout=120000) if k=='click' else pg.tap(st[1],timeout=120000))
+                        # na tela pequena dos testes (640x360) o botão da tela Jogar sozinho fica fora da área visível: clique pelo próprio botão
+                        await pg.evaluate("()=>document.getElementById('m-novo').click()")
+                    else:
+                        await (pg.click(st[1],timeout=120000) if k=='click' else pg.tap(st[1],timeout=120000))
                     # Novo jogo abre a criação do personagem: os testes antigos confirmam o personagem padrão
                     # (passo ["click","#m-novo","criacao"] deixa a tela aberta para testar a criação)
                     if st[1] in('#m-novo','#c-sim') and not(len(st)>2 and st[2]=='criacao'):
