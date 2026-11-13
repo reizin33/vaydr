@@ -7,6 +7,12 @@ page = open(os.path.join(SRC, 'page.html'), encoding='utf-8').read()
 import re
 _lob = re.search(r'multi:"(data:image/jpeg;base64,[A-Za-z0-9+/=]+)"', open(os.path.join(SRC, '21g_lobby_dados.js'), encoding='utf-8').read())
 page = page.replace('__IMG_CARGA__', _lob.group(1) if _lob else '')
+# FONTES=caminho/fontes.css (só para testes fora do .exe): põe as fontes do jogo dentro da página, como o desktop/preparar.mjs faz
+# no .exe (o arquivo vem do teste do Windows, junto com as fotos). Sem isso a página usa o link do Google Fonts, como sempre
+if os.environ.get('FONTES'):
+    _css = open(os.environ['FONTES'], encoding='utf-8').read()
+    page = re.sub(r'<link rel="preconnect"[^>]*>\s*', '', page)
+    page = re.sub(r'<link rel="stylesheet" href="https://fonts\.googleapis\.com/css2\?[^"]+">', lambda m: '<style>/* fontes do jogo dentro da página (teste) */\n' + _css + '</style>', page, count=1)
 js = '\n'.join(open(f, encoding='utf-8').read() for f in sorted(glob.glob(os.path.join(SRC, '*.js'))))
 out = page.replace('/*__JS__*/', js)
 SAIDA = os.environ.get('SAIDA')   # SAIDA=test_dev.html: só gera esse arquivo (para testar sem mexer no test.html nem no site)

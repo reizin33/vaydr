@@ -102,6 +102,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force teste | Out-Null
           Copy-Item "$env:APPDATA\VAYDR\vaydr.log" teste\ -ErrorAction SilentlyContinue
+          Copy-Item "desktop\app\fontes.css" teste\ -ErrorAction SilentlyContinue
 
       - name: Guardar fotos e relatórios dos testes
         if: always()

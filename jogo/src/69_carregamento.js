@@ -62,5 +62,5 @@ function cargaAtualizacao(o){const el=$('cg-status');if(!el)return;const f=o&&ty
 if(PC_APP){try{if(typeof PC_APP.estadoAtualizacao==='function')cargaAtualizacao(PC_APP.estadoAtualizacao());
   if(typeof PC_APP.aoEstadoAtualizacao==='function')PC_APP.aoEstadoAtualizacao(cargaAtualizacao);}catch(e){console.error('atualização na tela de carregamento',e);}}
 /* a última etapa da montagem: os sons gravados já saem do texto (base64) para bytes; no primeiro clique só falta o áudio */
-etapaMalha('fim','sons',1,()=>{try{sgravPreparar();}catch(e){console.error('sons (preparo)',e);}});
+etapaMalha('fim','sons',0.5,()=>{try{sgravPreparar();}catch(e){console.error('sons (preparo)',e);}});
 cargaDica();CARGA.troca=setInterval(cargaTrocarDica,7000);

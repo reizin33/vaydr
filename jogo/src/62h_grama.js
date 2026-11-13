@@ -27,7 +27,7 @@ function gramaDistribuir(){if(!GRAMA.ok)return;const src=MESH.grass,a=src.arr,n=
     const m=V[k];if(m.n>=m.max)continue;m.arr.set(a.subarray(o,o+8),m.n*8);m.n++;}
   for(const m of V){gl.bindBuffer(gl.ARRAY_BUFFER,m.ib);gl.bufferSubData(gl.ARRAY_BUFFER,0,m.arr,0,m.n*8);}}
 function gramaPronta(){return GRAMA.ok&&!!GRAMA.tex&&!!GRAMA.tex.pronta;}
-etapaMalha('mata','mata',2,()=>{try{gramaMontar();}catch(e){console.error('capim novo',e);GRAMA.ok=false;}});
+etapaMalha('mata','mata',1,()=>{try{gramaMontar();}catch(e){console.error('capim novo',e);GRAMA.ok=false;}});
 {const _rg=rebuildGrass;rebuildGrass=function(){const r=_rg.apply(this,arguments);try{gramaDistribuir();}catch(e){console.error('capim novo',e);}return r;};}
 /* no desenho: no lugar do capim antigo entram os 4 tufos novos (só no passe com luz; o capim não faz sombra, como antes) */
 {const _di=drawInst;drawInst=function(Pg,m){if(m===MESH.grass&&Pg===PLI&&gramaPronta()){for(const v of GRAMA.v)_di(Pg,v);return;}return _di.apply(this,arguments);};}

@@ -62,7 +62,8 @@ function buildFire(){const g=new GB(512,8),R=rng(31),bones=[];
   L.forEach((l,i)=>{add(g,cylTris(0,l[0],l[1],5,{phase:R()*6}),ID,lin(l[2]),{b:i,e:l[3]});const a=i/L.length*6.283,r=i<3?0.13:i<5?0.06:0.02;bones.push([Math.cos(a)*r,Math.sin(a)*r,R()*6.283,l[1]]);});
   return{mesh:litMesh(g.data()),bones,m:new Float32Array(192)};}
 let FIREM=null;
-/* a montagem do mundo por etapas (13/11/2026): cada etapa é [nome na tela de carregamento, peso (o tempo dela, mais ou menos),
+/* a montagem do mundo por etapas (13/11/2026): cada etapa é [nome na tela de carregamento, peso (de fábrica: o tempo medido dela,
+   em quartos de segundo, num computador sem placa de vídeo; depois a barra aprende o tempo do PC da pessoa),
    função]. initMeshes() roda todas de uma vez, como antes; boot() roda uma por vez (montarMundoPorEtapas) e a tela de
    carregamento mostra a etapa e a porcentagem de verdade entre uma e outra. Os módulos de depois põem as etapas deles com
    etapaMalha(fase,nome,peso,f): fase 'mata' (logo depois da mata do jogo) ou 'fim' (depois de tudo, como era o initMeshes
@@ -70,8 +71,8 @@ let FIREM=null;
 const ETAPAS_MALHAS={mata:[],fim:[]};
 function etapaMalha(fase,nome,peso,f){ETAPAS_MALHAS[fase].push([nome,peso,f,fase+'/'+nome+'/'+ETAPAS_MALHAS[fase].length]);}
 function etapasMalhasEmOrdem(){const L=[];
-  L.push(['terreno',30,()=>{const w=buildWorld();MESH.world=litMesh(w.data);MESH.world.casters=w.casterVerts;MESH.sil=unMesh(w.sil);MESH.towerSil=unMesh(w.towerSil);MESH.tower=litMesh(w.tower);},'terreno']);
-  L.push(['mata',8,()=>{const V=vegGeometry();const inst=(k,max)=>instMesh(V[k],max);
+  L.push(['terreno',67,()=>{const w=buildWorld();MESH.world=litMesh(w.data);MESH.world.casters=w.casterVerts;MESH.sil=unMesh(w.sil);MESH.towerSil=unMesh(w.towerSil);MESH.tower=litMesh(w.tower);},'terreno']);
+  L.push(['mata',19,()=>{const V=vegGeometry();const inst=(k,max)=>instMesh(V[k],max);
   MESH.pine=inst('pine',3200);MESH.round=inst('round',1600);MESH.dead=inst('dead',700);MESH.stump=inst('stump',3000);MESH.birch=inst('birch',1000);
   MESH.pineN=inst('pineHi',900);MESH.roundN=inst('roundHi',520);MESH.deadN=inst('deadHi',260);MESH.birchN=inst('birchHi',360);MESH.flor=inst('flor',3600);
   MESH.rock=inst('rock',220);MESH.bush=inst('bush',480);MESH.berries=inst('berries',480);
@@ -79,22 +80,22 @@ function etapasMalhasEmOrdem(){const L=[];
   MESH.pedra=inst('pedra',200);MESH.galho=inst('galho',200);MESH.cogumelo=inst('cogumelo',100);MESH.fibra=inst('fibra',200);MESH.grass=inst('grass',4600);
   for(const[k,v]of[['pine',0.0035],['pineN',0.0035],['round',0.006],['roundN',0.006],['birch',0.006],['birchN',0.006],['dead',0.002],['deadN',0.002],['bush',0.035],['berries',0.035],['grass',0.42],['fibra',0.18],['flor',0.5],['samambaia',0.12]])MESH[k].sway=v;},'vegetacao']);
   for(const e of ETAPAS_MALHAS.mata)L.push(e);
-  L.push(['cidade',8,()=>{const Wg=weaponGeometry();MESH.arma={};for(const k in Wg)MESH.arma[k]=litMesh(Wg[k]);
+  L.push(['cidade',72,()=>{const Wg=weaponGeometry();MESH.arma={};for(const k in Wg)MESH.arma[k]=litMesh(Wg[k]);
   const Og=obraGeometry();MESH.obra={};for(const k in Og)MESH.obra[k]=litMesh(Og[k]);
   const Xg=extraGeometry();for(const k in Xg)MESH[k]=litMesh(Xg[k]);
   {const cg=carroGeometry();MESH.carro=litMesh(cg.body);MESH.roda=litMesh(cg.roda);}
   initCidadeMeshes();},'cidade-armas']);
-  L.push(['cidade',8,()=>{FIREM=buildFire();MESH.ter=terMesh(terrainData());makeSplatTex(splatData(),SPLAT_S);},'cidade-terreno']);
-  L.push(['lugares',8,()=>{skInit();
+  L.push(['cidade',10,()=>{FIREM=buildFire();MESH.ter=terMesh(terrainData());makeSplatTex(splatData(),SPLAT_S);},'cidade-terreno']);
+  L.push(['lugares',15,()=>{skInit();
   const sv=survivorSpec();MESH.surv={mesh:litMesh(buildHuman(sv,survivorExtras)),bones:bonesOf(sv),sk:SKT.akai};P.ch=newChar(MESH.surv,1);
   MESH.roupa={};for(const id in ITEMS)if(ITEMS[id].tipo==='roupa')MESH.roupa[id]=litMesh(roupaGeometry(sv,id));
   MESH.roupaSK={};for(const id of['mochila','mochilaRef','mochilaPequena','mochilaExpedicao'])MESH.roupaSK[id]=litMesh(roupaGeometry(sv,id,{semAlca:true,dz:0.085,dy:0.02}));
   aplicarAparencia(APAR_PADRAO);},'lugares-sobrevivente']);
-  L.push(['lugares',8,()=>{const mkZ=(t,seed)=>{const sp=zombieSpec(t,seed);return{mesh:litMesh(buildHuman(sp,zombieExtras)),bones:bonesOf(sp),sk:SKT.yaku};};
+  L.push(['lugares',28,()=>{const mkZ=(t,seed)=>{const sp=zombieSpec(t,seed);return{mesh:litMesh(buildHuman(sp,zombieExtras)),bones:bonesOf(sp),sk:SKT.yaku};};
   ZMESH.walker=[mkZ('walker',11),mkZ('walker',12),mkZ('walker',13),mkZ('walker',14),mkZ('walker',19),mkZ('walker',23)];
   faunaMalhas();ZMESH.cao=buildCao();CAO.ch=newChar(ZMESH.cao,1);caoInicio();
   VULTO.ch=newChar(ZMESH.walker[3],1.08);VULTO.ch.vis=false;ZMESH.runner=[mkZ('runner',15),mkZ('runner',21)];ZMESH.brute=[mkZ('brute',16)];ZMESH.screamer=[mkZ('screamer',17)];zumbis2Meshes();armas3Meshes();efeitosMeshes();baseMilitarGeo();baseMilitarMontar();},'lugares-zumbis']);
-  for(const f of INIT_MALHAS)L.push(['lugares',1,()=>{try{f();}catch(e){console.error('malha',f.name,e);}},'m:'+(f.name||'')]);
+  for(const f of INIT_MALHAS)L.push(['lugares',0.5,()=>{try{f();}catch(e){console.error('malha',f.name,e);}},'m:'+(f.name||'')]);
   for(const e of ETAPAS_MALHAS.fim)L.push(e);
   return L;}
 function initMeshes(){for(const e of etapasMalhasEmOrdem())e[2]();}

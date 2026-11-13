@@ -84,7 +84,7 @@ function modxMontar(){MODX_INFO={};if(typeof MODX==='undefined')return;
     for(const v of PINHO.v)v.madeira.sway=MESH.pineN.sway;
     PINHO.resto=instClone(MESH.pineN,MESH.pineN.max);
     PINHO.ok=PINHO.v.length===3;MODX_INFO.pinheiro=PINHO.v.map(v=>({madeira:v.madeira.tri,agulha:v.agulha.tri}));}}catch(e){console.error('pinheiro',e);PINHO.ok=false;}}
-etapaMalha('fim','lugares',2,()=>modxMontar());
+etapaMalha('fim','lugares',1.5,()=>modxMontar());
 {const _rg=rebuildGrass;rebuildGrass=function(){const r=_rg.apply(this,arguments);try{galhosAtualizar();}catch(e){console.error('galhos secos',e);}return r;};}
 /* no desenho com luz: no lugar do pinheiro detalhado antigo entram os 3 modelos (madeira com o lado de trás escondido; agulhas dos dois lados) */
 {const _di=drawInst;drawInst=function(Pg,m){if(m===MESH.pineN&&Pg===PLI&&pinhoPronto()){_di(Pg,PINHO.resto);for(const v of PINHO.v)_di(Pg,v.madeira);

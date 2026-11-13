@@ -47,4 +47,7 @@ html = html.replace(/<link rel="preconnect"[^>]*>\s*/g, '');
 if (html.includes('fonts.googleapis.com') || html.includes('fonts.gstatic.com')) throw new Error('ainda sobrou endereço do Google Fonts na página');
 fs.mkdirSync(path.dirname(DESTINO), { recursive: true });
 fs.writeFileSync(DESTINO, html);
+// as mesmas fontes num arquivo à parte: o teste do .exe manda junto com as fotos, e as fotos e vídeos feitos fora do Windows
+// (jogo/build.py com FONTES=...) ficam com a letra igual à do jogo
+fs.writeFileSync(path.join(path.dirname(DESTINO), 'fontes.css'), saida);
 console.log(`ok: ${grupos.size} fontes (${Math.round(total / 1024)} KB) dentro de app/index.html (${(Buffer.byteLength(html) / 1e6).toFixed(1)} MB)`);
