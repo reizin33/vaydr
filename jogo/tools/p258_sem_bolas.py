@@ -36,8 +36,8 @@ async def main():
               return{especies_perto:n,placas_longe:l,extra:V.nExtra,restoPinho:V.restoP?V.restoP.n:null,restoRedonda:V.restoR.n,moitas:(M.moitas||[]).reduce((s,v)=>s+v.ms[0].n,0),pronta:X('mataProntas')(),graf:__nnc.cfg.graf}}""")
             await pg.screenshot(path=BASE + 'shots/p258_' + PRE + '_' + nome + '.png', timeout=600000)
             print('foto', nome, json.dumps(st), '%.0fs' % (time.time() - t0), flush=True)
-        await lugar(6.0, 18.0, 6.0, 30.0, 0.05, '3', None, 0.0); await foto('clareira')
-        await lugar(-10.0, 30.0, -80.0, -60.0, -0.22, '3', 34.0); await foto('panorama')
+        await lugar(6.0, 18.0, 6.0, 6.0, 0.05, '3', None, 0.0); await foto('clareira')        # como a foto do dono: olhando para a barraca, ele de frente
+        await lugar(-10.0, 30.0, -80.0, -60.0, -0.22, '1', 34.0); await foto('panorama')       # primeira pessoa (no alto ele ficaria no ar)
         if alvos['g']:
             g = alvos['g']; await lugar(g['x'] + 16, g['z'] + 4, g['x'], g['z'], 0.32); await foto('gigante')
         if alvos['f']:
@@ -45,7 +45,7 @@ async def main():
         if alvos['m']:
             m = alvos['m']; await lugar(m['x'] + 3.5, m['z'] + 1.5, m['x'], m['z'], -0.05); await foto('moita')
         await pg.evaluate("()=>{const n=__nnc;n.cfg.graf='baixo';n.aplicarCfg&&n.aplicarCfg();}")
-        await lugar(6.0, 18.0, 6.0, 30.0, 0.05, '3', None, 0.0); await foto('clareira_baixo')
+        await lugar(6.0, 18.0, 6.0, 6.0, 0.05, '3', None, 0.0); await foto('clareira_baixo')
         print(json.dumps({'erros': erros[:8]}, ensure_ascii=False))
         await b.close()
 asyncio.run(main())

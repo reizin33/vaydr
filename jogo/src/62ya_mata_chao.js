@@ -6,7 +6,8 @@
      árvores da mata (onde a sombra é maior), longe de estrada, trilha, casa e lugar com nome. Desenhada perto do jogador.
    · Pedras: as pedras de sempre (mesmo lugar, tamanho, colisão e minério) passam a ser pedras escaneadas (o matacão e as pedras
      com musgo). A sombra continua a da pedra de antes.
-   12/11, 22h30: as moitas redondas viram os arbustos de verdade (shrub_04 e shrub_02), e tudo isso vale também no gráfico Baixo
+   12/11, 22h30: as moitas redondas viram folhagem grande de verdade (calathea e antúrio; os arbustos shrub_02/04 saíram porque
+   a conversão deixou as folhas como placas claras no chão), e tudo isso vale também no gráfico Baixo
    (o dono pediu tirar todas as formas de bola e cone). Enquanto as texturas não carregam, aparece o desenho antigo. */
 const MCH={ok:false,fet:[],pedras:[],plantas:[],moitas:[],info:null,R:{baixo:14,medio:22,alto:30,ultra:40}};
 const MCH_PL=[];   // folhagem nova: {x,z,y,r,s,v (variante),t}
@@ -30,11 +31,11 @@ function mchMontar(){MCH.ok=false;if(typeof MATA==='undefined'||!MESH.samambaia|
       for(const p of pc)vs.push({A:MATA.pedras_musgo,partes:[p],lo:p.lo,hi:p.hi});}
     MCH.pedras=vs.map(v=>{const w=Math.max(v.hi[0]-v.lo[0],v.hi[2]-v.lo[2]),k=larg*1.05/Math.max(0.05,w);return mchVariante(v.A,v.partes,MESH.rock.max,k,0,-(v.hi[1]-v.lo[1])*k*0.12);});info.pedras=MCH.pedras.length;}
   /* folhagem do chão da mata */
-  MCH.plantas=[];const esp=[['calathea',1.9,[1,1,1]],['antorio',1.7,[1,1,1]],['monguba',1.25,[1,1,1]],['arbusto2',1.0,[0.95,1,0.95]]];
+  MCH.plantas=[];const esp=[['calathea',1.9,[1,1,1]],['antorio',1.7,[1,1,1]],['monguba',1.25,[1,1,1]]];   // o arbusto (shrub_02) saiu: a conversão deixou as folhas como placas claras no chão
   for(const[id,k,tint]of esp){const A=MATA[id];if(!A||!A.variantes)continue;for(const v of A.variantes){const x=mchVariante(A,v.partes,900,k,0,0,tint);x.id=id;for(const m of x.ms)m.sway=0.02;MCH.plantas.push(x);}}
   info.plantas=MCH.plantas.length;
   /* moitas (as bolas de folha de sempre, com e sem frutinha): viram os arbustos de verdade, do tamanho da moita, um pouco maiores */
-  MCH.moitas=[];if(V.bush&&MESH.bush){const L=mchLim(V.bush),alt=(L.hi[1]-L.lo[1])*1.3;for(const id of['arbusto4','arbusto2']){const A=MATA[id];if(!A||!A.variantes)continue;
+  MCH.moitas=[];if(V.bush&&MESH.bush){const L=mchLim(V.bush),alt=(L.hi[1]-L.lo[1])*1.3;for(const id of['calathea','antorio']){const A=MATA[id];if(!A||!A.variantes)continue;
     for(const v of A.variantes){const x=mchVariante(A,v.partes,MESH.bush.max,alt/Math.max(0.1,v.hi[1]-v.lo[1]),0,0,[0.95,1,0.93]);for(const m of x.ms)m.sway=MESH.bush.sway||0.03;MCH.moitas.push(x);}}}
   info.moitas=MCH.moitas.length;
   MCH.ok=MCH.fet.length>0||MCH.pedras.length>0||MCH.plantas.length>0||MCH.moitas.length>0;MCH.info=info;}

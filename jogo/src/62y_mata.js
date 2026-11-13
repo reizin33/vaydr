@@ -39,7 +39,7 @@ function mataMontar(){MATAV.ok=false;MATAV.esp=[];if(typeof MATA==='undefined'||
         const m=instTex(L[nome],max,tex[nome],fol?1:0,f=>mataGeo(f,k,fol));m.sway=MESH.roundN.sway;partes.push({m,fol,tex:tex[nome]});}return partes;});
     MATAV.esp.push({id,tex,lods,k,lim:{lo:A.lo.map(v=>v*k),hi:A.hi.map(v=>v*k)}});}
   MATAV.restoR=instClone(MESH.roundN,MESH.roundN.max);MATAV.restoB=instClone(MESH.birchN,MESH.birchN.max);MATAV.restoP=MESH.pineN?instClone(MESH.pineN,MESH.pineN.max):null;
-  MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='ilha3');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
+  MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='pequena');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
   MATAV.ok=MATAV.esp.length>0;MATAV.info={especies:MATAV.esp.map(e=>({id:e.id,escala:+e.k.toFixed(3),altura:+(e.lim.hi[1]).toFixed(2),
     tri:e.lods.map(L=>L.reduce((s,p)=>s+p.m.tri,0))})),alturaRedonda:+hR.toFixed(2)};}
 {const _im=initMeshes;initMeshes=function(){const r=_im.apply(this,arguments);try{mataMontar();}catch(e){console.error('mata nova',e);MATAV.erro=String(e);MATAV.ok=false;}return r;};}
@@ -51,9 +51,10 @@ function mataDistribuir(){if(!MATAV.ok)return;const R0=(MATA_R0[cfg.graf]??22)**
     for(let i=0;i<src.n;i++){const o=i*8;if(!liga){copiarInst(re,a,o);continue;}
       const e=MATAV.esp[mataEsp(a[o],a[o+2])],d=d2(a[o],a[o+2],P.x,P.z);
       if(ks!==1){for(let k=0;k<8;k++)tmp[k]=a[o+k];tmp[4]*=ks;poe(e,d,tmp,0);}else poe(e,d,a,o);}}
-  /* árvores de fruta dos quintais e dos sítios: a copa vira a árvore pequena de verdade, na altura da de antes (~3,4 m) */
+  /* árvores de fruta dos quintais e dos sítios: a copa vira a árvore pequena de verdade (copa larga e baixa, 4,2 m), com as frutas
+     dentro da copa (a ilha3, mais rala, deixava as frutas soltas no ar) */
   if(liga&&MATAV.peq>=0&&typeof FRUTEIRAS!=='undefined'){const e=MATAV.esp[MATAV.peq];for(const F of FRUTEIRAS){const d=d2(F.x,F.z,P.x,P.z);if(d>R1*1.5)continue;
-      tmp[0]=F.x;tmp[1]=F.y;tmp[2]=F.z;tmp[3]=F.x*1.7+F.z;tmp[4]=3.5/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1.02;tmp[7]=0.92;for(const p of e.lods[d<R0?0:1])copiarInst(p.m,tmp,0);}}
+      tmp[0]=F.x;tmp[1]=F.y;tmp[2]=F.z;tmp[3]=F.x*1.7+F.z;tmp[4]=4.2/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1.02;tmp[7]=0.92;for(const p of e.lods[d<R0?0:1])copiarInst(p.m,tmp,0);}}
   /* gigantes: copa de jacarandá do tamanho delas */
   if(liga&&MATAV.jac>=0){const e=MATAV.esp[MATAV.jac];for(const T of GIGANTES){tmp[0]=T.x;tmp[1]=T.y-0.3;tmp[2]=T.z;tmp[3]=T.id*2.39;tmp[4]=T.H*1.12/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1;tmp[7]=0.95;
       const d=d2(T.x,T.z,P.x,P.z);if(d<170*170)for(const p of e.lods[d<R0*2.6?0:1])copiarInst(p.m,tmp,0);else{MATAV.extra.set(tmp,MATAV.nExtra*8);MATAV.nExtra++;}}}
