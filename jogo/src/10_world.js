@@ -545,7 +545,8 @@ function vegGeometry(){const R=rng(5),G={};
       const Vv=(p,c)=>g.v8(p[0],p[1],p[2],c[0]*k,c[1]*k,c[2]*k,0,0);
       Vv(p0,base);Vv(p1,base);Vv(m1,cm);Vv(p0,base);Vv(m1,cm);Vv(m0,cm);Vv(m0,cm);Vv(m1,cm);Vv(t,tip);}
     return g.data();})();
-  G.flor=mk(g=>{add(g,cylTris(0.008,0.011,0.3,4),ID,lin(0x3d5a22));add(g,boxTris(0.06,0.012,0.02),mat(0.03,0.16,0,0,0.4,0.5),lin(0x3d5a22));
-    for(let i=0;i<5;i++){const a=i/5*6.283;add(g,boxTris(0.055,0.012,0.032),mat(Math.cos(a)*0.036,0.3,Math.sin(a)*0.036,0,-a,0.15),[0.95,0.95,0.95]);}
-    add(g,boxTris(0.032,0.022,0.032),mat(0,0.31,0),[0.9,0.62,0.12]);});
+  G.flor=mk(g=>{const cl=lin(0x6b8f3a);add(g,cylTris(0.006,0.01,0.14,5),ID,cl);   // caule curto e verde-claro, folhas rente ao chão (não parece alfinete solto)
+    for(let i=0;i<4;i++){const a=i/4*6.283+0.4;add(g,boxTris(0.07,0.008,0.028),mat(Math.cos(a)*0.035,0.012,Math.sin(a)*0.035,0,-a,-0.25),lin(0x557a2e));}
+    for(let i=0;i<5;i++){const a=i/5*6.283;add(g,boxTris(0.05,0.01,0.03),mat(Math.cos(a)*0.032,0.14,Math.sin(a)*0.032,0,-a,0.15),[0.95,0.95,0.95]);}
+    add(g,boxTris(0.03,0.02,0.03),mat(0,0.15,0),[0.9,0.62,0.12]);});
   return G;}

@@ -103,6 +103,7 @@ PASSOS.push(function mataFotos(){if(MATAV.longe||MATAV.erroFoto||!MATAV.ok||!mat
 /* desenho com luz: no lugar das redondas e bétulas de perto entram as espécies (madeira com o lado de trás escondido, folhas dos
    dois lados); de longe, as placas da própria espécie */
 {const _di=drawInst;drawInst=function(Pg,m){
+  if(Pg===PDI&&MATAV.sombraPerto&&(m===MESH.roundN||m===MESH.birchN||m===MESH.pineN))return;   // sombra de perto: quem faz é a árvore nova (mataSombra)
   if(Pg===PLI&&MATAV.ok&&(m===MESH.roundN||m===MESH.birchN||(m===MESH.pineN&&MATAV.restoP))){_di(Pg,m===MESH.roundN?MATAV.restoR:m===MESH.birchN?MATAV.restoB:MATAV.restoP);
     if(m===MESH.roundN&&mataLigada()&&mataProntas()){for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)if(!p.fol&&p.m.n)_di(Pg,p.m);
       const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)if(p.fol&&p.m.n)_di(Pg,p.m);if(cf)gl.enable(gl.CULL_FACE);}
@@ -116,4 +117,17 @@ gigMalha=function(T){return T.meshM&&MATAV.ok&&MATAV.jac>=0&&mataLigada()&&mataP
 {const _bw=buildWorld;buildWorld=function(){if(typeof COPAS_FRUT!=='undefined')COPAS_FRUT.n=0;MESH.copasFrut=null;return _bw.apply(this,arguments);};}
 function mataCopasFrut(){if(typeof COPAS_FRUT==='undefined'||!COPAS_FRUT.n)return null;if(!MESH.copasFrut)MESH.copasFrut=litMesh(COPAS_FRUT.data());return MESH.copasFrut;}
 DESENHO.opaco.push(function mataFrutDesenho(Pg){if(mataLigada()&&mataProntas()&&MATAV.peq>=0)return;const m=mataCopasFrut();if(m)drawStat(Pg,m,ID);});
-DESENHO.sombra.push(function mataFrutSombra(Pg){const m=mataCopasFrut();if(m)drawStat(Pg,m,ID);});
+DESENHO.sombra.push(function mataFrutSombra(Pg,perto){if(perto&&mataLigada()&&mataProntas()&&MATAV.peq>=0)return;const m=mataCopasFrut();if(m)drawStat(Pg,m,ID);});
+/* sombra de perto das árvores novas: madeira e folhas (com o recorte da textura), no lugar da sombra da árvore de bola e cone;
+   na sombra de longe (borrada) continua a forma antiga. Gigante: na de perto, só a madeira dela (a copa é o jacarandá). */
+const MATA_DVS=DEPTH_VS.replace('layout(location=0) in vec3 aPos;','layout(location=0) in vec3 aPos;layout(location=6) in vec2 aUV;out vec2 vUV;').replace('void main(){','void main(){vUV=aUV;');
+const MATA_DFS='precision mediump float;in vec2 vUV;uniform sampler2D uAlbT;uniform float uCorte;void main(){if(uCorte>0.5&&texture(uAlbT,vUV).a<0.5)discard;}';
+let PDIT=null;
+DESENHO.sombra.push(function mataSombra(Pg,perto){MATAV.sombraPerto=!!perto&&mataLigada()&&mataProntas();if(!MATAV.sombraPerto)return;
+  if(!PDIT)PDIT=program(MATA_DVS,MATA_DFS,'#define INST\n');const vp=gl.getUniform(Pg.p,Pg.u.uViewProj);
+  gl.useProgram(PDIT.p);gl.uniformMatrix4fv(PDIT.u.uViewProj,false,vp);if(PDIT.u.uTime)gl.uniform1f(PDIT.u.uTime,G.t);if(PDIT.u.uWind)gl.uniform2fv(PDIT.u.uWind,E.wind);if(PDIT.u.uAlbT)gl.uniform1i(PDIT.u.uAlbT,5);
+  const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);
+  for(const e of MATAV.esp)for(const L of e.lods)for(const p of L){const m=p.m;if(!m.n)continue;if(PDIT.u.uCorte)gl.uniform1f(PDIT.u.uCorte,p.fol?1:0);if(PDIT.u.uSway)gl.uniform1f(PDIT.u.uSway,m.sway||0);
+    gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,p.tex);gl.activeTexture(gl.TEXTURE0);gl.bindVertexArray(m.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,m.count,m.n);}
+  if(cf)gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);gl.useProgram(Pg.p);});
+gigSombra=function(T,perto){return perto&&T.meshM&&MATAV.ok&&MATAV.jac>=0&&mataLigada()&&mataProntas()?T.meshM:T.mesh;};

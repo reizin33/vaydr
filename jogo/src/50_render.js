@@ -2,6 +2,7 @@
 let W=1,H=1,dpr=1,vegDirty=true,vegT=0,grassT=0;
 /* malha da gigante para desenhar: a de sempre (a mata nova, quando ligada, usa só a madeira e põe a copa de verdade) */
 function gigMalha(T){return T.mesh;}
+function gigSombra(T,perto){return T.mesh;}
 function obraGeometry(){const O={},R=rng(77);const mk=f=>{const g=new GB(1024,8);f(g);return g.data();};
   O.barricada=mk(g=>{add(g,cylTris(0.17,0.17,2.9,7),mat(1.45,0.62,0,0,0,Math.PI/2),lin(0x5d4129),{j:0.1,rnd:R});
     for(let k=0;k<4;k++){const sx=-1.05+k*0.7;for(const sg of[1,-1]){const dy=Math.sin(0.87),dz=Math.cos(0.87)*sg,L=1.95,by=0.62-dy*L/2,bz=-dz*L/2;
@@ -350,7 +351,7 @@ function sombraCascata(lvp,perto,chars,hand,armaMesh){const R=perto?60:150;
   for(const o of OB)if(d2(o.x,o.z,P.x,P.z)<R*R)desenharObra(PD,o);
   if(G.fab&&G.fab.nv>=2)drawStat(PD,MESH.obra.oficina,trs(TMP,BENCH[0],ground(BENCH[0],BENCH[1]),BENCH[1],0,-0.35,0,1,1,1));
   if(MESH.baseMil&&d2(BASEM.x,BASEM.z,P.x,P.z)<(R+30)*(R+30))drawStat(PD,MESH.baseMil,ID);
-  for(const T of GIGANTES)if(d2(T.x,T.z,P.x,P.z)<(perto?62:150)**2)drawStat(PD,T.mesh,trs(TMP,T.x,T.y,T.z,0,0,0,1,1,1));   // sombra: a copa antiga faz a sombra da copa nova
+  for(const T of GIGANTES)if(d2(T.x,T.z,P.x,P.z)<(perto?62:150)**2)drawStat(PD,gigSombra(T,perto),trs(TMP,T.x,T.y,T.z,0,0,0,1,1,1));
   desenharCidade(PD,true,perto?55:140);
   if(perto){for(const c of CAIXAS)if(c.x!==undefined&&c.estado!=='espera'&&d2(c.x,c.z,P.x,P.z)<30*30)drawStat(PD,MESH.obra['cx_'+c.cat],trs(TMP,c.x,c.y,c.z,0,c.yaw,0,1,1,1));
     if(armaMesh&&cfg.cam!=='1'&&!CARRO.ativo)drawStat(PD,armaMesh,hand);}
