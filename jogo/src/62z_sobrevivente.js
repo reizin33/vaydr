@@ -56,7 +56,7 @@ function survCiclo(n){const c=SKCLIP[n],v=c&&c.vel?Math.hypot(c.vel[0],c.vel[2])
 function survLoco(ch,dt){const s=ch.sk;
   if(!s.loco)s.loco={D:new Float32Array(SK_N*4),m:new Float32Array(SK_N).fill(1),w:0,hy:0,hx:0,hz:0,hyJogo:0,n:0};
   const L=s.loco;
-  const livre=P.alive&&!(CARRO&&CARRO.ativo)&&!P.montado&&!P.nada&&!P.escala&&!P.muro&&!P.rola&&!P.dorme&&!P.anim&&!(P.ch.sk.clip&&P.ch.sk.cwAlvo>0);
+  const livre=(P.alive||G.modo==='criacao')&&!(CARRO&&CARRO.ativo)&&!P.montado&&!P.nada&&!P.escala&&!P.muro&&!P.rola&&!P.dorme&&!P.anim&&!(P.ch.sk.clip&&P.ch.sk.cwAlvo>0);
   L.w=approach(L.w,livre?1:0,dt*(livre?5:9));
   if(L.w<=0.001){SURV.estado='';return;}
   const esc=s.t.hip/SKT.akai.hip,sp=Math.hypot(P.vx||0,P.vz||0)/(ch.s||1)/esc;     // velocidade na escala do Akai
