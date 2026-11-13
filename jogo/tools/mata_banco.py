@@ -12,9 +12,9 @@ import os, sys, io, json, math, base64, time
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lugares_banco import ler_gltf, decimar, normais, codificar, cartas
+from lugares_banco import ler_gltf, decimar, normais, codificar, cartas, densidade_uv, celulas
 Image.MAX_IMAGE_PIXELS = None
-SAIDA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', '21i_mata_dados.js')
+SAIDA = os.environ.get('MATA_SAIDA') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', '21i_mata_dados.js')
 PASTAS = ['/mnt/user-data/uploads/', '/mnt/user-data/attachments/d6133a28-118d-54a2-ac28-a551fc07194e/']
 
 def acha(nome):
@@ -23,13 +23,17 @@ def acha(nome):
             if nome in f and f.endswith('.zip') and '2k' in f: return pasta + f
     raise SystemExit('não achei o zip de ' + nome)
 
-# id: arquivo, tipo, alvos de triângulos (perto, meia distância) — árvores: (madeira, folhas) por versão
+# id: arquivo, tipo, alvos de triângulos — árvores: por versão (perto, meia distância), o tronco, os galhos (sem os galhinhos
+# menores que frac da altura) e as folhas. 13/11: antes era um alvo só para a madeira toda, com os galhinhos até 7% da altura:
+# 50 a 70 mil triângulos de galho iam para ~3 mil e cada galho virava uma fita chata ("papel dobrado" no jogo). Agora ficam só
+# os galhos que aparecem (a folhagem cobre os finos) e eles quase não são simplificados; o tronco ganhou mais triângulos.
+def _L(tronco, galhos, folhas, frac): return dict(tronco=tronco, galhos=galhos, folhas=folhas, frac=frac)
 MODELOS = {
-    'ilha1': dict(src='island_tree_01', tipo='arvore', lod=[(5000, 9000), (900, 1800)]),
-    'ilha2': dict(src='island_tree_02', tipo='arvore', lod=[(5000, 9000), (900, 1800)]),
-    'ilha3': dict(src='island_tree_03', tipo='arvore', lod=[(5000, 9000), (900, 1800)]),
-    'jacaranda': dict(src='jacaranda_tree', tipo='arvore', lod=[(5500, 10000), (1000, 2000)]),
-    'pequena': dict(src='tree_small_02', tipo='arvore', lod=[(5000, 9000), (900, 1800)]),
+    'ilha1': dict(src='island_tree_01', tipo='arvore', lod=[_L(4500, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)]),
+    'ilha2': dict(src='island_tree_02', tipo='arvore', lod=[_L(4000, 4500, 9000, 0.12), _L(1000, 500, 1800, 0.16)]),
+    'ilha3': dict(src='island_tree_03', tipo='arvore', lod=[_L(4000, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)]),
+    'jacaranda': dict(src='jacaranda_tree', tipo='arvore', lod=[_L(5000, 5500, 10000, 0.12), _L(1000, 600, 2000, 0.16)]),
+    'pequena': dict(src='tree_small_02', tipo='arvore', lod=[_L(4000, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)]),
     'samambaia': dict(src='fern_02', tipo='planta', alvo=2200),
     'calathea': dict(src='calathea_orbifolia_01', tipo='planta', alvo=2600),
     'antorio': dict(src='anthurium_botany_01', tipo='planta', alvo=3200),
@@ -80,18 +84,55 @@ def mascara_folhas(UV, I, lado):
     for t in T: dr.polygon([(t[0], lado * 4 - 1 - t[1]), (t[2], lado * 4 - 1 - t[3]), (t[4], lado * 4 - 1 - t[5])], fill=255)
     return im.resize((lado, lado), Image.LANCZOS), len(T)
 
-def simplifica(P, UV, I, alvo):
-    """vértices juntos por célula (busca binária no tamanho da célula até ficar perto do alvo de triângulos)"""
-    if len(I) <= alvo: return P, UV, I
+def simplifica(P, UV, I, alvo, N0=None):
+    """vértices juntos por célula (busca binária no tamanho da célula até ficar perto do alvo de triângulos).
+    Com N0 (as normais da malha original): devolve também a normal de cada vértice novo, a média das normais originais que
+    caíram nele (13/11: a casca simplificada com a normal das faces novas ficava facetada, "papel dobrado")."""
+    if len(I) <= alvo: return (P, UV, I) if N0 is None else (P, UV, I, N0)
     car = cartas(len(P), I); diag = float(np.linalg.norm(P.max(0) - P.min(0)))
     lo, hi = diag * 1e-4, diag * 0.08; melhor = None
     for _ in range(18):
-        cel = math.sqrt(lo * hi); Pn, Un, In = decimar(P, UV, I, cel, carta=car)
-        if len(In) > alvo: lo = cel
-        else: hi = cel; melhor = (Pn, Un, In)
+        cel = math.sqrt(lo * hi); r = decimar_n(P, UV, I, cel, car, N0)
+        if len(r[2]) > alvo: lo = cel
+        else: hi = cel; melhor = r
         if hi / lo < 1.06: break
-    if melhor is None: melhor = decimar(P, UV, I, hi, carta=car)
-    return melhor
+    if melhor is None: melhor = decimar_n(P, UV, I, hi, car, N0)
+    return melhor if N0 is not None else melhor[:3]
+
+def normais_suaves(P, I):
+    """normal de cada vértice da malha original, somando as faces em volta pela POSIÇÃO (a costura da textura duplica o
+    vértice; aqui os dois lados da costura ficam com a mesma normal)"""
+    _, w = np.unique(np.round(P / 1e-5).astype(np.int64), axis=0, return_inverse=True); w = w.ravel()
+    f = np.cross(P[I[:, 1]] - P[I[:, 0]], P[I[:, 2]] - P[I[:, 0]]); Nw = np.zeros((int(w.max()) + 1, 3))
+    for j in range(3): np.add.at(Nw, w[I[:, j]], f)
+    N = Nw[w]; return N / (np.linalg.norm(N, axis=1, keepdims=True) + 1e-12)
+
+def decimar_n(P, UV, I, cel, carta, N0):
+    """decimar() (lugares_banco) que também leva as normais originais para os vértices novos"""
+    g = densidade_uv(P, UV, I); uc = max(1 / 512, cel * g * 4)
+    (cel_ids,), Pc = celulas([{'P': P}], cel)
+    ku = np.floor(UV / uc).astype(np.int64)
+    _, inv, cnt = np.unique(np.c_[cel_ids, carta, ku], axis=0, return_inverse=True, return_counts=True); inv = inv.ravel()
+    cel_de = np.zeros(cnt.size, np.int64); cel_de[inv] = cel_ids; Pn = Pc[cel_de]
+    Un = np.zeros((cnt.size, 2)); np.add.at(Un, inv, UV); Un /= cnt[:, None]
+    J = inv[I]; ok = (J[:, 0] != J[:, 1]) & (J[:, 1] != J[:, 2]) & (J[:, 0] != J[:, 2]); J = J[ok]
+    J = np.unique(np.sort(J, 1), axis=0, return_index=True)[1]; J = inv[I][ok][np.sort(J)]
+    usados = np.unique(J); mapa = -np.ones(cnt.size, np.int64); mapa[usados] = np.arange(len(usados))
+    if N0 is None: return Pn[usados], Un[usados], mapa[J]
+    Nn = np.zeros((cnt.size, 3)); np.add.at(Nn, inv, N0); Nn = Nn[usados]; tam = np.linalg.norm(Nn, axis=1)
+    In = mapa[J]; Pk = Pn[usados]
+    # onde as normais se anulam (os dois lados de uma parede fina na mesma célula): a normal das faces novas
+    fraco = tam < 0.35 * cnt[usados]
+    if fraco.any():
+        Ng = normais(Pk, In); Nn[fraco] = Ng[fraco]; tam[fraco] = 1
+    Nn = Nn / (tam[:, None] + 1e-12)
+    # vértices no mesmo ponto (costura da textura, ou a mesma célula dividida pela textura) ficam com a normal do ponto, a
+    # média de tudo o que caiu na célula; menos onde ela não concorda com a do vértice (parede fina: os dois lados)
+    ncel = int(cel_ids.max()) + 1; Nc = np.zeros((ncel, 3)); np.add.at(Nc, cel_ids, N0); cc = np.bincount(cel_ids, minlength=ncel)
+    tc = np.linalg.norm(Nc, axis=1); Ncu = Nc / (tc[:, None] + 1e-12)
+    ce = cel_de[usados]; usa = (tc[ce] > 0.5 * cc[ce]) & (np.einsum('ij,ij->i', Ncu[ce], Nn) > 0.6)
+    Nn[usa] = Ncu[ce[usa]]
+    return Pk, Un[usados], In, Nn
 
 def malha(P, UV, I, N=None):
     if N is None: N = normais(P, I)
@@ -151,20 +192,17 @@ def arvore(mid, cfg):
     cor = espalha_cor(rgb, masc); rgba = cor.copy(); rgba.putalpha(masc); tex['folhas'] = webp(rgba, 82)
     for p in mad: tex[p['nome']] = webp(abre(z, p['img'], 512 if 'branch' in p['nome'].lower() else 1024), 78)
     lods = []
-    for nl, (amad, afol) in enumerate(cfg['lod']):
+    for nl, Lc in enumerate(cfg['lod']):
         L = {}
-        # madeira: o tronco inteiro; os galhos sem os galhinhos (mais fino na meia distância)
-        partes_m = []
+        # madeira: o tronco inteiro; os galhos sem os galhinhos (mais fino na meia distância). Cada parte com o seu alvo e com
+        # as normais da malha original (a casca fica redonda na luz mesmo com poucos triângulos)
         for p in mad:
-            P, UV, I = p['P'], p['UV'], p['I']
-            if 'branch' in p['nome'].lower(): P, UV, I, nk, nc = galhos_grossos(P, UV, I, H, 0.07 if nl == 0 else 0.16)
-            partes_m.append((p['nome'], P, UV, I))
-        tot = sum(len(x[3]) for x in partes_m)
-        for nome, P, UV, I in partes_m:
+            P, UV, I = p['P'], p['UV'], p['I']; galho = 'branch' in p['nome'].lower()
+            if galho: P, UV, I, nk, nc = galhos_grossos(P, UV, I, H, Lc['frac'])
             if len(I) == 0: continue
-            alvo = max(60, int(amad * len(I) / max(tot, 1)))
-            Pn, Un, In = simplifica(P, UV, I, alvo); L[nome] = malha(Pn, Un, In)
-        Pq, Uq, Nq, Iq, nfol, k = folhas_cartas(fP, fUV, fI, afol // 2, centro, H, 7 + nl, 0.3 if nl == 0 else 0.4)
+            Pn, Un, In, Nn = simplifica(P, UV, I, Lc['galhos'] if galho else Lc['tronco'], normais_suaves(P, I))
+            L[p['nome']] = malha(Pn, Un, In, Nn)
+        Pq, Uq, Nq, Iq, nfol, k = folhas_cartas(fP, fUV, fI, Lc['folhas'] // 2, centro, H, 7 + nl, 0.3 if nl == 0 else 0.4)
         L['folhas'] = malha(Pq, Uq, Iq, Nq); L['folhas']['escala'] = round(k, 3)
         lods.append(L)
     print(mid, 'altura %.2f m' % H, 'folhas', nfol, 'recorte', ntri, 'tri', [{k: v['tri'] for k, v in L.items()} for L in lods], '%.0fs' % (time.time() - t0), flush=True)
