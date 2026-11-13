@@ -133,7 +133,8 @@ function criarJanela() {
     guardarJanela(win);
     if (podeFechar) return;
     e.preventDefault();
-    salvarAntes().then((r) => { log('salvou ao fechar:', r); if (SMOKE) { rel.salvouAoFechar = r; escrever(); } podeFechar = true; if (win && !win.isDestroyed()) win.close(); });
+    if (SMOKE && rel.cliqueSair) rel.pedidoDeFecharEm_s = (Date.now() - rel.cliqueSair) / 1000;
+    salvarAntes().then((r) => { log('salvou ao fechar:', r); if (SMOKE) { rel.salvouAoFechar = r; if (rel.cliqueSair) rel.fechouEm_s = (Date.now() - rel.cliqueSair) / 1000; escrever(); } podeFechar = true; if (win && !win.isDestroyed()) win.close(); });
   });
   win.on('closed', () => { win = null; });
   win.loadURL(ENDERECO + (SMOKE ? '#teste' : ''));
@@ -237,7 +238,10 @@ async function fumaca() {
   rel.ok = !!s && continuar && salvouAoFechar && jogando && sair && erros().length === 0;
   codigoSaida = rel.ok ? 0 : 1;
   escrever();
-  setTimeout(() => { rel.ok = false; rel.motivo = 'o botão Sair do jogo não fechou o jogo'; escrever(); app.exit(5); }, 15000);
+  // a espera: no Windows da nuvem a placa de vídeo é feita na CPU e, com a serra e a mata da 10.2.0, um quadro do menu leva ~10 s;
+  // o clique só roda quando o quadro em andamento termina (antes eram 15 s e a 10.2.0 passou do tempo). O relatório guarda quanto levou.
+  rel.cliqueSair = Date.now(); escrever();
+  setTimeout(() => { rel.ok = false; rel.motivo = 'o botão Sair do jogo não fechou o jogo em 90 s'; escrever(); app.exit(5); }, 90000);
   await js("document.getElementById('m-sair').click()");
 }
 let atualizacaoTerminou = false;
