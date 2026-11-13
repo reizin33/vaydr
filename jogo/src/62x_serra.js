@@ -98,11 +98,16 @@ for(let j=SVN.J0+1;j<SVN.J1;j++)for(let i=SVN.I0+1;i<SVN.I1;i++)TH[j*TW+i]=svnAl
   return{data:T.data,idx:out.slice(0,q)};};}
 
 /* ---------- gruta: colisão, teto, escuro, abrigo e a beira do mapa ---------- */
-for(const c of SVN.gruta.col)colBox(c[0],c[1],c[2],c[3],0,{y0:c[4],y1:c[5],gruta:true});
+/* as paredes da gruta entram depois do mundo montado (no buildWorld abaixo): postas no começo, elas mudavam os sorteios da mata
+   (freeSpot recusava pontos em cima delas) e as pedras e árvores da Mata dos Morros saíam em outro lugar — jogo salvo com tudo
+   fora do lugar e a caminhonete do teste p233 presa numa pedra nova (13/11) */
+function svnColisoes(){if(SVN.colOk)return;SVN.colOk=true;for(const c of SVN.gruta.col)colBox(c[0],c[1],c[2],c[3],0,{y0:c[4],y1:c[5],gruta:true});}
 {const _te=tetoEm;tetoEm=function(x,y,z){const r=_te(x,y,z);if(r!==null)return r;return svnNaGruta(x,y,z)?svnTeto(x,z):null;};}
 {const _ie=interiorEm;interiorEm=function(x,y,z){const r=_ie(x,y,z);if(r>=0.96)return r;const k=svnEscuro(x,y,z);return k>r?k:r;};}
 {const _ab=abrigado;abrigado=function(){if(svnEscuro(P.x,P.y+0.3,P.z)>0.15)return true;return _ab.apply(this,arguments);};}
-{const _dm=dentroMapa;dentroMapa=function(x,z,m=0){if(_dm(x,z,m))return true;const c=SVN.pisoCaixa;return x>c[0]&&x<c[2]&&z>c[1]&&z<c[3]&&svnPiso(x,z)!==null;};}
+/* (só depois do mundo montado: durante a montagem, a gruta contando como "dentro do mapa" dava colisão a árvores da Mata dos
+   Morros que antes não tinham, e os sorteios seguintes mudavam; 13/11) */
+{const _dm=dentroMapa;dentroMapa=function(x,z,m=0){if(_dm(x,z,m))return true;if(!SVN.mapaOk)return false;const c=SVN.pisoCaixa;return x>c[0]&&x<c[2]&&z>c[1]&&z<c[3]&&svnPiso(x,z)!==null;};}
 /* chuva: dentro da gruta não cai na câmera; e o olho se acostuma ao escuro (devagar, como de verdade) */
 {const _ce=computeEnv;let tAnt=0;computeEnv=function(){const r=_ce.apply(this,arguments);try{const S=SVN,agora=performance.now()/1000,dt=Math.min(0.5,Math.max(0,agora-tAnt));tAnt=agora;
     const k=svnEscuro(cam.pos[0],cam.pos[1],cam.pos[2]),alvo=G.modo==='jogo'?k:0;S.adapt+=(alvo-S.adapt)*(1-Math.exp(-dt*(alvo>S.adapt?0.55:1.6)));
@@ -144,7 +149,7 @@ function svnLimpar(){const inf={arvores:0,pedras:0,moitas:0,chao:0,brenha:0,nova
     const t={id:id++,x,z,y:ground(x,z)-0.15*s,s,r:R()*6.283,kind,hp:5,alive:true,t:0.8+R()*0.3,serra:true};TREES.push(t);
     if(dentroMapa(x,z,-3))colCircle(x,z,TREE_R*s,{tree:t});inf.novas++;}
   SVN_INFO=inf;}
-{const _bw=buildWorld;buildWorld=function(){const r=_bw.apply(this,arguments);try{svnLimpar();}catch(e){console.error('serra (mata)',e);}return r;};}
+{const _bw=buildWorld;buildWorld=function(){const r=_bw.apply(this,arguments);SVN.mapaOk=true;try{svnColisoes();}catch(e){console.error('serra (gruta)',e);}try{svnLimpar();}catch(e){console.error('serra (mata)',e);}return r;};}
 
 /* ---------- desenho ---------- */
 const SVN_CAV_VS=`layout(location=0) in vec3 aPos;layout(location=1) in vec3 aNrm;layout(location=2) in vec4 aCol;layout(location=3) in float aEsc;
