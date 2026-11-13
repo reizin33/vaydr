@@ -2,7 +2,8 @@
 1280×720, celular em pé (390×844) e celular deitado (844×390):
 1. abre pela tela inicial (Novo jogo) e mede a tela: onde ficam os painéis, a área do personagem (#cr-foco) e o tamanho do
    personagem na tela (pés e topo da cabeça projetados pela câmera do palco); confere que os painéis não cobrem o personagem;
-2. clica TODAS as opções de rosto, cabelo e corpo, uma por uma: a escolha fica marcada, entra na aparência (CRIA.ap) e na
+2. (13/11) a criação abre com o corpo Sobrevivente (sem opções de rosto e cabelo, só a altura dele); escolhe Personalizado e
+   clica TODAS as opções de rosto, cabelo e corpo, uma por uma: a escolha fica marcada, entra na aparência (CRIA.ap) e na
    malha 3D do jogador (MESH.jogador.ap), e o resumo muda;
 3. abas Roupas e Acessórios, aparência aleatória, nome, câmera (frente/costas/lado, girar, aproximar, resetar, arrastar,
    roda do mouse) e a câmera que chega perto do rosto nas abas Rosto e Cabelo;
@@ -27,7 +28,7 @@ def er(nome, c): return ev(nome, R + c)
 ABRE = [["wait", 2], js("for(const k of[X('SAVE_KEY'),X('SAVE_BAK'),X('SAVE_DIA'),X('SAVE_RUIM')])localStorage.removeItem(k);X('mostrarMenu')();"), ["wait", 0.3],
         ["click", "#m-novo", "criacao"], ["wait", 1.5]]
 # todas as opções de uma aba, clicando nos botões de verdade
-TODAS = ("const res={abas:{},erros:[]};for(const aba of['rosto','cabelo','corpo']){document.querySelector('#cr-nav [data-aba=\"'+aba+'\"]').click();"
+TODAS = ("const res={abas:{},erros:[]};document.querySelector('#cr-nav [data-aba=\"rosto\"]').click();{const bp=document.querySelector('#cr-opcoes [data-corpo=\"personalizado\"]');if(bp)bp.click();res.corpo=X('corpoDe')?X('corpoDe')(C.ap):null;}for(const aba of['rosto','cabelo','corpo']){document.querySelector('#cr-nav [data-aba=\"'+aba+'\"]').click();"
          "const ks=[...new Set([...document.querySelectorAll('#cr-opcoes [data-k]')].map(b=>b.dataset.k))];res.abas[aba]={};"
          "for(const k of ks){const N=document.querySelectorAll('#cr-opcoes [data-k=\"'+k+'\"]').length;let ok=0;const nomes=[];"
          "for(let i=0;i<N;i++){const b=document.querySelector('#cr-opcoes [data-k=\"'+k+'\"][data-i=\"'+i+'\"]');if(!b){res.erros.push(k+i+' sem botão');continue;}"
@@ -41,7 +42,10 @@ def funcional(vp):
              "opcoes:document.querySelectorAll('#cr-opcoes .cr-op').length,vistasComCanvas:document.querySelectorAll('#cr-vistas canvas').length,retrato:!!document.getElementById('cr-retrato'),"
              "nomeNoPainel:!!document.querySelector('.cr-lado #cr-nome')},medir());")]
     if vp == 'pc':
-        s += [er("todasOpcoes", TODAS),
+        s += [er("corpoPadrao", "document.querySelector('#cr-nav [data-aba=\"rosto\"]').click();const rosto=document.querySelectorAll('#cr-opcoes [data-k]').length,tipos=document.querySelectorAll('#cr-opcoes [data-corpo]').length;"
+                 "document.querySelector('#cr-nav [data-aba=\"corpo\"]').click();const corpo=[...new Set([...document.querySelectorAll('#cr-opcoes [data-k]')].map(b=>b.dataset.k))],alt=[...document.querySelectorAll('#cr-opcoes [data-k=\"altura\"] b')].map(b=>b.textContent);"
+                 "return{corpo:X('corpoDe')(C.ap),sobrevivente:!!P.ch.surv,tiposDeCorpo:tipos,opcoesDeRosto:rosto,opcoesDaAbaCorpo:corpo,alturas:alt};"),
+              er("todasOpcoes", TODAS),
               jr("document.querySelector('#cr-nav [data-aba=\"roupas\"]').click();window.__roupas={cartao:!!document.querySelector('#cr-opcoes .cr-info-card'),lista:document.querySelectorAll('#cr-opcoes .cr-lista li').length,zoom:C.zoomAlvo};"
                  "document.querySelector('#cr-nav [data-aba=\"acess\"]').click();window.__acess={lista:document.querySelectorAll('#cr-opcoes .cr-lista li').length,zoom:C.zoomAlvo};"
                  "document.querySelector('#cr-nav [data-aba=\"rosto\"]').click();window.__zRosto=C.zoomAlvo;document.querySelector('#cr-nav [data-aba=\"corpo\"]').click();window.__zCorpo=C.zoomAlvo;"
@@ -70,7 +74,7 @@ def funcional(vp):
               ["click", "#m-continuar"], ["wait", 1.5],
               er("carregou", "const a=sessionStorage.getItem('__apS');return{modo:G.modo,aparenciaIgual:JSON.stringify(G.aparencia)===a,malhaIgual:JSON.stringify(J().ap)===a,nome:G.aparencia&&G.aparencia.nome};")]
     else:
-        s += [jr("document.querySelector('#cr-nav [data-aba=\"cabelo\"]').click();document.querySelector('#cr-opcoes [data-k=\"cabelo\"][data-i=\"3\"]').click();"),
+        s += [jr("document.querySelector('#cr-nav [data-aba=\"cabelo\"]').click();{const bp=document.querySelector('#cr-opcoes [data-corpo=\"personalizado\"]');if(bp)bp.click();}document.querySelector('#cr-opcoes [data-k=\"cabelo\"][data-i=\"3\"]').click();"),
               er("celular", "return{cabelo:C.ap.cabelo,malha:J().ap.cabelo,zoom:C.zoomAlvo,painelRola:(()=>{const p=document.querySelector('.cr-painel');return p.scrollHeight>p.clientHeight;})(),"
                  "botoes:[...document.querySelectorAll('.cr-camera button')].map(b=>vis(b)).filter(Boolean).length};")]
     return s
