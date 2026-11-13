@@ -1,0 +1,106 @@
+{
+ "modo": "1",
+ "versao": "10.2.1",
+ "electron": "44.9.2",
+ "chrome": "152.0.7977.167",
+ "passos": [
+  {
+   "nome": "tela de carregamento",
+   "s": 9,
+   "ok": true,
+   "pct": 38,
+   "etapa": "cidade",
+   "status": "Carregando o mundo",
+   "dica": "Ferramentas gastam com o uso. Na bancada dá para consertar."
+  },
+  {
+   "nome": "menu apareceu",
+   "s": 164,
+   "ok": true,
+   "gl": {
+    "webgl2": true,
+    "placa": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "falha3D": false,
+    "fonte": [
+     "Sofia Sans Condensed 400 800",
+     "Stardos Stencil 700"
+    ],
+    "tela": [
+     1008,
+     681
+    ]
+   },
+   "versaoNoMenu": "Versão 10.2.1 · PC ",
+   "botaoSair": true
+  },
+  {
+   "nome": "novo jogo",
+   "s": 202,
+   "ok": true
+  },
+  {
+   "nome": "quadros por segundo",
+   "s": 255,
+   "fps": 0.1
+  },
+  {
+   "nome": "salvar",
+   "s": 255,
+   "retorno": true,
+   "tem": true,
+   "tamanho": 22527,
+   "salvoEm": 1794593920160
+  },
+  {
+   "nome": "cópia do save em arquivo",
+   "s": 258,
+   "ok": true,
+   "dl": {
+    "nome": "vaydr-jogo-dia1-2026-11-13.json",
+    "estado": "completed",
+    "tam": 22529,
+    "pasta": "D:\\a\\vaydr\\vaydr\\teste"
+   }
+  },
+  {
+   "nome": "fechando a janela como o jogador (o jogo deve salvar sozinho)",
+   "s": 258,
+   "errosNaPagina": 0
+  }
+ ],
+ "gpu": {
+  "2d_canvas": "enabled",
+  "direct_rendering_display_compositor": "disabled_off_ok",
+  "gpu_compositing": "enabled",
+  "multiple_raster_threads": "enabled_on",
+  "opengl": "enabled_on",
+  "rasterization": "enabled",
+  "raw_draw": "disabled_off_ok",
+  "skia_graphite": "disabled_off",
+  "trees_in_viz": "disabled_off",
+  "video_decode": "enabled",
+  "video_encode": "enabled",
+  "webgl": "enabled",
+  "webgpu": "unavailable_software",
+  "webnn": "disabled_off"
+ },
+ "eventos": [],
+ "downloads": [
+  {
+   "nome": "vaydr-jogo-dia1-2026-11-13.json",
+   "estado": "completed",
+   "tam": 22529,
+   "pasta": "D:\\a\\vaydr\\vaydr\\teste"
+  }
+ ],
+ "videoCarga": {
+  "quadros": 37,
+  "segundos": 125
+ },
+ "marca": {
+  "fome": 33.3,
+  "salvoEmAntes": 1794593920160
+ },
+ "ok": true,
+ "salvouAoFechar": true
+}

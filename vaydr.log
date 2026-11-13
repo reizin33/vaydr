@@ -1,0 +1,19 @@
+2026-11-13T18:14:25.013Z VAYDR 10.2.1 abrindo {"electron":"44.9.2","smoke":"1"}
+2026-11-13T18:14:25.076Z atualização automática desligada {"empacotado":true,"ligada":true,"smoke":"1"}
+2026-11-13T18:14:33.602Z [teste] tela de carregamento {"ok":true,"pct":38,"etapa":"cidade","status":"Carregando o mundo","dica":"Ferramentas gastam com o uso. Na bancada dá para consertar."}
+2026-11-13T18:17:08.571Z [teste] menu apareceu {"ok":true,"gl":{"webgl2":true,"placa":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","falha3D":false,"fonte":["Sofia Sans Condensed 400 800","Stardos Stencil 700"],"tela":[1008,681]},"versaoNoMenu":"Versão 10.2.1 · PC ","botaoSair":true}
+2026-11-13T18:17:46.505Z [teste] novo jogo {"ok":true}
+2026-11-13T18:18:40.107Z [teste] quadros por segundo {"fps":0.1}
+2026-11-13T18:18:40.224Z [teste] salvar {"retorno":true,"tem":true,"tamanho":22527,"salvoEm":1794593920160}
+2026-11-13T18:18:42.346Z download vaydr-jogo-dia1-2026-11-13.json completed 22529
+2026-11-13T18:18:42.605Z [teste] cópia do save em arquivo {"ok":true,"dl":{"nome":"vaydr-jogo-dia1-2026-11-13.json","estado":"completed","tam":22529,"pasta":"D:\\a\\vaydr\\vaydr\\teste"}}
+2026-11-13T18:18:43.030Z [teste] fechando a janela como o jogador (o jogo deve salvar sozinho) {"errosNaPagina":0}
+2026-11-13T18:18:43.036Z salvou ao fechar: true
+2026-11-13T18:19:06.394Z VAYDR 10.2.1 abrindo {"electron":"44.9.2","smoke":"2"}
+2026-11-13T18:19:06.441Z atualização automática desligada {"empacotado":true,"ligada":true,"smoke":"2"}
+2026-11-13T18:19:14.504Z [teste] tela de carregamento {"ok":true,"pct":67,"etapa":"lugares","status":"Carregando o mundo","dica":"Aperte P para o modo foto: a câmera fica livre, com filtros e hora do dia."}
+2026-11-13T18:21:19.789Z [teste] menu apareceu {"ok":true,"gl":{"webgl2":true,"placa":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","falha3D":false,"fonte":["Sofia Sans Condensed 400 800","Stardos Stencil 700"],"tela":[1008,681]},"versaoNoMenu":"Versão 10.2.1 · PC ","botaoSair":true}
+2026-11-13T18:21:20.990Z [teste] save depois de reabrir {"save":{"salvoEm":1794593923040,"fome":33.3,"dia":1},"botaoContinuar":true,"salvouAoFechar":true}
+2026-11-13T18:22:03.734Z [teste] continuou o jogo salvo {"ok":true,"fome":33.3,"dia":1}
+2026-11-13T18:22:20.160Z [teste] menu com o botão Sair do jogo {"ok":true}
+2026-11-13T18:22:20.164Z salvou ao fechar: null

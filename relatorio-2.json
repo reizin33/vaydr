@@ -1,0 +1,84 @@
+{
+ "modo": "2",
+ "versao": "10.2.1",
+ "electron": "44.9.2",
+ "chrome": "152.0.7977.167",
+ "passos": [
+  {
+   "nome": "tela de carregamento",
+   "s": 8,
+   "ok": true,
+   "pct": 67,
+   "etapa": "lugares",
+   "status": "Carregando o mundo",
+   "dica": "Aperte P para o modo foto: a câmera fica livre, com filtros e hora do dia."
+  },
+  {
+   "nome": "menu apareceu",
+   "s": 133,
+   "ok": true,
+   "gl": {
+    "webgl2": true,
+    "placa": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "falha3D": false,
+    "fonte": [
+     "Sofia Sans Condensed 400 800",
+     "Stardos Stencil 700"
+    ],
+    "tela": [
+     1008,
+     681
+    ]
+   },
+   "versaoNoMenu": "Versão 10.2.1 · PC ",
+   "botaoSair": true
+  },
+  {
+   "nome": "save depois de reabrir",
+   "s": 135,
+   "save": {
+    "salvoEm": 1794593923040,
+    "fome": 33.3,
+    "dia": 1
+   },
+   "botaoContinuar": true,
+   "salvouAoFechar": true
+  },
+  {
+   "nome": "continuou o jogo salvo",
+   "s": 177,
+   "ok": true,
+   "fome": 33.3,
+   "dia": 1
+  },
+  {
+   "nome": "menu com o botão Sair do jogo",
+   "s": 194,
+   "ok": true
+  }
+ ],
+ "gpu": {
+  "2d_canvas": "enabled",
+  "direct_rendering_display_compositor": "disabled_off_ok",
+  "gpu_compositing": "enabled",
+  "multiple_raster_threads": "enabled_on",
+  "opengl": "enabled_on",
+  "rasterization": "enabled",
+  "raw_draw": "disabled_off_ok",
+  "skia_graphite": "disabled_off",
+  "trees_in_viz": "disabled_off",
+  "video_decode": "enabled",
+  "video_encode": "enabled",
+  "webgl": "enabled",
+  "webgpu": "unavailable_software",
+  "webnn": "disabled_off"
+ },
+ "eventos": [],
+ "downloads": [],
+ "videoCarga": null,
+ "ok": true,
+ "cliqueSair": 1794594140161,
+ "pedidoDeFecharEm_s": 0.002,
+ "salvouAoFechar": null,
+ "fechouEm_s": 0.004
+}
