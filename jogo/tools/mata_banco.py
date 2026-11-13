@@ -26,14 +26,15 @@ def acha(nome):
 # id: arquivo, tipo, alvos de triângulos — árvores: por versão (perto, meia distância), o tronco, os galhos (sem os galhinhos
 # menores que frac da altura) e as folhas. 13/11: antes era um alvo só para a madeira toda, com os galhinhos até 7% da altura:
 # 50 a 70 mil triângulos de galho iam para ~3 mil e cada galho virava uma fita chata ("papel dobrado" no jogo). Agora ficam só
-# os galhos que aparecem (a folhagem cobre os finos) e eles quase não são simplificados; o tronco ganhou mais triângulos.
+# os galhos que aparecem (a folhagem cobre os finos) e eles quase não são simplificados; o tronco ganhou mais triângulos
+# (de perto, onde a pessoa para e corta a árvore, 8 a 9 mil nas árvores que o jogo aumenta).
 def _L(tronco, galhos, folhas, frac): return dict(tronco=tronco, galhos=galhos, folhas=folhas, frac=frac)
 MODELOS = {
-    'ilha1': dict(src='island_tree_01', tipo='arvore', lod=[_L(4500, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)]),
-    'ilha2': dict(src='island_tree_02', tipo='arvore', lod=[_L(4000, 4500, 9000, 0.12), _L(1000, 500, 1800, 0.16)]),
+    'ilha1': dict(src='island_tree_01', tipo='arvore', lod=[_L(9000, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)], tex_tronco=2048),
+    'ilha2': dict(src='island_tree_02', tipo='arvore', lod=[_L(8000, 4500, 9000, 0.12), _L(1000, 500, 1800, 0.16)], tex_tronco=2048),
     'ilha3': dict(src='island_tree_03', tipo='arvore', lod=[_L(4000, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)]),
     'jacaranda': dict(src='jacaranda_tree', tipo='arvore', lod=[_L(5000, 5500, 10000, 0.12), _L(1000, 600, 2000, 0.16)]),
-    'pequena': dict(src='tree_small_02', tipo='arvore', lod=[_L(4000, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)]),
+    'pequena': dict(src='tree_small_02', tipo='arvore', lod=[_L(8000, 4500, 9000, 0.10), _L(1000, 500, 1800, 0.16)], tex_tronco=2048),
     'samambaia': dict(src='fern_02', tipo='planta', alvo=2200),
     'calathea': dict(src='calathea_orbifolia_01', tipo='planta', alvo=2600),
     'antorio': dict(src='anthurium_botany_01', tipo='planta', alvo=3200),
@@ -190,7 +191,8 @@ def arvore(mid, cfg):
     tex = {}
     ftex = fol[0]['img']; rgb = abre(z, ftex, 1024); masc, ntri = mascara_folhas(fUV, fI, 1024)
     cor = espalha_cor(rgb, masc); rgba = cor.copy(); rgba.putalpha(masc); tex['folhas'] = webp(rgba, 82)
-    for p in mad: tex[p['nome']] = webp(abre(z, p['img'], 512 if 'branch' in p['nome'].lower() else 1024), 78)
+    # a casca do tronco: 2K nas árvores que o jogo aumenta (de perto, ao cortar, a de 1K ficava borrada); galhos 512
+    for p in mad: tex[p['nome']] = webp(abre(z, p['img'], 512 if 'branch' in p['nome'].lower() else cfg.get('tex_tronco', 1024)), 78)
     lods = []
     for nl, Lc in enumerate(cfg['lod']):
         L = {}

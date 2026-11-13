@@ -26,7 +26,9 @@ function mataEsp(x,z){const n=MATAV.esp.length;return Math.min(n-1,Math.floor(pi
 function mataAlturaRedonda(){const L=ARVL.lim&&ARVL.lim.roundHi;return L?L.hi[1]-L.lo[1]:7;}
 /* escala da espécie e cor das folhas: miolo da copa mais escuro, pontas mais claras, um pouco de variação de verde */
 function mataGeo(f,k,fol){const n=f.length/11;for(let i=0;i<n;i++){const a=i*11;f[a]*=k;f[a+1]*=k;f[a+2]*=k;}
-  if(!fol)return;let cx=0,cy=0,cz=0;for(let i=0;i<n;i++){cx+=f[i*11];cy+=f[i*11+1];cz+=f[i*11+2];}cx/=n;cy/=n;cz/=n;
+  /* madeira: o pé do tronco mais escuro até ~1,3 m (terra, musgo e a sombra do chão). Sem isso a raiz das árvores de casca
+     clara, deitada no chão e de frente para o céu, ficava quase branca e parecia uma mancha (13/11) */
+  if(!fol){for(let i=0;i<n;i++){const a=i*11,t=Math.min(1,Math.max(0,f[a+1]/1.3)),ao=0.48+0.52*t*t*(3-2*t);f[a+3]*=ao;f[a+4]*=ao;f[a+5]*=ao;}return;}let cx=0,cy=0,cz=0;for(let i=0;i<n;i++){cx+=f[i*11];cy+=f[i*11+1];cz+=f[i*11+2];}cx/=n;cy/=n;cz/=n;
   let rm=0.01;for(let i=0;i<n;i++){const a=i*11,r=Math.hypot(f[a]-cx,(f[a+1]-cy)*1.4,f[a+2]-cz);if(r>rm)rm=r;}
   for(let i=0;i<n;i++){const a=i*11,r=Math.hypot(f[a]-cx,(f[a+1]-cy)*1.4,f[a+2]-cz)/rm,emb=f[a+1]<cy?0.85:1,ao=(0.5+0.5*Math.min(1,r*1.15))*emb;
     f[a+3]=0.95*ao;f[a+4]=1.0*ao;f[a+5]=0.9*ao;}}

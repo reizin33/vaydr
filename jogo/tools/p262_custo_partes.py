@@ -1,10 +1,10 @@
 """De onde vem o custo do quadro (SwiftShader: compara as partes entre si, não diz o FPS de um PC): no mesmo lugar e na mesma
 qualidade, o tempo do quadro com tudo, sem a mata nova (volta a árvore antiga), sem a folhagem nova do chão, com o boneco
-clássico no lugar do sobrevivente e sem as três; na serra, também sem os paredões e sem a serra toda. Uso (na pasta jogo/): python3 tools/p262_custo_partes.py pagina.html [graf]"""
+clássico no lugar do sobrevivente e sem as três; na serra, também sem os paredões e sem a serra toda. Uso (na pasta jogo/): python3 tools/p262_custo_partes.py pagina.html [graf] [lugares separados por vírgula]"""
 import asyncio, sys, os, json, time
 from playwright.async_api import async_playwright
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/'
-PAG = sys.argv[1]; GRAF = sys.argv[2] if len(sys.argv) > 2 else 'alto'
+PAG = sys.argv[1]; GRAF = sys.argv[2] if len(sys.argv) > 2 else 'alto'; SO = sys.argv[3].split(',') if len(sys.argv) > 3 else None
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 LUGARES = [('clareira', 6.0, 18.0, 6.0, 6.0), ('mata', 18.0, -30.0, 40.0, -62.0), ('serra', -104.0, -42.0, -150.0, -98.0)]
 POS = """([x,z,tx,tz])=>{const n=__nnc,P=n.P,X=s=>n.ev(s);P.x=x;P.z=z;P.y=X('ground')(x,z);P.vx=P.vz=P.vy=0;P.yaw=Math.atan2(tx-x,tz-z);P.body=P.yaw;P.pitch=0.02;
@@ -41,6 +41,7 @@ async def main():
         await pg.wait_for_timeout(20000)
         res = {}
         for nome, x, z, tx, tz in LUGARES:
+            if SO and nome not in SO: continue
             res[nome] = {}
             for caso, js in CASOS + (CASOS_SERRA if nome == 'serra' else []):
                 await pg.evaluate(js); await pg.evaluate(POS, [x, z, tx, tz]); await pg.wait_for_timeout(1500)
