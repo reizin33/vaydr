@@ -209,12 +209,28 @@ async function fumaca() {
   const foto = async (nome) => { const img = await win.webContents.capturePage(); fs.writeFileSync(path.join(SAIDA, nome + '.png'), img.toPNG()); };
   const erros = () => testes.eventos.filter((e) => e.nome === 'erro-pagina');
   rel.gpu = app.getGPUFeatureStatus();
+  // o vídeo da tela de carregamento (10.2.1, só no teste 1): um quadro da janela a cada 250 ms, com a hora de cada um, desde a
+  // página aberta até o menu aparecer (no máximo 120 s); o vídeo é montado depois com esses quadros, no tempo de verdade
+  let menuVisto = false;
+  const video = (async () => {
+    if (SMOKE !== '1') return null;
+    const pasta = path.join(SAIDA, 'carga'); fs.mkdirSync(pasta, { recursive: true });
+    const tempos = [], ini = Date.now(); let depoisMenu = 0;
+    while (Date.now() - ini < 120000 && tempos.length < 480) {
+      try { const img = (await win.webContents.capturePage()).resize({ width: 960 }); fs.writeFileSync(path.join(pasta, String(tempos.length).padStart(3, '0') + '.jpg'), img.toJPEG(78)); tempos.push(Date.now() - ini); } catch (_) {}
+      if (menuVisto && ++depoisMenu > 10) break;
+      await dormir(250);
+    }
+    fs.writeFileSync(path.join(pasta, 'tempos.json'), JSON.stringify(tempos));
+    return { quadros: tempos.length, segundos: Math.round((Date.now() - ini) / 100) / 10 };
+  })();
   // a tela de carregamento (10.2.1): uma foto no meio da montagem do mundo, com a etapa, a porcentagem e a dica
   const carga = await esperar("typeof window.__cargaPct==='number'&&window.__cargaPct>=0.3", 120000);
   await foto(SMOKE === '1' ? '0-carregando' : '0-carregando-reaberto');
   passo('tela de carregamento', { ok: carga, pct: await js('Math.round((window.__cargaPct||0)*100)'), etapa: await js("String(window.__cargaEtapa||'')"),
     status: await js("(document.getElementById('cg-status')||{}).textContent||''"), dica: await js("(document.getElementById('cg-dica')||{}).textContent||''") });
   const menu = await esperar("!!document.getElementById('t-menu')&&!document.getElementById('t-menu').hidden&&typeof __nnc!=='undefined'", 180000);
+  menuVisto = true; rel.videoCarga = await video;
   await dormir(2500);
   passo('menu apareceu', { ok: menu, gl: await js(INFO_GL), versaoNoMenu: await js("document.querySelector('#t-menu .versao').textContent"), botaoSair: await js("!!document.getElementById('m-sair')") });
   await foto(SMOKE === '1' ? '1-menu' : '2-menu-reaberto');
