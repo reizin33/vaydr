@@ -121,8 +121,10 @@ function propBike(C,M){const f=lin(0x8a2a22),pn=lin(0x161616);for(const x of[-0.
 function propCasinha(C,M,R){const m=lin(0x8a5a3a);add(C,bvTris(0.8,0.6,1.0),mm(M,mat(0,0.3,0)),m,{j:0.06,rnd:R});add(C,roofTris(1.1,0.35,0.95),mm(M,mat(0,0.6,0)),lin(0x7a3a28));
   add(C,bvTris(0.36,0.4,0.02),mm(M,mat(0,0.22,0.505)),lin(0x120e0a));add(C,cylTris(0.12,0.1,0.06,8),mm(M,mat(0.5,0,0.7)),lin(0x9aa1a6));}
 function propCorreio(C,M){add(C,bvTris(0.06,1.05,0.06),mm(M,mat(0,0.52,0)),lin(0x5a412a));add(C,bvTris(0.36,0.26,0.24),mm(M,mat(0,1.15,0)),lin(0xc9a227),{j:0.04});add(C,bvTris(0.2,0.02,0.01),mm(M,mat(0,1.2,0.125)),lin(0x1a1a1a));}
+/* bolas de folha das árvores de fruta: malha à parte (MESH.copasFrut), desenhada só quando a mata nova não está ligada */
+const COPAS_FRUT=new GB(1<<14,8);
 function propArvore(C,M,R,fruta){const t=lin(0x5a4330);add(C,cylTris(0.14,0.2,1.6,7),M,t,{j:0.1,rnd:R});for(const a of[0.6,2.4,4.3])add(C,cylTris(0.05,0.08,1.0,5),mm(M,mat(Math.sin(a)*0.15,1.4,Math.cos(a)*0.15,0.6*Math.cos(a),0,-0.6*Math.sin(a))),t);
-  const verde=fruta==='manga'?lin(0x2f5a24):lin(0x3f6a2a);for(let i=0;i<5;i++){const a=i*1.3,r=i?0.65:0;add(C,icoTris(0.8+R()*0.3,0.3,R),mm(M,mat(Math.cos(a)*r,2.3+(i?R()*0.4:0.5),Math.sin(a)*r,R(),R()*3,R(),1.1,0.85,1.1)),mixc(verde,lin(0x4f7a2f),R()*0.5),{j:0.15,rnd:R});}
+  const verde=fruta==='manga'?lin(0x2f5a24):lin(0x3f6a2a),CC=COPAS_FRUT;for(let i=0;i<5;i++){const a=i*1.3,r=i?0.65:0;add(CC,icoTris(0.8+R()*0.3,0.3,R),mm(M,mat(Math.cos(a)*r,2.3+(i?R()*0.4:0.5),Math.sin(a)*r,R(),R()*3,R(),1.1,0.85,1.1)),mixc(verde,lin(0x4f7a2f),R()*0.5),{j:0.15,rnd:R});}
   // as frutas são desenhadas à parte (somem quando você colhe e voltam com o tempo): 48yb_pomar. Os R() ficam para o resto do sítio sair igual.
   for(let i=0;i<14;i++){R();R();R();}const p=xf(M,0,0,0);FRUTEIRAS.push({id:'fr'+FRUTEIRAS.length,M:new Float32Array(M),x:p[0],y:p[1],z:p[2],fruta});}
 function propLixo(C,M,R){for(let i=0;i<3;i++)add(C,icoTris(0.22+R()*0.08,0.3,R),mm(M,mat((R()-0.5)*0.7,0.18,(R()-0.5)*0.7,0,R()*3,0,1,0.8,1)),lin(i%2?0x1a1c1e:0x2a2c30),{j:0.2,rnd:R});}

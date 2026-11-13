@@ -183,9 +183,9 @@ void main(){vec3 n0=normalize(vN),n=n0;gInt=vE;
   vec3 c=al*luzCav(vW,n,vE);
   vec3 v=normalize(uCam-vW);
   if(uSpotC.r>0.0){vec3 ls=uSpotP-vW;float ds=length(ls);vec3 ln=ls/max(ds,0.001);float cone=smoothstep(uSpotK.x,uSpotK.y,dot(-ln,uSpotD));
-    float at=pow(clamp(1.0-pow(ds/uSpotR,4.0),0.0,1.0),2.0)/(ds*ds*0.05+2.2);c+=uSpotC*cone*at*pow(max(dot(normalize(mix(n,n0,0.75)),normalize(ln+v)),0.0),40.0)*molh*2.4*(1.0-smoothstep(5.0,14.0,ds));}
+    float at=pow(clamp(1.0-pow(ds/uSpotR,4.0),0.0,1.0),2.0)/(ds*ds*0.05+2.2);c+=uSpotC*cone*at*pow(max(dot(normalize(mix(n,n0,0.75)),normalize(ln+v)),0.0),48.0)*molh*1.1*(1.0-smoothstep(5.0,14.0,ds));}
   for(int i=0;i<4;i++){if(i>=uNPL)break;vec3 lv=uPL[i].xyz-vW;float d=length(lv);float r=uPL[i].w;if(r>0.0&&d<r){vec3 l=lv/d;
-    c+=uPC[i]*pow(max(dot(normalize(mix(n,n0,0.75)),normalize(l+v)),0.0),40.0)*molh*pow(clamp(1.0-pow(d/r,4.0),0.0,1.0),2.0)/(d*d+1.0)*1.5;}}
+    c+=uPC[i]*pow(max(dot(normalize(mix(n,n0,0.75)),normalize(l+v)),0.0),40.0)*molh*pow(clamp(1.0-pow(d/r,4.0),0.0,1.0),2.0)/(d*d+1.0)*0.9;}}
   c+=uDirC*pow(max(dot(n,normalize(uDirD+v)),0.0),40.0)*molh*0.25*gSh*(1.0-vE);
   o=acabar(c,vW,0.0);}`;
 /* cor e terra de cada ponto do chão da serra (a mesma do terreno de sempre, mais o capim seco do alto e o solo nas encostas) */
@@ -273,3 +273,7 @@ DESENHO.sombra.push(function svnSombra(Pg,perto){const S=SVN;if(!S.pronto)return
   for(const pc of S.pedacos){const b=pc.b,d=Math.hypot(Math.max(b[0]-P.x,0,P.x-b[3]),Math.max(b[2]-P.z,0,P.z-b[5]));if(d>R)continue;
     const m=svnMalhaPara(pc,perto?1:2,false);if(!m)continue;gl.bindVertexArray(m.vao);gl.drawElements(gl.TRIANGLES,m.n,gl.UNSIGNED_SHORT,0);}
   const C=S.cav,b=C&&C.b;if(C&&Math.hypot(Math.max(b[0]-P.x,0,P.x-b[3]),Math.max(b[2]-P.z,0,P.z-b[5]))<R){gl.bindVertexArray(C.vao);gl.drawElements(gl.TRIANGLES,C.n,gl.UNSIGNED_SHORT,0);}});
+/* minimapa: dentro da gruta aparece o nome dela; em cima da serra nova (fora do círculo antigo da região) aparece "Serra Velha"
+   em vez de "Mata" */
+{const _hl=hud2Lugar;hud2Lugar=function(x,z){try{if(SVN.pronto&&svnS(x,z)>-1&&svnPiso(x,z)!==null&&svnTeto(x,z)!==null)return{nome:SERRA_DADOS.gruta.nome||'Gruta da Serra Velha',d:null};}catch(e){}
+  const r=_hl.apply(this,arguments);try{if(r&&r.d===null&&r.nome==='Mata'&&svnNaSerra(x,z)&&svnOffEm(x,z)>3)return{nome:'Serra Velha',d:null};}catch(e){}return r;};}

@@ -121,6 +121,32 @@ for k in range(26):
 for k in range(12):
     C = SALAO if k < 9 else GRUTA; ang = rng.random() * 6.283; rr = 0.35 + rng.random() * 0.5
     PEDRAS.append((C[0] + math.cos(ang) * C[3] * rr, C[1] + math.sin(ang) * C[4] * rr, 0.35 + rng.random() * 0.75))
+# blocos caídos do teto (abatimento): poliedros de faces quebradas, achatados, inclinados e meio enterrados, nos mesmos
+# lugares das pedras de antes (que eram bolhas lisas e pareciam bolas). Sorteio próprio: o resto da caverna não muda.
+rngB = np.random.default_rng(91); BLOCOS = []
+BASE_N = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]], float)
+for k_b, (ps, pt, pr) in enumerate(PEDRAS):
+    r_ = (0.5 + (pr - 0.35) / 0.75 * 0.6) * (0.75 if k_b >= 9 else 1.0)   # 0,5 a 1,1 m (menores na gruta pequena)
+    sc = np.array([1.0 + 0.5 * rngB.random(), max(0.5 / r_, 0.62 + 0.3 * rngB.random()), 0.8 + 0.4 * rngB.random()]) * r_
+    ns = list(BASE_N) + [v / np.linalg.norm(v) for v in rngB.normal(size=(5, 3))]
+    ns = np.array([n + rngB.normal(size=3) * 0.28 for n in ns]); ns /= np.linalg.norm(ns, axis=1, keepdims=True)
+    hs = 0.72 + 0.26 * rngB.random(len(ns))
+    yaw = rngB.random() * 6.283; incl = (rngB.random() ** 1.5) * 0.55; eixo_i = rngB.random() * 6.283
+    cy_, sy_ = math.cos(yaw), math.sin(yaw); Ry = np.array([[cy_, 0, sy_], [0, 1, 0], [-sy_, 0, cy_]])
+    a_ = np.array([math.cos(eixo_i), 0, math.sin(eixo_i)]); K = np.array([[0, -a_[2], a_[1]], [a_[2], 0, -a_[0]], [-a_[1], a_[0], 0]])
+    R = (np.eye(3) + math.sin(incl) * K + (1 - math.cos(incl)) * K @ K) @ Ry   # colunas = eixos do bloco no mundo
+    cx, cz = L2W(ps, pt); cy = float(chao_cav(np.array(cx), np.array(cz))) + sc[1] * 0.5
+    BLOCOS.append((cx, cy, cz, R, sc, ns, hs))
+def bloco(px, py, pz, B_):
+    """distância com sinal (aproximada) até um bloco: o maior dos planos das faces, no espaço do bloco"""
+    cx, cy, cz, R, sc, ns, hs = B_; qx, qy, qz = px - cx, py - cy, pz - cz
+    lx = (R[0, 0] * qx + R[1, 0] * qy + R[2, 0] * qz) / sc[0]
+    ly = (R[0, 1] * qx + R[1, 1] * qy + R[2, 1] * qz) / sc[1]
+    lz = (R[0, 2] * qx + R[1, 2] * qy + R[2, 2] * qz) / sc[2]
+    db = None
+    for n_, h_ in zip(ns, hs):
+        di = n_[0] * lx + n_[1] * ly + n_[2] * lz - h_; db = di if db is None else np.maximum(db, di)
+    return db * sc.min()
 def ar(px, py, pz):
     """distância com sinal: negativo = ar da caverna"""
     d = None
@@ -135,9 +161,9 @@ def ar(px, py, pz):
     for (es, et, er, el) in EST:
         cx, cz = L2W(es, et); top = hE + 8.5; dxz = np.hypot(px - cx, pz - cz); k_ = np.clip((top - py) / el, 0, 1)
         d = np.maximum(d, -np.where(py > top - el, dxz - er * (1 - k_) - 0.02, 9))
-    for (ps, pt, pr) in PEDRAS:
-        cx, cz = L2W(ps, pt); cy = float(chao_cav(np.array(cx), np.array(cz))) + pr * 0.15
-        d = np.maximum(d, -(np.sqrt((px - cx) ** 2 + ((py - cy) * 1.35) ** 2 + (pz - cz) ** 2) - pr))
+    asp = 0.035 * fbm3(N3b, px * 2.3 + 11, py * 2.3, pz * 2.3 - 4)          # aspereza das faces (sem desmanchar as arestas)
+    for B_ in BLOCOS:
+        d = np.maximum(d, -(bloco(px, py, pz, B_) + asp))
     return d
 # região da boca (coordenadas s,t): aqui o terreno some e quem desenha é a malha 3D (paredão com saliências)
 BOCA_S = (-3.5, 9.0); BOCA_T = 11.0

@@ -11,7 +11,7 @@ ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshade
 VISTAS = [
     ('longe_base', None, None, 10.5, '1', False, None, None, 0),        # da Base Militar olhando para a serra
     ('longe_alto', None, None, 15.5, '1', False, None, None, 0),        # de cima, a serra inteira
-    ('boca', -15.0, 1.5, 10.0, '3', False, 4.0, 0.0, 0),
+    ('boca', -9.0, 1.0, 10.0, '3', False, 3.0, 0.0, 0),           # no pátio, a boca na frente
     ('boca_lado', -11.0, -9.0, 15.5, '3', False, 3.0, 2.0, 0),
     ('dentro_lanterna', 9.0, -0.4, 10.0, '3', True, 24.0, -2.0, 0),
     ('salao_1p', 23.0, -1.8, 10.0, '1', True, 33.0, 2.5, 0),

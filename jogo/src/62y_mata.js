@@ -9,12 +9,17 @@
      do jogo (como as árvores de longe do 62s).
    · As folhas recebem luz como um volume (normal para fora da copa) e o miolo da copa é mais escuro (a luz não entra).
    · A sombra continua a da árvore de antes (mesmo lugar e altura).
-   · No gráfico Baixo (aparelho fraco) fica tudo como antes. Enquanto as texturas não carregam, aparecem as árvores de antes. */
+   · Enquanto as texturas não carregam, aparecem as árvores de antes. (Desde 12/11, 22h30, vale também no gráfico Baixo, com
+     distâncias menores: o dono pediu tirar todas as árvores de bola e cone.)
+   · 12/11, 22h ("árvores redondas com cone, está feio"): os pinheiros de cone também viram espécies da mata (na altura deles) e as
+     gigantes ganham copa de jacarandá do tamanho delas (a madeira, os galhos andáveis, os cipós e a colisão continuam os delas;
+     a sombra da copa é a da copa antiga). Para o jogo não pesar: de perto o LOD0, até MATA_R1 o LOD1 e dali em diante a placa. */
+const MATA_R1={baixo:30,medio:45,alto:60,ultra:80};                            // até onde vai a versão de meia distância (m)
 const MATA_ESP=['jacaranda','ilha1','ilha2','ilha3','pequena'];
 const MATA_ALT={jacaranda:1.3,ilha1:1.05,ilha2:0.95,ilha3:0.9,pequena:0.95};   // altura em relação à árvore redonda de antes
-const MATA_R0={baixo:0,medio:16,alto:22,ultra:30};                            // até onde vai a versão de perto (m)
+const MATA_R0={baixo:10,medio:16,alto:22,ultra:30};                            // até onde vai a versão de perto (m)
 const MATAV={ok:false,esp:[],restoR:null,restoB:null,longe:null,info:null,erro:null};
-function mataLigada(){return MATAV.ok&&cfg.graf!=='baixo';}
+function mataLigada(){return MATAV.ok;}
 function mataProntas(){for(const e of MATAV.esp)for(const k in e.tex)if(!e.tex[k].pronta)return false;return MATAV.esp.length>0;}
 function mataEsp(x,z){const n=MATAV.esp.length;return Math.min(n-1,Math.floor(pinhoHash(x+0.37,z-1.71)*n));}
 /* altura da árvore redonda detalhada de antes (s = 1) */
@@ -26,23 +31,33 @@ function mataGeo(f,k,fol){const n=f.length/11;for(let i=0;i<n;i++){const a=i*11;
   for(let i=0;i<n;i++){const a=i*11,r=Math.hypot(f[a]-cx,(f[a+1]-cy)*1.4,f[a+2]-cz)/rm,emb=f[a+1]<cy?0.85:1,ao=(0.5+0.5*Math.min(1,r*1.15))*emb;
     f[a+3]=0.95*ao;f[a+4]=1.0*ao;f[a+5]=0.9*ao;}}
 function mataMontar(){MATAV.ok=false;MATAV.esp=[];if(typeof MATA==='undefined'||!MESH.roundN||!MESH.birchN)return;
-  const hR=mataAlturaRedonda(),max=MESH.roundN.max+MESH.birchN.max;
+  const hR=mataAlturaRedonda(),LP=ARVL.lim&&ARVL.lim.pineHi,hP=LP?LP.hi[1]-LP.lo[1]:hR*1.4;MATAV.kPinho=hP/hR;
+  const max=MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length+(typeof FRUTEIRAS!=='undefined'?FRUTEIRAS.length+40:0);
   for(const id of MATA_ESP){const A=MATA[id];if(!A||A.tipo!=='arvore')continue;const k=hR*(MATA_ALT[id]||1)/A.h;
     const tex={};for(const nome in A.tex)tex[nome]=texModelo('mata_'+id+'_'+nome,A.tex[nome],nome!=='folhas');
     const lods=A.lod.map(L=>{const partes=[];for(const nome in L){const fol=nome==='folhas';
         const m=instTex(L[nome],max,tex[nome],fol?1:0,f=>mataGeo(f,k,fol));m.sway=MESH.roundN.sway;partes.push({m,fol,tex:tex[nome]});}return partes;});
     MATAV.esp.push({id,tex,lods,k,lim:{lo:A.lo.map(v=>v*k),hi:A.hi.map(v=>v*k)}});}
-  MATAV.restoR=instClone(MESH.roundN,MESH.roundN.max);MATAV.restoB=instClone(MESH.birchN,MESH.birchN.max);
+  MATAV.restoR=instClone(MESH.roundN,MESH.roundN.max);MATAV.restoB=instClone(MESH.birchN,MESH.birchN.max);MATAV.restoP=MESH.pineN?instClone(MESH.pineN,MESH.pineN.max):null;
+  MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='ilha3');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
   MATAV.ok=MATAV.esp.length>0;MATAV.info={especies:MATAV.esp.map(e=>({id:e.id,escala:+e.k.toFixed(3),altura:+(e.lim.hi[1]).toFixed(2),
     tri:e.lods.map(L=>L.reduce((s,p)=>s+p.m.tri,0))})),alturaRedonda:+hR.toFixed(2)};}
 {const _im=initMeshes;initMeshes=function(){const r=_im.apply(this,arguments);try{mataMontar();}catch(e){console.error('mata nova',e);MATAV.erro=String(e);MATAV.ok=false;}return r;};}
 /* as árvores de perto (redondas e bétulas) vão para a espécie de cada uma: de perto o LOD0, até o fim do "perto" o LOD1 */
-function mataDistribuir(){if(!MATAV.ok)return;const R0=(MATA_R0[cfg.graf]??22)**2,liga=mataLigada()&&mataProntas();
-  for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)p.m.n=0;MATAV.restoR.n=0;MATAV.restoB.n=0;
-  for(const[src,re]of[[MESH.roundN,MATAV.restoR],[MESH.birchN,MATAV.restoB]]){const a=src.arr;
+function mataDistribuir(){if(!MATAV.ok)return;const R0=(MATA_R0[cfg.graf]??22)**2,R1=(MATA_R1[cfg.graf]??60)**2,liga=mataLigada()&&mataProntas(),tmp=MATAV.tmp||(MATAV.tmp=new Float32Array(8));
+  for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)p.m.n=0;MATAV.restoR.n=0;MATAV.restoB.n=0;if(MATAV.restoP)MATAV.restoP.n=0;MATAV.nExtra=0;
+  const poe=(e,d,a,o)=>{if(d>=R1){MATAV.extra.set(a.subarray(o,o+8),MATAV.nExtra*8);MATAV.nExtra++;return;}for(const p of e.lods[d<R0?0:1])copiarInst(p.m,a,o);};
+  for(const[src,re,ks]of[[MESH.roundN,MATAV.restoR,1],[MESH.birchN,MATAV.restoB,1],[MESH.pineN,MATAV.restoP,MATAV.kPinho]]){if(!src||!re)continue;const a=src.arr;
     for(let i=0;i<src.n;i++){const o=i*8;if(!liga){copiarInst(re,a,o);continue;}
-      const e=MATAV.esp[mataEsp(a[o],a[o+2])],L=e.lods[d2(a[o],a[o+2],P.x,P.z)<R0?0:1];for(const p of L)copiarInst(p.m,a,o);}}
-  for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)subirInst(p.m);subirInst(MATAV.restoR);subirInst(MATAV.restoB);
+      const e=MATAV.esp[mataEsp(a[o],a[o+2])],d=d2(a[o],a[o+2],P.x,P.z);
+      if(ks!==1){for(let k=0;k<8;k++)tmp[k]=a[o+k];tmp[4]*=ks;poe(e,d,tmp,0);}else poe(e,d,a,o);}}
+  /* árvores de fruta dos quintais e dos sítios: a copa vira a árvore pequena de verdade, na altura da de antes (~3,4 m) */
+  if(liga&&MATAV.peq>=0&&typeof FRUTEIRAS!=='undefined'){const e=MATAV.esp[MATAV.peq];for(const F of FRUTEIRAS){const d=d2(F.x,F.z,P.x,P.z);if(d>R1*1.5)continue;
+      tmp[0]=F.x;tmp[1]=F.y;tmp[2]=F.z;tmp[3]=F.x*1.7+F.z;tmp[4]=3.5/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1.02;tmp[7]=0.92;for(const p of e.lods[d<R0?0:1])copiarInst(p.m,tmp,0);}}
+  /* gigantes: copa de jacarandá do tamanho delas */
+  if(liga&&MATAV.jac>=0){const e=MATAV.esp[MATAV.jac];for(const T of GIGANTES){tmp[0]=T.x;tmp[1]=T.y-0.3;tmp[2]=T.z;tmp[3]=T.id*2.39;tmp[4]=T.H*1.12/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1;tmp[7]=0.95;
+      const d=d2(T.x,T.z,P.x,P.z);if(d<170*170)for(const p of e.lods[d<R0*2.6?0:1])copiarInst(p.m,tmp,0);else{MATAV.extra.set(tmp,MATAV.nExtra*8);MATAV.nExtra++;}}}
+  for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)subirInst(p.m);subirInst(MATAV.restoR);subirInst(MATAV.restoB);if(MATAV.restoP)subirInst(MATAV.restoP);
   mataLongeDistribuir();}
 {const _rv=rebuildVeg;rebuildVeg=function(force){const ia=vegT;const r=_rv.apply(this,arguments);if(force||vegT!==ia-1){try{mataDistribuir();}catch(e){console.error('mata nova',e);}}return r;};}
 /* fotos das espécies para as árvores de longe (uma vez, quando as texturas chegam) */
@@ -75,20 +90,30 @@ function mataAssar(){const F=MATAV.esp.map(e=>({nome:e.id,partes:e.lods[0].map(p
   gl.bindTexture(gl.TEXTURE_2D,tex);gl.generateMipmap(gl.TEXTURE_2D);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAX_LEVEL,4);
-  const max=MESH.round.max+MESH.birch.max,sway=MESH.round.sway;
+  const max=MESH.round.max+MESH.birch.max+(MESH.pine?MESH.pine.max:0)+MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length,sway=MESH.round.sway;
   MATAV.longe={tex,m:cels.map(cel=>Object.assign(arvlMalha(arvlGeo(cel),max,sway),{tex})),atlas:[AW,AH]};mataLongeDistribuir();}
 function mataLongeDistribuir(){const L=MATAV.longe;if(!L||!mataLigada())return;for(const m of L.m)m.n=0;
-  for(const s of[MESH.round,MESH.birch])for(let i=0;i<s.n;i++){const o=i*8;copiarInst(L.m[mataEsp(s.arr[o],s.arr[o+2])],s.arr,o);}
+  const tmp=MATAV.tmp||(MATAV.tmp=new Float32Array(8));
+  for(const[s,ks]of[[MESH.round,1],[MESH.birch,1],[MESH.pine,MATAV.kPinho]]){if(!s)continue;for(let i=0;i<s.n;i++){const o=i*8,q=L.m[mataEsp(s.arr[o],s.arr[o+2])];
+    if(ks===1)copiarInst(q,s.arr,o);else{for(let k=0;k<8;k++)tmp[k]=s.arr[o+k];tmp[4]*=ks;copiarInst(q,tmp,0);}}}
+  for(let i=0;i<MATAV.nExtra;i++){const o=i*8,a=MATAV.extra;copiarInst(L.m[a[o+4]>3.0&&MATAV.jac>=0&&GIGANTES.some(T=>T.x===a[o]&&T.z===a[o+2])?MATAV.jac:mataEsp(a[o],a[o+2])],a,o);}
   for(const m of L.m)subirInst(m);}
 PASSOS.push(function mataFotos(){if(MATAV.longe||MATAV.erroFoto||!MATAV.ok||!mataLigada()||!mataProntas())return;
   try{mataAssar();mataDistribuir();}catch(e){MATAV.erroFoto=String(e);console.error('mata (fotos)',e);}});
 /* desenho com luz: no lugar das redondas e bétulas de perto entram as espécies (madeira com o lado de trás escondido, folhas dos
    dois lados); de longe, as placas da própria espécie */
 {const _di=drawInst;drawInst=function(Pg,m){
-  if(Pg===PLI&&MATAV.ok&&(m===MESH.roundN||m===MESH.birchN)){_di(Pg,m===MESH.roundN?MATAV.restoR:MATAV.restoB);
+  if(Pg===PLI&&MATAV.ok&&(m===MESH.roundN||m===MESH.birchN||(m===MESH.pineN&&MATAV.restoP))){_di(Pg,m===MESH.roundN?MATAV.restoR:m===MESH.birchN?MATAV.restoB:MATAV.restoP);
     if(m===MESH.roundN&&mataLigada()&&mataProntas()){for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)if(!p.fol&&p.m.n)_di(Pg,p.m);
       const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)if(p.fol&&p.m.n)_di(Pg,p.m);if(cf)gl.enable(gl.CULL_FACE);}
     return;}
-  if(Pg===PLI&&MATAV.longe&&mataLigada()&&(m===MESH.round||m===MESH.birch)){if(m===MESH.round){const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);
+  if(Pg===PLI&&MATAV.longe&&mataLigada()&&(m===MESH.round||m===MESH.birch||m===MESH.pine)){if(m===MESH.round){const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);
       for(const q of MATAV.longe.m)if(q.n)_di(Pg,q);if(cf)gl.enable(gl.CULL_FACE);}return;}
   return _di.apply(this,arguments);};}
+/* gigante com a mata nova ligada: só a madeira (a copa é o jacarandá das instâncias) */
+gigMalha=function(T){return T.meshM&&MATAV.ok&&MATAV.jac>=0&&mataLigada()&&mataProntas()?T.meshM:T.mesh;};
+/* bolas de folha das árvores de fruta (14c_rurais): só sem a mata nova; a sombra delas fica sempre (é a sombra da copa nova) */
+{const _bw=buildWorld;buildWorld=function(){if(typeof COPAS_FRUT!=='undefined')COPAS_FRUT.n=0;MESH.copasFrut=null;return _bw.apply(this,arguments);};}
+function mataCopasFrut(){if(typeof COPAS_FRUT==='undefined'||!COPAS_FRUT.n)return null;if(!MESH.copasFrut)MESH.copasFrut=litMesh(COPAS_FRUT.data());return MESH.copasFrut;}
+DESENHO.opaco.push(function mataFrutDesenho(Pg){if(mataLigada()&&mataProntas()&&MATAV.peq>=0)return;const m=mataCopasFrut();if(m)drawStat(Pg,m,ID);});
+DESENHO.sombra.push(function mataFrutSombra(Pg){const m=mataCopasFrut();if(m)drawStat(Pg,m,ID);});

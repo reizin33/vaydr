@@ -1,5 +1,7 @@
 /* ================= malhas e desenho ================= */
 let W=1,H=1,dpr=1,vegDirty=true,vegT=0,grassT=0;
+/* malha da gigante para desenhar: a de sempre (a mata nova, quando ligada, usa só a madeira e põe a copa de verdade) */
+function gigMalha(T){return T.mesh;}
 function obraGeometry(){const O={},R=rng(77);const mk=f=>{const g=new GB(1024,8);f(g);return g.data();};
   O.barricada=mk(g=>{add(g,cylTris(0.17,0.17,2.9,7),mat(1.45,0.62,0,0,0,Math.PI/2),lin(0x5d4129),{j:0.1,rnd:R});
     for(let k=0;k<4;k++){const sx=-1.05+k*0.7;for(const sg of[1,-1]){const dy=Math.sin(0.87),dz=Math.cos(0.87)*sg,L=1.95,by=0.62-dy*L/2,bz=-dz*L/2;
@@ -65,7 +67,7 @@ function initMeshes(){
   MESH.pine=inst('pine',3200);MESH.round=inst('round',1600);MESH.dead=inst('dead',700);MESH.stump=inst('stump',3000);MESH.birch=inst('birch',1000);
   MESH.pineN=inst('pineHi',900);MESH.roundN=inst('roundHi',520);MESH.deadN=inst('deadHi',260);MESH.birchN=inst('birchHi',360);MESH.flor=inst('flor',3600);
   MESH.rock=inst('rock',220);MESH.bush=inst('bush',480);MESH.berries=inst('berries',480);
-  MESH.samambaia=inst('samambaia',2500);MESH.folhas=inst('folhas',2700);for(const T of GIGANTES)T.mesh=litMesh(geoGigante(T));
+  MESH.samambaia=inst('samambaia',2500);MESH.folhas=inst('folhas',2700);for(const T of GIGANTES){T.mesh=litMesh(geoGigante(T));T.meshM=litMesh(geoGigante(T,true));}
   MESH.pedra=inst('pedra',200);MESH.galho=inst('galho',200);MESH.cogumelo=inst('cogumelo',100);MESH.fibra=inst('fibra',200);MESH.grass=inst('grass',4600);
   for(const[k,v]of[['pine',0.0035],['pineN',0.0035],['round',0.006],['roundN',0.006],['birch',0.006],['birchN',0.006],['dead',0.002],['deadN',0.002],['bush',0.035],['berries',0.035],['grass',0.42],['fibra',0.18],['flor',0.5],['samambaia',0.12]])MESH[k].sway=v;
   const Wg=weaponGeometry();MESH.arma={};for(const k in Wg)MESH.arma[k]=litMesh(Wg[k]);
@@ -269,7 +271,7 @@ function render(){
   gl.uniform3f(PL.u.uTint,1,1,1);
   if(MESH.baseMil&&d2(BASEM.x,BASEM.z,cam.pos[0],cam.pos[2])<230*230)drawStat(PL,MESH.baseMil,ID);
   if(G.fab&&G.fab.nv>=2)drawStat(PL,MESH.obra.oficina,trs(TMP,BENCH[0],ground(BENCH[0],BENCH[1]),BENCH[1],0,-0.35,0,1,1,1));
-  for(const T of GIGANTES)if(d2(T.x,T.z,cam.pos[0],cam.pos[2])<170*170)drawStat(PL,T.mesh,trs(TMP,T.x,T.y,T.z,0,0,0,1,1,1));
+  for(const T of GIGANTES)if(d2(T.x,T.z,cam.pos[0],cam.pos[2])<170*170)drawStat(PL,gigMalha(T),trs(TMP,T.x,T.y,T.z,0,0,0,1,1,1));
   for(const c of CAIXAS){if(c.x===undefined||c.estado==='espera')continue;const vd=CAIXA_CFG.verDist[c.cat];if(d2(c.x,c.z,P.x,P.z)>vd*vd)continue;
     const k=c.estado==='saqueada'?0.5:1;gl.uniform3f(PL.u.uTint,k,k,k);drawStat(PL,MESH.obra['cx_'+c.cat],trs(TMP,c.x,c.y,c.z,0,c.yaw,0,1,1,1));}
   gl.uniform3f(PL.u.uTint,1,1,1);
@@ -348,7 +350,7 @@ function sombraCascata(lvp,perto,chars,hand,armaMesh){const R=perto?60:150;
   for(const o of OB)if(d2(o.x,o.z,P.x,P.z)<R*R)desenharObra(PD,o);
   if(G.fab&&G.fab.nv>=2)drawStat(PD,MESH.obra.oficina,trs(TMP,BENCH[0],ground(BENCH[0],BENCH[1]),BENCH[1],0,-0.35,0,1,1,1));
   if(MESH.baseMil&&d2(BASEM.x,BASEM.z,P.x,P.z)<(R+30)*(R+30))drawStat(PD,MESH.baseMil,ID);
-  for(const T of GIGANTES)if(d2(T.x,T.z,P.x,P.z)<(perto?62:150)**2)drawStat(PD,T.mesh,trs(TMP,T.x,T.y,T.z,0,0,0,1,1,1));
+  for(const T of GIGANTES)if(d2(T.x,T.z,P.x,P.z)<(perto?62:150)**2)drawStat(PD,T.mesh,trs(TMP,T.x,T.y,T.z,0,0,0,1,1,1));   // sombra: a copa antiga faz a sombra da copa nova
   desenharCidade(PD,true,perto?55:140);
   if(perto){for(const c of CAIXAS)if(c.x!==undefined&&c.estado!=='espera'&&d2(c.x,c.z,P.x,P.z)<30*30)drawStat(PD,MESH.obra['cx_'+c.cat],trs(TMP,c.x,c.y,c.z,0,c.yaw,0,1,1,1));
     if(armaMesh&&cfg.cam!=='1'&&!CARRO.ativo)drawStat(PD,armaMesh,hand);}
