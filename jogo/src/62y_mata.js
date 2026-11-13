@@ -15,8 +15,8 @@
      gigantes ganham copa de jacarandá do tamanho delas (a madeira, os galhos andáveis, os cipós e a colisão continuam os delas;
      a sombra da copa é a da copa antiga). Para o jogo não pesar: de perto o LOD0, até MATA_R1 o LOD1 e dali em diante a placa. */
 const MATA_R1={baixo:30,medio:45,alto:60,ultra:80};                            // até onde vai a versão de meia distância (m)
-const MATA_ESP=['jacaranda','ilha1','ilha2','ilha3','pequena'];
-const MATA_ALT={jacaranda:1.3,ilha1:1.05,ilha2:0.95,ilha3:0.9,pequena:0.95};   // altura em relação à árvore redonda de antes
+const MATA_ESP=['jacaranda','ilha1','ilha2','pequena'];   // 13/11: a ilha3 saiu (árvore baixa e esparramada: no tamanho das outras, o tronco claro deitava no chão e parecia lixo branco)
+const MATA_ALT={jacaranda:1.3,ilha1:1.05,ilha2:0.95,pequena:0.95};   // altura em relação à árvore redonda de antes
 const MATA_R0={baixo:10,medio:16,alto:22,ultra:30};                            // até onde vai a versão de perto (m)
 const MATAV={ok:false,esp:[],restoR:null,restoB:null,longe:null,info:null,erro:null};
 function mataLigada(){return MATAV.ok;}
@@ -39,7 +39,7 @@ function mataMontar(){MATAV.ok=false;MATAV.esp=[];if(typeof MATA==='undefined'||
         const m=instTex(L[nome],max,tex[nome],fol?1:0,f=>mataGeo(f,k,fol));m.sway=MESH.roundN.sway;partes.push({m,fol,tex:tex[nome]});}return partes;});
     MATAV.esp.push({id,tex,lods,k,lim:{lo:A.lo.map(v=>v*k),hi:A.hi.map(v=>v*k)}});}
   MATAV.restoR=instClone(MESH.roundN,MESH.roundN.max);MATAV.restoB=instClone(MESH.birchN,MESH.birchN.max);MATAV.restoP=MESH.pineN?instClone(MESH.pineN,MESH.pineN.max):null;
-  MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='pequena');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
+  MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='ilha1');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
   MATAV.ok=MATAV.esp.length>0;MATAV.info={especies:MATAV.esp.map(e=>({id:e.id,escala:+e.k.toFixed(3),altura:+(e.lim.hi[1]).toFixed(2),
     tri:e.lods.map(L=>L.reduce((s,p)=>s+p.m.tri,0))})),alturaRedonda:+hR.toFixed(2)};}
 {const _im=initMeshes;initMeshes=function(){const r=_im.apply(this,arguments);try{mataMontar();}catch(e){console.error('mata nova',e);MATAV.erro=String(e);MATAV.ok=false;}return r;};}
@@ -51,10 +51,14 @@ function mataDistribuir(){if(!MATAV.ok)return;const R0=(MATA_R0[cfg.graf]??22)**
     for(let i=0;i<src.n;i++){const o=i*8;if(!liga){copiarInst(re,a,o);continue;}
       const e=MATAV.esp[mataEsp(a[o],a[o+2])],d=d2(a[o],a[o+2],P.x,P.z);
       if(ks!==1){for(let k=0;k<8;k++)tmp[k]=a[o+k];tmp[4]*=ks;poe(e,d,tmp,0);}else poe(e,d,a,o);}}
-  /* árvores de fruta dos quintais e dos sítios: a copa vira a árvore pequena de verdade (copa larga e baixa, 4,2 m), com as frutas
-     dentro da copa (a ilha3, mais rala, deixava as frutas soltas no ar) */
+  /* árvores de fruta dos quintais e dos sítios: a copa vira a ilha1 (copa redonda e cheia, como a de uma laranjeira, 4 m),
+     com as frutas dentro da copa (as mais ralas deixavam as frutas soltas no ar) */
   if(liga&&MATAV.peq>=0&&typeof FRUTEIRAS!=='undefined'){const e=MATAV.esp[MATAV.peq];for(const F of FRUTEIRAS){const d=d2(F.x,F.z,P.x,P.z);if(d>R1*1.5)continue;
-      tmp[0]=F.x;tmp[1]=F.y;tmp[2]=F.z;tmp[3]=F.x*1.7+F.z;tmp[4]=4.2/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1.02;tmp[7]=0.92;for(const p of e.lods[d<R0?0:1])copiarInst(p.m,tmp,0);}}
+      tmp[0]=F.x;tmp[1]=F.y;tmp[2]=F.z;tmp[3]=F.x*1.7+F.z;tmp[4]=4.0/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1.02;tmp[7]=0.92;for(const p of e.lods[d<R0?0:1])copiarInst(p.m,tmp,0);}}
+  /* árvores de fruta plantadas pelo jogador (pomar): a mesma árvore, do tamanho do quanto ela já cresceu */
+  if(liga&&MATAV.peq>=0&&typeof OB!=='undefined'&&typeof pomarExt==='function'){const e=MATAV.esp[MATAV.peq];for(const o of OB){const D=OBRAS[o.tipo];if(!D||!D.pomar)continue;const d=d2(o.x,o.z,P.x,P.z);if(d>R1*1.5)continue;
+      const c=pomarExt(o).cresce||0;if(c<0.1)continue;tmp[0]=o.x;tmp[1]=o.y;tmp[2]=o.z;tmp[3]=o.yaw||0;tmp[4]=4.0*(0.22+0.78*c)/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1.02;tmp[7]=0.92;
+      for(const p of e.lods[d<R0?0:1])copiarInst(p.m,tmp,0);}}
   /* gigantes: copa de jacarandá do tamanho delas */
   if(liga&&MATAV.jac>=0){const e=MATAV.esp[MATAV.jac];for(const T of GIGANTES){tmp[0]=T.x;tmp[1]=T.y-0.3;tmp[2]=T.z;tmp[3]=T.id*2.39;tmp[4]=T.H*1.12/e.lim.hi[1];tmp[5]=0.95;tmp[6]=1;tmp[7]=0.95;
       const d=d2(T.x,T.z,P.x,P.z);if(d<170*170)for(const p of e.lods[d<R0*2.6?0:1])copiarInst(p.m,tmp,0);else{MATAV.extra.set(tmp,MATAV.nExtra*8);MATAV.nExtra++;}}}
@@ -132,3 +136,9 @@ DESENHO.sombra.push(function mataSombra(Pg,perto){MATAV.sombraPerto=!!perto&&mat
     gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,p.tex);gl.activeTexture(gl.TEXTURE0);gl.bindVertexArray(m.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,m.count,m.n);}
   if(cf)gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);gl.useProgram(Pg.p);});
 gigSombra=function(T,perto){return perto&&T.meshM&&MATAV.ok&&MATAV.jac>=0&&mataLigada()&&mataProntas()?T.meshM:T.mesh;};
+/* pomar: com a mata nova, a árvore plantada desenha só a madeira (a copa é a árvore de verdade das instâncias) */
+INIT_MALHAS.push(function mataPomarMalhas(){if(typeof POMAR==='undefined')return;MATAV.pomar={};const tronco=lin(0x5a4330);
+  for(const t in POMAR){if(!MESH['pomarArv_'+t])continue;const g=new GB(1024,8);add(g,cylTris(0.14,0.2,1.6,7),mat(0,0,0),tronco);
+    for(const a of[0.6,2.4,4.3])add(g,cylTris(0.05,0.08,1.0,5),mat(Math.sin(a)*0.15,1.4,Math.cos(a)*0.15,0.6*Math.cos(a),0,-0.6*Math.sin(a)),tronco);
+    MATAV.pomar[t]={bola:MESH['pomarArv_'+t],madeira:litMesh(g.data())};}});
+PASSOS.push(function mataPomarTroca(){if(!MATAV.pomar)return;const nova=mataLigada()&&mataProntas()&&MATAV.peq>=0;for(const t in MATAV.pomar){const q=MATAV.pomar[t];MESH['pomarArv_'+t]=nova?q.madeira:q.bola;}});
