@@ -89,7 +89,7 @@ void main(){
 float n1=texture(uNoise,vUV*7.0).r,n2=texture(uNoise,vUV*31.0+vec2(0.37,0.11)).r,n3=texture(uNoise,vUV*97.0).r;
 vec3 al=uCor*(0.78+0.44*n1)*mix(0.9+0.2*n2,0.62+0.76*n3,uPelo)*uTint;
 #else
-if(uUseMask>0.5&&texture(uMask,vUV).r<0.5)discard;
+if(uUseMask>1.5){if(texture(uAlb,vUV).a<0.5)discard;}else if(uUseMask>0.5&&texture(uMask,vUV).r<0.5)discard;   /* 2: recorte pela transparência da própria textura (cabelo, barba, cílios do personagem personalizado) */
 vec3 al=texture(uAlb,vUV).rgb*uTexK*uTint;
 /* detalhe preso na textura (não escorrega quando o personagem anda): trama leve no tecido e na pele */
 al*=0.93+0.14*texture(uNoise,vUV*23.0).r;

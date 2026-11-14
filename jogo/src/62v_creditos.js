@@ -11,9 +11,18 @@ const CREDITOS=[
     {obra:'Destroyed Building 02',autor:'Prince Obrymec',link:'sketchfab.com/3d-models/destroyed-building-02-13875c4f2a3d46e4a110aded70e7d466',lic:'Sketchfab Standard',mod:'cores aplicadas no jogo'},
     {obra:'Decayed concrete train shed with graffiti',autor:'',link:'fab.com',lic:'Fab Standard'},
     {obra:'Old Concrete Bunker PBR Scan',autor:'',link:'fab.com',lic:'Fab Standard'},
-    {obra:'Corroded subway tunnel',autor:'',link:'fab.com',lic:'Fab Standard',mod:'escala ajustada e convertido para o jogo'}]},
+    {obra:'Corroded subway tunnel',autor:'',link:'fab.com',lic:'Fab Standard',mod:'escala ajustada e convertido para o jogo'},
+    /* v10.2.2: a Base Militar destruída e o prédio em ruína (créditos tirados do license.txt de cada download) */
+    {obra:'Crashed helicopter',autor:'J1G4R',link:'sketchfab.com/3d-models/crashed-helicopter-1ad46b04f23d43dbb2730c9435c1a7cc',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
+    {obra:'Abandoned Soviet BTR - 80',autor:'GameDev Nick',link:'sketchfab.com/3d-models/abandoned-soviet-btr-80-32145d6303e5487e9d92097b9845ef02',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
+    {obra:'Abandoned soviet military body-van KUNG',autor:'Mikhail Volkov',link:'sketchfab.com/3d-models/abandoned-soviet-military-body-van-kung-ed8dd9fe963347b1bedf3a46fc3aa42c',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
+    {obra:'Abandoned Garage Block Rusty Ruined Game-Ready',autor:'olegolegperepelica',link:'sketchfab.com/3d-models/abandoned-garage-block-rusty-ruined-game-ready-a1959927a98e4752bdb01b6e1f7f7d26',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
+    {obra:'Sandbag Barrier (Ready for Unreal Engine)',autor:'G4AGamingLabs',link:'sketchfab.com/3d-models/sandbag-barrier-ready-for-unreal-engine-593800671c8e45eca93b8b7c765c0f77',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
+    {obra:'Ruin Building',autor:'nermin',link:'sketchfab.com/3d-models/ruin-building-184d70cc473540749206cc7d8f9917b8',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'}]},
+  {tit:'Personagem',itens:[
+    {obra:'Corpos, peles, olhos, sobrancelhas, cabelos, barbas, roupas e sapatos do Personalizado, e o braço da 1ª pessoa',autor:'MakeHuman',link:'makehumancommunity.org',lic:'CC0',mod:'ajustado ao esqueleto do jogo'}]},
   {tit:'Texturas e modelos',itens:[
-    {obra:'Grama, chão da mata, folhas, rocha, tábuas, capim, ferramentas, baú, galhos e pinheiro',autor:'Poly Haven',link:'polyhaven.com',lic:'CC0'}]},
+    {obra:'Grama, chão da mata, folhas, rocha, tábuas, capim, ferramentas, baú, galhos, pinheiro, móveis e objetos do mapa (barreira, tambor, caixa militar)',autor:'Poly Haven',link:'polyhaven.com',lic:'CC0'}]},
   {tit:'Sons gravados',itens:[
     {obra:'Impact Sounds e RPG Audio',autor:'Kenney',link:'kenney.nl',lic:'CC0'},
     {obra:'Pacotes de efeitos CC0 (madeira, metal, quebra, criaturas, tiros)',autor:'rubberduck',link:'opengameart.org',lic:'CC0'},
