@@ -28,22 +28,30 @@ for(const[t,e]of[['arsenal',['espingarda',.22,1,1]],['arsenal',['cartucho',.5,4,
   ['cobertura',['rifle',.08,1,1]],['cobertura',['balaRifle',.2,2,6]],['cofre_pol',['rifle',.12,1,1]],['vestiario',['cartucho',.12,2,4]],['deposito',['bombaCaseira',.03,1,1]],
   ['deposito',['isca',.04,1,1]],['ap_gaveta',['isca',.03,1,1]],['armazem',['besta',.03,1,1]],['armazem',['virote',.08,3,8]],['hotel_mala',['cartucho',.04,2,4]]])if(CID_LOOT[t])CID_LOOT[t].push(e);
 /* ---------- malhas na mão (osso 11: cano em -y, topo em +z) ---------- */
+let ARMA_COR_FP=0.12;   // comprimento da coronha das armas longas na 1ª pessoa (m; 0 = sem coronha)
 function armas3Meshes(){const R=rng(91),mk=f=>{const g=new GB(512,8);f(g);return litMesh(g.data());},aco=lin(0x2c2f33),aco2=lin(0x4a4f55),mad=lin(0x6a4a2c),mad2=lin(0x553a22);
-  MESH.arma.espingarda=mk(g=>{add(g,boxTris(0.034,0.06,0.11),mat(0,0.01,0.02),mad2);add(g,boxTris(0.045,0.16,0.07),mat(0,-0.05,0.075),aco);
+  /* armas longas: na 1ª pessoa a coronha é mais curta (MESH.armaFP): a inteira vinha até a câmera e cobria a mão direita no cabo
+     e o antebraço (14/11). cor(L,y0,z0,rx): coronha de comprimento L começando atrás do cabo, inclinada rx */
+  const cor=(g,L,y0,z0,rx,lg,altura)=>add(g,boxTris(lg,L,altura,{bx:0.9}),mat(0,y0+L/2*Math.cos(rx),z0+L/2*Math.sin(rx),rx,0,0),mad,{j:0.05,rnd:R}),FP=(MESH.armaFP={});
+  const espingarda=fp=>mk(g=>{add(g,boxTris(0.034,0.06,0.11),mat(0,0.01,0.02),mad2);add(g,boxTris(0.045,0.16,0.07),mat(0,-0.05,0.075),aco);
     add(g,cylTris(0.012,0.012,0.62,8),mat(0,-0.12,0.098,Math.PI,0,0),aco2);add(g,cylTris(0.011,0.011,0.5,8),mat(0,-0.12,0.068,Math.PI,0,0),aco);
-    add(g,boxTris(0.05,0.15,0.045),mat(0,-0.42,0.066),mad,{j:0.05,rnd:R});add(g,boxTris(0.04,0.34,0.06,{bx:0.9}),mat(0,0.2,0.035,-0.18,0,0),mad,{j:0.05,rnd:R});
-    add(g,boxTris(0.044,0.03,0.09),mat(0,0.37,0.005,-0.18,0,0),lin(0x1a1a1a));});
-  MESH.arma.rifle=mk(g=>{add(g,boxTris(0.034,0.06,0.11),mat(0,0.01,0.02),mad2);add(g,boxTris(0.042,0.2,0.06),mat(0,-0.06,0.072),aco);
+    add(g,boxTris(0.05,0.15,0.045),mat(0,-0.42,0.066),mad,{j:0.05,rnd:R});
+    if(fp){if(ARMA_COR_FP>0)cor(g,ARMA_COR_FP,0.03,0.066,-0.18,0.04,0.06);return;}
+    add(g,boxTris(0.04,0.34,0.06,{bx:0.9}),mat(0,0.2,0.035,-0.18,0,0),mad,{j:0.05,rnd:R});add(g,boxTris(0.044,0.03,0.09),mat(0,0.37,0.005,-0.18,0,0),lin(0x1a1a1a));});
+  MESH.arma.espingarda=espingarda(false);FP.espingarda=espingarda(true);
+  const rifle=fp=>mk(g=>{add(g,boxTris(0.034,0.06,0.11),mat(0,0.01,0.02),mad2);add(g,boxTris(0.042,0.2,0.06),mat(0,-0.06,0.072),aco);
     add(g,cylTris(0.01,0.012,0.7,8),mat(0,-0.16,0.088,Math.PI,0,0),aco2);add(g,boxTris(0.05,0.42,0.05,{bx:0.85}),mat(0,-0.32,0.055),mad,{j:0.05,rnd:R});
-    add(g,boxTris(0.04,0.36,0.065,{bx:0.9}),mat(0,0.21,0.035,-0.16,0,0),mad,{j:0.05,rnd:R});
+    if(!fp)add(g,boxTris(0.04,0.36,0.065,{bx:0.9}),mat(0,0.21,0.035,-0.16,0,0),mad,{j:0.05,rnd:R});else if(ARMA_COR_FP>0)cor(g,ARMA_COR_FP,0.03,0.064,-0.16,0.04,0.065);
     add(g,cylTris(0.018,0.018,0.26,10),mat(0,0.06,0.145,Math.PI,0,0),lin(0x161819));for(const y of[0.07,-0.2])add(g,cylTris(0.026,0.026,0.05,10),mat(0,y,0.145,Math.PI,0,0),lin(0x161819));
     add(g,cylTris(0.02,0.02,0.002,10),mat(0,-0.25,0.145,Math.PI,0,0),lin(0x5a8aa8),{e:0.4});for(const y of[0.0,-0.13])add(g,boxTris(0.012,0.012,0.04),mat(0,y,0.118),aco);
     add(g,cylTris(0.007,0.007,0.06,6),mat(0.03,0.02,0.09,0,0,Math.PI/2),aco2);add(g,icoTris(0.012,0.1,R),mat(0.062,0.02,0.09),aco2);});
-  MESH.arma.besta=mk(g=>{add(g,boxTris(0.034,0.06,0.11),mat(0,0.01,0.02),mad2);add(g,boxTris(0.04,0.62,0.05),mat(0,-0.12,0.07),mad,{j:0.05,rnd:R});
-    add(g,boxTris(0.038,0.3,0.06,{bx:0.9}),mat(0,0.24,0.04,-0.16,0,0),mad,{j:0.05,rnd:R});
+  MESH.arma.rifle=rifle(false);FP.rifle=rifle(true);
+  const besta=fp=>mk(g=>{add(g,boxTris(0.034,0.06,0.11),mat(0,0.01,0.02),mad2);add(g,boxTris(0.04,0.62,0.05),mat(0,-0.12,0.07),mad,{j:0.05,rnd:R});
+    if(!fp)add(g,boxTris(0.038,0.3,0.06,{bx:0.9}),mat(0,0.24,0.04,-0.16,0,0),mad,{j:0.05,rnd:R});else if(ARMA_COR_FP>0)cor(g,ARMA_COR_FP,0.09,0.064,-0.16,0.038,0.06);
     for(const s of[-1,1]){add(g,boxTris(0.3,0.024,0.03),mm(mat(s*0.15,-0.42,0.08),mat(0,0,0,0,0,s*0.22)),aco2);}
     add(g,cylTris(0.003,0.003,0.56,4),mat(0.28,-0.36,0.085,0,0,Math.PI/2),lin(0xd8d0c0));add(g,cylTris(0.006,0.006,0.34,5),mat(0,-0.05,0.1,Math.PI,0,0),lin(0x8a6a40));
     add(g,cylTris(0,0.011,0.04,4),mat(0,-0.39,0.1,Math.PI,0,0),aco);add(g,boxTris(0.016,0.05,0.03),mat(0,0.06,-0.01),aco);});
+  MESH.arma.besta=besta(false);FP.besta=besta(true);
   MESH.arma.bombaCaseira=mk(g=>{add(g,cylTris(0.032,0.032,0.17,10),mat(0,0,-0.07,Math.PI/2,0,0),lin(0x5a5e62),{j:0.05,rnd:R});
     for(const z of[-0.08,0.1])add(g,cylTris(0.038,0.038,0.03,10),mat(0,0,z,Math.PI/2,0,0),lin(0x3a3d40));add(g,boxTris(0.07,0.075,0.05),mat(0,0,0.02),lin(0x2a2a2a));
     add(g,cylTris(0.004,0.004,0.07,4),mat(0,0,0.13,Math.PI/2+0.4,0,0),lin(0x8a7a50));add(g,icoTris(0.009,0.1,R),mat(0,0.03,0.19),lin(0xffa040),{e:2.5});});

@@ -13,15 +13,16 @@ import lugares_banco as LB
 ZIPMH = sys.argv[1]; PREVIA = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != '-' else None
 SAIDA = sys.argv[3] if len(sys.argv) > 3 else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', '21l_braco_dados.js')
 # medidas em metros. No corpo: ombro (x além do qual é braço), tw (o pulso ao longo do eixo, a partir do meio do braço), dedos (U do pulso até os dedos, raio, x). No braço (U a partir do pulso para os dedos, V na linha
-# dos nós, W para a palma): corte (até onde vai o antebraço), Uk (linha dos nós, onde os dedos começam a dobrar), Rc (raio do cabo),
+# dos nós, W para a palma): corte (até onde vai o braço: passa do cotovelo, para a ponta cortada não aparecer na tela com a mão
+# esquerda longe, no guarda-mão das armas longas; o braço fica reto), Uk (linha dos nós, onde os dedos começam a dobrar), Rc (raio do cabo),
 # lim (borda entre o polegar e o indicador), pol (onde o polegar começa e acaba), pb (a base do polegar), mao0 (onde a luva começa)
-HOMEM = dict(malha='male_generic', pele='skins/middleage_caucasian_male/middleage_lightskinned_male_diffuse.png', corte=-0.24,
+HOMEM = dict(malha='male_generic', pele='skins/middleage_caucasian_male/middleage_lightskinned_male_diffuse.png', corte=-0.42,
              Uk=0.108, Rc=0.026, polegar_giro=-1.6, polegar_giro2=0.2, lado=640,
              ombro=-0.26, tw=-0.068, dedos=(0.118, 0.12, -0.40), braco=(0.13, -0.25), lim=(-0.030, 0.06), pol=(0.0, 0.03, 0.15, 0.175),
              pb=(0.035, -0.03, 0.004), mao0=-0.035)
 # a mão do female_generic é a do male_generic em 77% (mesma forma): as medidas da mão vão nessa escala; o pulso foi achado no perfil
 # do braço (a seção mais fina antes de a mão alargar) e o antebraço é mais curto (o cotovelo fica a uns 26 cm do pulso)
-MULHER = dict(HOMEM, malha='female_generic', pele='skins/young_caucasian_female/young_lightskinned_female_diffuse.png', corte=-0.19,
+MULHER = dict(HOMEM, malha='female_generic', pele='skins/young_caucasian_female/young_lightskinned_female_diffuse.png', corte=-0.35,
               Uk=0.083, ombro=-0.22, tw=-0.04, dedos=(0.091, 0.105, -0.36), braco=(0.115, -0.21), lim=(-0.023, 0.046), pol=(0.0, 0.023, 0.116, 0.135),
               pb=(0.027, -0.023, 0.004), mao0=-0.027)
 z = zipfile.ZipFile(ZIPMH)

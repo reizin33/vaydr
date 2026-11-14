@@ -390,7 +390,7 @@ function render(){
     const f=cam.fwd,r=cam.right,u=cam.up,p=cam.pos;CW.set([r[0],r[1],r[2],0,u[0],u[1],u[2],0,-f[0],-f[1],-f[2],0,p[0],p[1],p[2],1]);
     mul(VPV,PRV,V);setLit(PL);gl.uniformMatrix4fv(PL.u.uViewProj,false,VPV);gl.uniform1f(PL.u.uShadowOn,0);mul(TMP2,CW,TMP);
     if(id==='arco')desenharArco1P(PL,CW);
-    else if(id&&MESH.arma[id]&&(ITEMS[id].tipo==='arma'||ITEMS[id].mao)&&!brfSemItem(id)){drawStat(PL,MESH.arma[id],TMP2);if(id==='lanterna'&&P.lanterna&&MESH.lanternaLente)drawStat(PL,MESH.lanternaLente,TMP2);}
+    else if(id&&MESH.arma[id]&&(ITEMS[id].tipo==='arma'||ITEMS[id].mao)&&!brfSemItem(id)){drawStat(PL,(MESH.armaFP&&MESH.armaFP[id])||MESH.arma[id],TMP2);if(id==='lanterna'&&P.lanterna&&MESH.lanternaLente)drawStat(PL,MESH.lanternaLente,TMP2);}
     bracoFPDesenhar(PL,CW,TMP,id);}   // v10.2.2: braço e mão de verdade, fechada no cabo (62yh_braco.js)
   gl.bindVertexArray(null);
   if(post)posProcessar();}
