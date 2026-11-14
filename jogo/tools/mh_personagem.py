@@ -412,14 +412,14 @@ for cid, c in CORPOS.items():
     perna = np.isin(W22.argmax(1), [IX['LeftUpLeg'], IX['RightUpLeg']])
     xi = float(np.abs(X[perna & (Y > yC - 0.03) & (Y < yC - 0.005)]).min())
     if cid == 'homem':
-        topo, bainha = yL + 0.058, yC - 0.06   # o cós fica abaixo do da bermuda e da calça do jogo (quadril + 6 cm), senão aparece por cima
+        topo, bainha = yL + 0.045, yC - 0.06   # o cós fica abaixo do da calça e da bermuda 3D (na frente ela desce até quadril + 5,3 cm)
         def dentro(p, a, b):
             y = p[:, 1]; sd = np.minimum(np.minimum(topo - y, y - bainha), (0.5 - a) * 0.08)
             el = np.clip(1 - np.abs((topo - y) - 0.006) / 0.006, 0, 1) + np.clip(1 - np.abs((y - bainha) - 0.004) / 0.004, 0, 1) * 0.6
             return sd, np.clip(el, 0, 1)
         ylim = (bainha - 0.03, topo + 0.03)
     else:
-        topo = yL + 0.065
+        topo = yL + 0.038   # abaixo do cós da calça e da bermuda 3D, que na frente desce até quadril + 4,6 cm
         # o top: duas copas (elipses, vistas de frente, em volta do bico de cada peito) com o decote em coração, e a faixa por baixo
         # do peito dando a volta nas costas. O bico é o ponto mais à frente dos vértices do peito (peso dos ossos breast*)
         cp = (B > 0.3) & (A < 0.5); yU = float(np.percentile(Y[cp], 2))
