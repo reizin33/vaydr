@@ -64,9 +64,11 @@ const testes = { eventos: [], downloads: [] };   // o que os testes de fumaça l
 function salvarAntes() {
   if (!win || win.isDestroyed()) return Promise.resolve('sem janela');
   const js = "(()=>{try{return window.__vaydrPC?window.__vaydrPC.salvar():'sem gancho';}catch(e){return 'erro: '+e.message;}})()";
+  /* no teste da nuvem (desenho por software, um quadro a cada 10 s ou mais) a página pode demorar para responder: lá a espera é
+     maior; para o jogador continua 2,5 s (um jogo travado fecha logo) */
   return Promise.race([
     win.webContents.executeJavaScript(js, true).catch((e) => 'erro: ' + e.message),
-    new Promise((r) => setTimeout(() => r('tempo esgotado'), 2500)),
+    new Promise((r) => setTimeout(() => r('tempo esgotado'), SMOKE ? 25000 : 2500)),
   ]);
 }
 
@@ -229,7 +231,9 @@ async function fumaca() {
   await foto(SMOKE === '1' ? '0-carregando' : '0-carregando-reaberto');
   passo('tela de carregamento', { ok: carga, pct: await js('Math.round((window.__cargaPct||0)*100)'), etapa: await js("String(window.__cargaEtapa||'')"),
     status: await js("(document.getElementById('cg-status')||{}).textContent||''"), dica: await js("(document.getElementById('cg-dica')||{}).textContent||''") });
-  const menu = await esperar("!!document.getElementById('t-menu')&&!document.getElementById('t-menu').hidden&&typeof __nnc!=='undefined'", 180000);
+  /* 10.2.2: com os modelos de verdade (objetos, base militar, personagem do MakeHuman, peças da cidade) a montagem no Windows da
+     nuvem, que desenha por software, passou de ~2,7 para ~5,5 minutos: o menu pode levar até 7 minutos lá */
+  const menu = await esperar("!!document.getElementById('t-menu')&&!document.getElementById('t-menu').hidden&&typeof __nnc!=='undefined'", 420000);
   menuVisto = true; rel.videoCarga = await video;
   await dormir(2500);
   passo('menu apareceu', { ok: menu, gl: await js(INFO_GL), versaoNoMenu: await js("document.querySelector('#t-menu .versao').textContent"), botaoSair: await js("!!document.getElementById('m-sair')") });
@@ -318,7 +322,7 @@ if (SMOKE === 'versao') {
       iniciarAtualizacao();
       return;   // este teste não precisa da janela do jogo
     }
-    if (SMOKE) setTimeout(() => { rel.ok = false; rel.motivo = 'tempo esgotado'; escrever(); app.exit(3); }, 12 * 60 * 1000);
+    if (SMOKE) setTimeout(() => { rel.ok = false; rel.motivo = 'tempo esgotado'; escrever(); app.exit(3); }, 14 * 60 * 1000);   // o passo do GitHub espera até 15
     criarJanela();
     iniciarAtualizacao();
   });
