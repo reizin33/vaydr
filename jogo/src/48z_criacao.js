@@ -99,7 +99,7 @@ const criaRoupaInicial=()=>({cabeca:null,rosto:null,camiseta:null,tronco:null,ma
 function abrirCriacao(apagar){CRIA.apagar=!!apagar;try{audioInit();}catch(_){}
   if(!CRIA.ap)CRIA.ap=aparLimpa(APAR_PADRAO);
   if(G.modo!=='criacao')CRIA.volta={hora:G.hora,chuva:G.chuva,chuvaAlvo:G.chuvaAlvo,x:P.x,z:P.z,y:P.y,yaw:P.ch.yaw,roupa:P.roupa,alive:P.alive,zs:Z.splice(0)};
-  G.modo='criacao';tela('t-criacao');$('cr-modal').hidden=true;hudEl.classList.add('oculto');{const mk=$('marca');if(mk)mk.hidden=true;}   /* o losango da missão fica fora do HUD: aberto do meio do jogo, ele ficava parado em cima do personagem */
+  G.modo='criacao';tela('t-criacao');$('cr-modal').hidden=true;hudEl.classList.add('oculto');{const mk=$('marca');if(mk)mk.hidden=true;const mi=$('mira');if(mi)mi.classList.add('escondido');}   /* o losango da missão e a mira ficam fora do HUD: aberto do meio do jogo, eles ficavam parados na tela */
   G.hora=CRIA_HORA;G.chuva=G.chuvaAlvo=0;P.alive=false;const[x,z]=CRIA_PONTO;P.x=x;P.z=z;P.y=ground(x,z);
   Object.assign(P.ch,{x,z,y:P.y,yaw:CRIA_YAW,pitch:0,roll:0});if(P.ch.sk){P.ch.sk.clip=null;P.ch.sk.cw=0;P.ch.sk.dyRaiz=0;}P.roupa=criaRoupaInicial();
   CRIA.ang=CRIA.angAlvo=0;CRIA.zoom=CRIA.zoomAlvo=0;CRIA.girar=false;CRIA.vista='frente';CRIA.arr=null;

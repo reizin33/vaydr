@@ -231,7 +231,7 @@ function skDesenharUm(Pg,c){const m=c.sk.t.mesh;gl.uniformMatrix4fv(Pg.u.uSk,fal
 function skSombra(chars,lvp){let ok=false;for(const c of chars){if(!c.sk||!c.sk.t.pronto||c.proc||d2(c.x,c.z,P.x,P.z)>42*42)continue;
     if(!ok){gl.useProgram(PDSK.p);gl.uniformMatrix4fv(PDSK.u.uViewProj,false,lvp||LVP);ok=true;}skDesenharUm(PDSK,c);}}
 function skDesenhar(chars){let ok=false;
-  for(const c of chars){if(!c.sk||!c.sk.t.pronto||c.proc)continue;if(c===P.ch&&(cfg.cam==='1'||camDist<0.75))continue;
+  for(const c of chars){if(!c.sk||!c.sk.t.pronto||c.proc)continue;if(c===P.ch&&G.modo!=='criacao'&&(cfg.cam==='1'||camDist<0.75))continue;   // na criação o corpo aparece mesmo se o jogo estava na 1ª pessoa
     if(!ok){setLit(PSK);gl.disable(gl.CULL_FACE);gl.uniform1f(PSK.u.uTexK,1.0);ok=true;}
     const t=c.sk.t;gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,t.tex);gl.uniform1i(PSK.u.uAlb,3);
     gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,t.mask||t.tex);gl.uniform1i(PSK.u.uMask,4);gl.uniform1f(PSK.u.uUseMask,t.mask?1:0);
@@ -240,7 +240,7 @@ function skDesenhar(chars){let ok=false;
     gl.uniform3fv(PSK.u.uTint,c.tint||[1,1,1]);gl.uniform1f(PSK.u.uIntS,interiorEm(c.x,c.y+0.3,c.z));gl.uniform1f(PSK.u.uPe,c.y||0);gl.uniform1f(PSK.u.uZumbi,c.zumbi?1:0);skDesenharUm(PSK,c);}
   if(ok){gl.uniform1f(PSK.u.uIntS,0);skCascas();skCascasNpc(chars);gl.enable(gl.CULL_FACE);}}
 /* roupas vestidas pelo jogador, por cima do corpo */
-function skCascas(){const c=P.ch;if(!c||!c.sk||!c.sk.t.pronto||c.proc||!P.roupa||cfg.cam==='1'||camDist<0.75||CARRO.ativo)return;const t=c.sk.t;let ok=false;
+function skCascas(){const c=P.ch;if(!c||!c.sk||!c.sk.t.pronto||c.proc||!P.roupa||(G.modo!=='criacao'&&(cfg.cam==='1'||camDist<0.75))||CARRO.ativo)return;const t=c.sk.t;let ok=false;
   const TAB=t.cascas||SK_CASCAS;for(const slot of ROUPA_SLOTS){const id=P.roupa[slot],L=id&&TAB[id];if(!L)continue;
     if(!ok){setLit(PSKC);gl.uniformMatrix4fv(PSKC.u.uSk,false,c.sk.skin);gl.uniform1f(PSKC.u.uIntS,interiorEm(c.x,c.y+0.3,c.z));gl.uniform3fv(PSKC.u.uTint,c.tint||[1,1,1]);gl.bindVertexArray(t.mesh.vao);ok=true;}
     for(const k of L){const sb=t.sub[k.sub];if(!sb||!sb.n)continue;gl.uniform1f(PSKC.u.uInfla,k.inf);gl.uniform3fv(PSKC.u.uCor,k.lin||(k.lin=lin(k.cor)));gl.uniform1f(PSKC.u.uPelo,k.pelo);
