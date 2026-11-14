@@ -76,7 +76,9 @@ function mhTexRoupa(id,g){const d=MHP.pecas[id],e=d[g],src=e.texf&&MHP.roupasTex
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);});}catch(err){console.error('personalizado: tingir roupa',err);}};
   im.src=src;return t;}
-function mhPeca(id,g){const k=id+'|'+g;if(MHG.peca[k])return MHG.peca[k];const d=MHP.pecas[id][g],ib=b64bytes(d.ib);
+/* os dados de uma peça num corpo; as roupas da mesma forma (só a cor muda) apontam para a outra: {mesmo:id} */
+const mhPd=(id,g)=>{const d=MHP.pecas[id][g];return d&&d.mesmo?MHP.pecas[d.mesmo][g]:d;};
+function mhPeca(id,g){const d0=MHP.pecas[id][g],id0=d0&&d0.mesmo||id,k=id0+'|'+g;if(MHG.peca[k])return MHG.peca[k];const d=mhPd(id,g),ib=b64bytes(d.ib);
   const m=mhVAO(mhVB(d),d.i32?new Uint32Array(ib.buffer):new Uint16Array(ib.buffer),d.i32);m.alfa=!!MHP.pecas[id].alfa;return MHG.peca[k]=m;}
 /* o esqueleto de cada corpo (o SKD dele e o skTipo com o alinhamento das poses do jogo), feito uma vez */
 function mhEsq(g){if(MHG.esq[g])return MHG.esq[g];const c=MHP.corpos[g],nome='mh_'+g;
@@ -86,7 +88,7 @@ function mhEsq(g){if(MHG.esq[g])return MHG.esq[g];const c=MHP.corpos[g],nome='mh
 function mhTipo(ap){const m=mhDe(ap),rp=mhRoupas(m.g),k=MH_CAMPOS.map(c=>m[c]).join('|')+'|'+rp.join(',');let t=MHG.tipos.get(k);if(t){MHG.tipos.delete(k);MHG.tipos.set(k,t);return t;}
   const e=mhEsq(m.g),g=m.g,ids=['olhos',m.cabelo,m.barba,m.sobr,g==='mulher'?'cilios_m':'cilios_h',...rp].filter(x=>x&&MHP.pecas[x]&&MHP.pecas[x][g]);
   /* corpo: tira os triângulos escondidos pelas peças que cobrem o corpo (as roupas 3D) */
-  const bits=ids.map(id=>MHP.pecas[id][g].oculta).filter(Boolean).map(b64bytes),I=e.mhIdx,n=I.length/3;let out=I;
+  const bits=ids.map(id=>mhPd(id,g).oculta).filter(Boolean).map(b64bytes),I=e.mhIdx,n=I.length/3;let out=I;
   if(bits.length){const tmp=new (e.mhI32?Uint32Array:Uint16Array)(I.length);let o=0;
     for(let i=0;i<n;i++){let esc=false;for(const b of bits)if((b[i>>3]>>(i&7))&1){esc=true;break;}if(esc)continue;tmp[o++]=I[i*3];tmp[o++]=I[i*3+1];tmp[o++]=I[i*3+2];}out=tmp.subarray(0,o);}
   /* as roupas do jogo: as regiões do corpo (tronco, mangas, pernas, bermuda, pés, cabeça, mãos, cinto) vão no fim dos índices */

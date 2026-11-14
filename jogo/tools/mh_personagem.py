@@ -473,11 +473,16 @@ for cid, c in CORPOS.items():
         log('  %-12s %-11s %5d vértices %5d triângulos%s' % (pid, cat, pk['nv'], pk['ni'] // 3, (', esconde %d do corpo' % pk.get('nocult', 0)) if pk.get('nocult') else ''))
     # roupas do jogo: a parte da roupa pronta, recortada; o corpo some só onde a parte cobre (dos vértices que o próprio MakeHuman
     # apaga, os que ficam por baixo desta parte: cobertos()). Os braços (para o colete) são os ossos do braço, sem o ombro
-    ENC = {}; ARM = [IX[o] for o in ('LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand')]
+    ENC = {}; GEO = {}; ARM = [IX[o] for o in ('LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand')]
     yJoelho = float((pA['LeftLeg'][1] + pA['RightLeg'][1]) / 2); yCint = float(pA['Hips'][1])
     for item, nome, fontes, corp, extra in ROUPAS3D:
         if cid not in fontes: continue
         pasta, parte = fontes[cid]
+        kg = (pasta, parte, json.dumps(extra, sort_keys=True))
+        if kg in GEO:   # a mesma forma de outra peça (só a cor muda): a malha não se repete
+            e = SAIDA['pecas'].setdefault(item, {'nome': nome, 'cat': 'roupa', 'corpos': list(fontes.keys()), 'cor': corp})
+            e[cid] = {'mesmo': GEO[kg], 'texf': pasta + ':' + parte}; log('  %-12s roupa = %s' % (item, GEO[kg])); continue
+        GEO[kg] = item
         if pasta not in ENC: ENC[pasta] = encaixar(ZS, 'clothes/' + pasta, P, miny)
         E = ENC[pasta]
         if E is None: log('  falta', pasta); continue
