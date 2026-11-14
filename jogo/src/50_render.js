@@ -275,7 +275,7 @@ function render(){
     if(lanternaNaMao())spotP=xf(P.ch.m.subarray(11*16,12*16),LANT_PONTA[0],LANT_PONTA[1],LANT_PONTA[2]);
     else{const hy=P.y+lerp(1.6,1.08,P.agK||0)*(P.ch.s||1);spotP=[P.x+spotD[0]*0.5,hy+spotD[1]*0.5,P.z+spotD[2]*0.5];}}
   luzes();
-  const hand=P.ch.m.subarray(11*16,12*16),selId=selItem()?selItem().id:null,armaMesh=selId&&MESH.arma[selId]&&(ITEMS[selId].tipo==='arma'||ITEMS[selId].mao)?MESH.arma[selId]:null;
+  const hand=P.ch.m.subarray(11*16,12*16),selId=selItem()?selItem().id:null,armaMesh=selId&&G.modo!=='criacao'&&MESH.arma[selId]&&(ITEMS[selId].tipo==='arma'||ITEMS[selId].mao)?MESH.arma[selId]:null;   // na tela de criação o personagem fica de mãos vazias
   // sombra (com cascatas: perto à esquerda da textura, longe à direita)
   if(sh){gl.bindFramebuffer(gl.FRAMEBUFFER,SHADOW.fbo);gl.viewport(0,0,SHADOW.w,SHADOW.size);gl.clear(gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1.6,3);

@@ -65,6 +65,17 @@ function mhVAO(vbuf,idx,i32){const vao=gl.createVertexArray();gl.bindVertexArray
   const e=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,e);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,idx,gl.STATIC_DRAW);gl.bindVertexArray(null);
   return{vao,ebo:e,count:idx.length,tipo:i32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT};}
 function mhTex(chave,url){return MHG.tex[chave]||(MHG.tex[chave]=skTextura(url,true));}
+/* a textura de uma roupa 3D: a luz do tecido (cinza, dividida pelas peças que saem da mesma roupa pronta) tingida na cor da peça
+   do jogo; até a imagem chegar, a peça fica na cor lisa */
+function mhTexRoupa(id,g){const d=MHP.pecas[id],e=d[g],src=e.texf&&MHP.roupasTex&&MHP.roupasTex[e.texf];if(!src)return mhTex('p_'+id+'_'+g,e.tex||d.tex);
+  const c=d.cor|0,k='r_'+e.texf+'_'+c;if(MHG.tex[k])return MHG.tex[k];const cr=(c>>16)&255,cg=(c>>8)&255,cb=c&255,t=gl.createTexture();MHG.tex[k]=t;
+  skNaUnidade(()=>{gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([cr,cg,cb,255]));gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);});
+  const im=new Image();im.onload=()=>{if(!gl)return;try{const cv=document.createElement('canvas');cv.width=im.width;cv.height=im.height;const x=cv.getContext('2d');x.drawImage(im,0,0);
+    const px=x.getImageData(0,0,cv.width,cv.height),D=px.data;for(let i=0;i<D.length;i+=4){const f=D[i]*(1.45/255);D[i]=Math.min(255,cr*f);D[i+1]=Math.min(255,cg*f);D[i+2]=Math.min(255,cb*f);D[i+3]=255;}
+    x.putImageData(px,0,0);skNaUnidade(()=>{gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.SRGB8_ALPHA8,gl.RGBA,gl.UNSIGNED_BYTE,cv);gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);});}catch(err){console.error('personalizado: tingir roupa',err);}};
+  im.src=src;return t;}
 function mhPeca(id,g){const k=id+'|'+g;if(MHG.peca[k])return MHG.peca[k];const d=MHP.pecas[id][g],ib=b64bytes(d.ib);
   const m=mhVAO(mhVB(d),d.i32?new Uint32Array(ib.buffer):new Uint16Array(ib.buffer),d.i32);m.alfa=!!MHP.pecas[id].alfa;return MHG.peca[k]=m;}
 /* o esqueleto de cada corpo (o SKD dele e o skTipo com o alinhamento das poses do jogo), feito uma vez */
@@ -85,7 +96,7 @@ function mhTipo(ap){const m=mhDe(ap),rp=mhRoupas(m.g),k=MH_CAMPOS.map(c=>m[c]).j
   const corpo=mhVAO(e.mhVB,todos,e.mhI32);corpo.count=out.length;
   /* peças: as opacas primeiro (olhos), depois as recortadas */
   const partes=ids.map(id=>{const p=mhPeca(id,g),d=MHP.pecas[id];return{vao:p.vao,count:p.count,tipo:p.tipo,alfa:p.alfa,
-      tex:id==='olhos'?mhTex('olho_'+m.olhos,MHP.olhos[m.olhos].tex):d[g].tex?mhTex('p_'+id+'_'+g,d[g].tex):mhTex('p_'+id,d.tex)};})
+      tex:id==='olhos'?mhTex('olho_'+m.olhos,MHP.olhos[m.olhos].tex):d.cat==='roupa'?mhTexRoupa(id,g):mhTex('p_'+id,d.tex)};})
     .sort((a,b)=>a.alfa-b.alfa);
   t=Object.assign(Object.create(e),{nome:'mh',mesh:corpo,tex:mhTex('pele_'+m.pele,MHP.peles[m.pele].tex),mask:null,nrm:null,rug:null,partes,sub,cascas:MH_CASCAS,pronto:true,mh:m});
   MHG.tipos.set(k,t);
