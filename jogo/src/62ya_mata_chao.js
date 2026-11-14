@@ -38,7 +38,10 @@ function mchMontar(){MCH.ok=false;if(typeof MATA==='undefined'||!MESH.samambaia|
   MCH.moitas=[];if(V.bush&&MESH.bush){const L=mchLim(V.bush),alt=(L.hi[1]-L.lo[1])*1.3;for(const id of['calathea','antorio']){const A=MATA[id];if(!A||!A.variantes)continue;
     for(const v of A.variantes){const x=mchVariante(A,v.partes,MESH.bush.max,alt/Math.max(0.1,v.hi[1]-v.lo[1]),0,0,[0.95,1,0.93]);for(const m of x.ms)m.sway=MESH.bush.sway||0.03;MCH.moitas.push(x);}}}
   info.moitas=MCH.moitas.length;
-  MCH.ok=MCH.fet.length>0||MCH.pedras.length>0||MCH.plantas.length>0||MCH.moitas.length>0;MCH.info=info;}
+  /* v10.2.2: toco da árvore cortada (era um cilindro marrom de tampa clara): o toco escaneado com raízes (tree_stump_01), ~1,1 m de largura */
+  MCH.tocos=[];if(MATA.toco&&MESH.stump){const A=MATA.toco,w=Math.max(A.hi[0]-A.lo[0],A.hi[2]-A.lo[2]);MCH.tocos.push(mchVariante(A,A.partes,MESH.stump.max,1.15/Math.max(0.1,w),0,-0.04));}
+  info.tocos=MCH.tocos.length;
+  MCH.ok=MCH.fet.length>0||MCH.pedras.length>0||MCH.plantas.length>0||MCH.moitas.length>0||MCH.tocos.length>0;MCH.info=info;}
 etapaMalha('mata','mata',3,()=>{try{mchMontar();}catch(e){console.error('mata (chão)',e);MCH.ok=false;MCH.erro=String(e);}});
 /* onde nasce a folhagem nova: em volta dos troncos das árvores da mata (sorteio fixo: o mesmo mundo, a mesma mata) */
 function mchSemear(){MCH_PL.length=0;const R=rng(61031),n=MCH.plantas.length||12;let tent=0;
@@ -52,13 +55,14 @@ function mchSemear(){MCH_PL.length=0;const R=rng(61031),n=MCH.plantas.length||12
 {const _bw=buildWorld;buildWorld=function(){const r=_bw.apply(this,arguments);try{mchSemear();}catch(e){console.error('mata (folhagem)',e);}return r;};}
 /* reparte: samambaias de sempre entre as 4 variantes; pedras de sempre entre as 8; folhagem nova perto do jogador */
 function mchDistribuir(){if(!MCH.ok)return;const liga=mchLigada();
-  for(const L of[MCH.fet,MCH.pedras,MCH.plantas,MCH.moitas||[]])for(const v of L)for(const m of v.ms)m.n=0;
+  for(const L of[MCH.fet,MCH.pedras,MCH.plantas,MCH.moitas||[],MCH.tocos||[]])for(const v of L)for(const m of v.ms)m.n=0;
   if(liga){const S=MESH.samambaia,a=S.arr;if(MCH.fet.length)for(let i=0;i<S.n;i++){const o=i*8,v=MCH.fet[Math.floor(pinhoHash(a[o]+3.1,a[o+2])*MCH.fet.length)%MCH.fet.length];for(const m of v.ms)copiarInst(m,a,o);}
     const Rk=MESH.rock,b=Rk.arr;if(MCH.pedras.length)for(let i=0;i<Rk.n;i++){const o=i*8,v=MCH.pedras[Math.floor(pinhoHash(b[o]-7.3,b[o+2]+1.1)*MCH.pedras.length)%MCH.pedras.length];for(const m of v.ms)copiarInst(m,b,o);}
     const Bu=MESH.bush,bb=Bu.arr;if(MCH.moitas&&MCH.moitas.length)for(let i=0;i<Bu.n;i++){const o=i*8,v=MCH.moitas[Math.floor(pinhoHash(bb[o]+5.3,bb[o+2]-2.2)*MCH.moitas.length)%MCH.moitas.length];for(const m of v.ms)copiarInst(m,bb,o);}
+    if(MCH.tocos&&MCH.tocos.length){const St=MESH.stump,sa=St.arr,v=MCH.tocos[0];for(let i=0;i<St.n;i++)for(const m of v.ms)copiarInst(m,sa,i*8);}
     const R2=(MCH.R[cfg.graf]||30)**2,tmp=new Float32Array(8);if(MCH.plantas.length)for(const q of MCH_PL){if(d2(q.x,q.z,P.x,P.z)>R2)continue;const v=MCH.plantas[q.v%MCH.plantas.length];
       tmp[0]=q.x;tmp[1]=q.y;tmp[2]=q.z;tmp[3]=q.r;tmp[4]=q.s;tmp[5]=tmp[6]=tmp[7]=q.t;for(const m of v.ms)copiarInst(m,tmp,0);}}
-  for(const L of[MCH.fet,MCH.pedras,MCH.plantas,MCH.moitas||[]])for(const v of L)for(const m of v.ms)subirInst(m);}
+  for(const L of[MCH.fet,MCH.pedras,MCH.plantas,MCH.moitas||[],MCH.tocos||[]])for(const v of L)for(const m of v.ms)subirInst(m);}
 {const _rg=rebuildGrass;rebuildGrass=function(){const r=_rg.apply(this,arguments);try{mchDistribuir();}catch(e){console.error('mata (chão)',e);}return r;};}
 {const _rv=rebuildVeg;rebuildVeg=function(force){const ia=vegT;const r=_rv.apply(this,arguments);if(force||vegT!==ia-1){try{mchDistribuir();}catch(e){console.error('mata (chão)',e);}}return r;};}
 function mchDesenhaLista(Pg,L,dupla){const cf=gl.isEnabled(gl.CULL_FACE);if(dupla&&cf)gl.disable(gl.CULL_FACE);for(const v of L)for(const m of v.ms)if(m.n)drawInstMch(Pg,m);if(dupla&&cf)gl.enable(gl.CULL_FACE);}
@@ -67,6 +71,7 @@ let drawInstMch=null;
   if(Pg===PLI&&mchLigada()){
     if(m===MESH.samambaia&&MCH.fet.length&&MCH.fet.every(v=>mchProntas(v.tex))){mchDesenhaLista(Pg,MCH.fet,true);return;}
     if(m===MESH.rock&&MCH.pedras.length&&MCH.pedras.every(v=>mchProntas(v.tex))){mchDesenhaLista(Pg,MCH.pedras,false);return;}
-    if(m===MESH.bush&&MCH.moitas&&MCH.moitas.length&&MCH.moitas.every(v=>mchProntas(v.tex))){mchDesenhaLista(Pg,MCH.moitas,true);return;}}
+    if(m===MESH.bush&&MCH.moitas&&MCH.moitas.length&&MCH.moitas.every(v=>mchProntas(v.tex))){mchDesenhaLista(Pg,MCH.moitas,true);return;}
+    if(m===MESH.stump&&MCH.tocos&&MCH.tocos.length&&MCH.tocos.every(v=>mchProntas(v.tex))){mchDesenhaLista(Pg,MCH.tocos,false);return;}}
   return _di.apply(this,arguments);};}
 DESENHO.opaco.push(function mchFolhagem(Pg){if(!mchLigada()||!MCH.plantas.length||!MCH.plantas.every(v=>mchProntas(v.tex)))return;setLit(PLI);mchDesenhaLista(PLI,MCH.plantas,true);setLit(Pg);});

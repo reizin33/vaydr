@@ -33,6 +33,14 @@ const SVN=(function(){const D=SERRA_DADOS,nx=D.nx,nz=D.nz,x0=D.x0,z0=D.z0,x1=D.x
   const dbur=(x,z)=>{if(bi1<0)return 99;const i=(x-x0)/dx,j=(z-z0)/dz;if(i<bi0-8||i>bi1+9||j<bj0-8||j>bj1+9)return 99;let b=99;
     for(let jj=Math.max(bj0,Math.floor(j-8));jj<=Math.min(bj1,Math.ceil(j+8));jj++)for(let ii=Math.max(bi0,Math.floor(i-8));ii<=Math.min(bi1,Math.ceil(i+8));ii++)
       if(bur[jj*nx+ii]){const d=Math.hypot((ii+0.5-i)*dx,(jj+0.5-j)*dz);if(d<b)b=d;}return b;};
+  /* v10.2.2 ("terreno em degraus"): o levantamento da serra tem degraus de 1 a 1,5 m a cada 3 a 5 m nas encostas, que viram faixas
+     de pedra e de grama alternadas, como escada. Um desfoque gaussiano (σ ≈ 1,6 m) na grade de 1 m alisa os degraus e o chiado;
+     perto da boca da gruta (encaixe com o paredão escaneado) e na beira da serra (emenda com o terreno de fora) fica como estava */
+  {const K=[0.0439,0.1724,0.4578,0.8226,1,0.8226,0.4578,0.1724,0.0439],Ks=K.reduce((a,b)=>a+b,0),T=new Float32Array(H1.length),B=new Float32Array(H1.length);
+    for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){let a=0;for(let k=-4;k<=4;k++){const ii=i+k<0?0:i+k>nx?nx:i+k;a+=H1[j*W1+ii]*K[k+4];}T[j*W1+i]=a/Ks;}
+    for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){let a=0;for(let k=-4;k<=4;k++){const jj=j+k<0?0:j+k>nz?nz:j+k;a+=T[jj*W1+i]*K[k+4];}B[j*W1+i]=a/Ks;}
+    for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){const x=x0+(x1-x0)*i/nx,z=z0+(z1-z0)*j/nz,k=j*W1+i,borda=Math.min(x-x0,x1-x,z-z0,z1-z),w=smooth(6,16,borda)*smooth(5,11,dbur(x,z));
+      if(w>0)H1[k]+=(B[k]-H1[k])*w;}}
   /* grade de 0,5 m */
   const NX2=S.NX2,NZ2=S.NZ2,W2=S.W2,H2=new Float32Array(W2*(NZ2+1));
   const h1=(i,j)=>H1[(j<0?0:j>nz?nz:j)*W1+(i<0?0:i>nx?nx:i)];
@@ -65,6 +73,7 @@ function svnAlt(x,z){const S=SVN,fx=(x-S.x0)/S.hx,fz=(z-S.z0)/S.hz;let i=Math.fl
   const u=fx-i,v=fz-j,k=j*S.W2+i,H=S.H2,hA=H[k],hD=H[k+1],hB=H[k+S.W2],hC=H[k+S.W2+1];
   return v>=u?hA+(hC-hB)*u+(hB-hA)*v:hA+(hD-hA)*u+(hC-hD)*v;}
 /* chão da caverna (null fora da pegada) e teto em cima dele (null = céu aberto) */
+const SVN_ESC_VIZ=[[0,0],[0.6,0],[-0.6,0],[0,0.6],[0,-0.6],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2],[0.9,0.9],[-0.9,0.9],[0.9,-0.9],[-0.9,-0.9]];
 function svnPiso(x,z){const P=SVN.piso,fx=(x-P.x0)/P.res,fz=(z-P.z0)/P.res;if(!(fx>=0&&fz>=0&&fx<P.nx-1&&fz<P.nz-1))return null;
   const i=fx|0,j=fz|0,u=fx-i,v=fz-j,k=j*P.nx+i,h=P.h;let s=0,w=0,q,a;
   if((q=h[k])>-32768){a=(1-u)*(1-v);s+=q*a;w+=a;}if((q=h[k+1])>-32768){a=u*(1-v);s+=q*a;w+=a;}
@@ -243,7 +252,14 @@ function svnPreparaGL(){const S=SVN;S.pronto=false;
   const G=S.gruta,o=G.o,v=b64bytes(G.v),n=b64bytes(G.n),c=b64bytes(G.c),ix=b64bytes(G.i),nv=G.nv;
   const V=new Uint16Array(v.buffer,0,nv*3),N=new Int8Array(n.buffer,0,nv*3),I=new Uint32Array(ix.buffer,0,G.nt*3),data=new Float32Array(nv*11);
   for(let k=0;k<nv;k++){const q=k*11;data[q]=o[0]+V[k*3]/1000;data[q+1]=o[1]+V[k*3+1]/1000;data[q+2]=o[2]+V[k*3+2]/1000;
-    data[q+3]=N[k*3]/127;data[q+4]=N[k*3+1]/127;data[q+5]=N[k*3+2]/127;for(let t=0;t<5;t++)data[q+6+t]=c[k*5+t]/255;}
+    data[q+3]=N[k*3]/127;data[q+4]=N[k*3+1]/127;data[q+5]=N[k*3+2]/127;for(let t=0;t<5;t++)data[q+6+t]=c[k*5+t]/255;
+    /* v10.2.2 ("a caverna cheia de buraco nas pedras, uma luz"): o escuro de cada ponto vinha 0 ou 0,96, sem meio-termo, e uns
+       pedaços de parede lá dentro (15 a 25 m da boca) ficavam com 0 = luz do céu inteira, em manchas de borda dura que pareciam
+       furos com luz. Parede de dentro (entre o chão e o teto da gruta) agora escurece aos poucos conforme entra: claro na boca,
+       escuro de vez a uns 14 m. A pedra de fora (em cima e em volta da boca) continua com a luz de fora */
+    if(data[q+10]<0.5){const x=data[q],y=data[q+1],z=data[q+2];let dentro=false;
+      for(const r of SVN_ESC_VIZ){const f=svnPiso(x+r[0],z+r[1]),t=svnTeto(x+r[0],z+r[1]);if(f!==null&&t!==null&&y>f-0.9&&y<t+0.9){dentro=true;break;}}
+      if(dentro){const u=Math.min(1,Math.max(0,(svnS(x,z)-2)/12));data[q+10]=Math.max(data[q+10],0.96*u*u*(3-2*u));}}}
   const vao=gl.createVertexArray();gl.bindVertexArray(vao);const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,44,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,44,12);
   gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,4,gl.FLOAT,false,44,24);gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,44,40);
@@ -278,6 +294,21 @@ DESENHO.sombra.push(function svnSombra(Pg,perto){const S=SVN;if(!S.pronto)return
   for(const pc of S.pedacos){const b=pc.b,d=Math.hypot(Math.max(b[0]-P.x,0,P.x-b[3]),Math.max(b[2]-P.z,0,P.z-b[5]));if(d>R)continue;
     const m=svnMalhaPara(pc,perto?1:2,false);if(!m)continue;gl.bindVertexArray(m.vao);gl.drawElements(gl.TRIANGLES,m.n,gl.UNSIGNED_SHORT,0);}
   const C=S.cav,b=C&&C.b;if(C&&Math.hypot(Math.max(b[0]-P.x,0,P.x-b[3]),Math.max(b[2]-P.z,0,P.z-b[5]))<R){gl.bindVertexArray(C.vao);gl.drawElements(gl.TRIANGLES,C.n,gl.UNSIGNED_SHORT,0);}});
+/* v10.2.2: a picareta minera a parede da gruta (antes só as rochas soltas do mapa davam pedra; a parede era só cenário).
+   Golpe com a picareta dentro da gruta, de frente para a parede (até uns 2 m): 2 pedras e meia chance de minério de ferro (é a
+   Serra Velha). Cada trecho de parede (2 m) aguenta 5 golpes e volta a dar pedra dois dias depois. */
+function minerarExtra(s,fx,fz){if(!SVN.pronto||!svnNaGruta(P.x,P.y+1,P.z))return false;
+  let hx=null,hz=null;for(const k of[0.7,1.2,1.7,2.2]){const x=P.x+fx*k,z=P.z+fz*k;if(!svnNaGruta(x,P.y+1,z)){hx=x;hz=z;break;}}
+  if(hx===null)return false;
+  const D=G.minaGruta||(G.minaGruta={}),ch=Math.round(hx/2)+','+Math.round(hz/2),e=D[ch]||(D[ch]={n:0,t:0});
+  if(e.n>=5&&G.tm<e.t){feed('Este trecho da parede já está esgotado',true);sfx('pedra',hx,hz,0.4);return true;}
+  if(e.n>=5){e.n=0;}
+  e.n++;if(e.n>=5)e.t=G.tm+2*1440;
+  const hy=P.y+1.1;lascas(hx,hy,hz,[0.46,0.43,0.4,1],6);sfx('pedra',hx,hz);barulho(P.x,P.z,12,true);gastar(s,1);P.shake=0.14;
+  ganhar('pedra',2);if(Math.random()<0.5)ganhar('minerioFerro',1);ganharXP(2);
+  if(e.n===1)dica('minaGruta','corpo','A parede da gruta dá pedra e minério de ferro. Cada trecho aguenta alguns golpes e volta a render depois de dois dias.');
+  return true;}
+V8.salvar.minaGruta=()=>G.minaGruta||{};V8.novo.minaGruta=()=>{G.minaGruta={};};V8.carregar.minaGruta=s=>{G.minaGruta=(s&&typeof s==='object')?s:{};};
 /* minimapa: dentro da gruta aparece o nome dela; em cima da serra nova (fora do círculo antigo da região) aparece "Serra Velha"
    em vez de "Mata" */
 {const _hl=hud2Lugar;hud2Lugar=function(x,z){try{if(SVN.pronto&&svnS(x,z)>-1&&svnPiso(x,z)!==null&&svnTeto(x,z)!==null)return{nome:SERRA_DADOS.gruta.nome||'Gruta da Serra Velha',d:null};}catch(e){}

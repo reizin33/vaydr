@@ -165,8 +165,11 @@ function carMesh(C,x,z,yaw,paint,R,trunkOpen){const base=mat(x,ground(x,z),z,0,y
   colBox(x,z,0.95,2.15,yaw);const t=fwd(yaw,-2.75);return{tx:x+t[0],tz:z+t[1]};}
 
 function clearingProps(C,N,R){const fx=FIRE[0],fz=FIRE[2],y=FIRE[1];
+  /* v10.2.2: as peças que viraram modelo de verdade (62yf_props.js) são montadas aqui num buffer jogado fora (D), para o
+     sorteio R continuar o mesmo (o resto do mundo depende dele) */
+  const D=new GB(1<<10,8),Cp=prpAcamp('fogueira',{x:fx,y,z:fz})?D:C;
   for(let i=0;i<10;i++){const a=i/10*6.283+R()*0.2;
-    add(C,icoTris(0.17,0.35,R),mat(fx+Math.cos(a)*0.74,y+0.04,fz+Math.sin(a)*0.74,R(),R()*6,R(),1.25,0.8,1.05),mixc(lin(0x5d5a55),lin(0x7a766d),R()),{j:0.15,rnd:R});}
+    add(Cp,icoTris(0.17,0.35,R),mat(fx+Math.cos(a)*0.74,y+0.04,fz+Math.sin(a)*0.74,R(),R()*6,R(),1.25,0.8,1.05),mixc(lin(0x5d5a55),lin(0x7a766d),R()),{j:0.15,rnd:R});}
   add(N,cylTris(0.62,0.66,0.035,10),mat(fx,y-0.01,fz),lin(0x2a2622),{j:0.1,rnd:R});
   for(let i=0;i<5;i++){const a=i/5*6.283+0.4,bx=fx+Math.cos(a)*0.52,bz=fz+Math.sin(a)*0.52;
     add(C,cylTris(0.065,0.08,0.62,6),alignY(bx,y+0.02,bz,fx-bx,0.42,fz-bz),lin(0x5a3d27),{e:0.18,j:0.2,rnd:R});}
@@ -181,43 +184,43 @@ function clearingProps(C,N,R){const fx=FIRE[0],fz=FIRE[2],y=FIRE[1];
     colBox(TENT[0],TENT[1],1.1,1.3,TENT_YAW);const d=fwd(TENT_YAW,2.0);
     interAdd({id:'cama',kind:'cama',x:TENT[0]+d[0],z:TENT[1]+d[1],label:'Descansar na barraca',sub:'salva o jogo'});}
   // bancos
-  for(const[bx,bz,yaw]of[[fx,fz+1.6,0.1],[fx-1.8,fz-0.7,1.2]]){add(C,cylTris(0.18,0.18,1.6,8),mm(mat(bx,ground(bx,bz)+0.17,bz,0,yaw,0),mat(0.8,0,0,0,0,Math.PI/2)),lin(0x4a3524),{j:0.1,rnd:R});
+  for(const[bx,bz,yaw]of[[fx,fz+1.6,0.1],[fx-1.8,fz-0.7,1.2]]){add(prpAcamp('banco',{x:bx,y:ground(bx,bz),z:bz,yaw})?D:C,cylTris(0.18,0.18,1.6,8),mm(mat(bx,ground(bx,bz)+0.17,bz,0,yaw,0),mat(0.8,0,0,0,0,Math.PI/2)),lin(0x4a3524),{j:0.1,rnd:R});
     colBox(bx,bz,0.8,0.22,yaw);}
   // bancada com rádio
-  {const x=BENCH[0],z=BENCH[1],g=ground(x,z),base=mat(x,g,z,0,-0.35,0),wood=lin(0x7a5a3a),dark=lin(0x5a412a);
-    add(C,boxTris(1.7,0.08,0.72),mm(base,mat(0,0.88,0)),wood,{j:0.08,rnd:R});
-    for(const p of[[0.78,0.3],[-0.78,0.3],[0.78,-0.3],[-0.78,-0.3]])add(C,boxTris(0.08,0.86,0.08),mm(base,mat(p[0],0.43,p[1])),dark);
-    add(C,boxTris(1.5,0.05,0.6),mm(base,mat(0,0.3,0)),dark);
-    add(C,boxTris(0.56,0.015,0.13,{tz:0.5}),mm(base,mat(0.25,0.935,0.12,0,0.3,0)),lin(0x9aa1a6));
-    add(C,boxTris(0.3,0.17,0.13),mm(base,mat(-0.3,1.005,0.18)),lin(0x2f3133));
-    add(N,boxTris(0.1,0.05,0.012),mm(base,mat(-0.34,1.02,0.247)),lin(0x9be38b),{e:1.4});
-    add(C,cylTris(0.006,0.006,0.42,4),mm(base,mat(-0.18,1.09,0.15,-0.3,0,-0.2)),lin(0x9aa1a6));
+  {const x=BENCH[0],z=BENCH[1],g=ground(x,z),base=mat(x,g,z,0,-0.35,0),wood=lin(0x7a5a3a),dark=lin(0x5a412a),Cm=prpAcamp('bancada',{x,y:g,z,yaw:-0.35})?D:C,Cr=Cm===D&&prpAcamp('radio',{x,y:g,z,yaw:-0.35})?D:C;
+    add(Cm,boxTris(1.7,0.08,0.72),mm(base,mat(0,0.88,0)),wood,{j:0.08,rnd:R});
+    for(const p of[[0.78,0.3],[-0.78,0.3],[0.78,-0.3],[-0.78,-0.3]])add(Cm,boxTris(0.08,0.86,0.08),mm(base,mat(p[0],0.43,p[1])),dark);
+    add(Cm,boxTris(1.5,0.05,0.6),mm(base,mat(0,0.3,0)),dark);
+    add(C,boxTris(0.56,0.015,0.13,{tz:0.5}),mm(base,mat(0.25,Cm===D?0.925:0.935,0.12,0,0.3,0)),lin(0x9aa1a6));
+    add(Cr,boxTris(0.3,0.17,0.13),mm(base,mat(-0.3,1.005,0.18)),lin(0x2f3133));
+    add(Cr===D?D:N,boxTris(0.1,0.05,0.012),mm(base,mat(-0.34,1.02,0.247)),lin(0x9be38b),{e:1.4});
+    add(Cr,cylTris(0.006,0.006,0.42,4),mm(base,mat(-0.18,1.09,0.15,-0.3,0,-0.2)),lin(0x9aa1a6));
     for(let i=0;i<3;i++)add(C,boxTris(0.2,1.5,0.04),mm(base,mat(1.0,0.72,-0.32+i*0.27,-0.22,0,-0.2-i*0.04)),mixc(wood,dark,R()*0.5),{j:0.1,rnd:R});
     colBox(x,z,0.9,0.4,-0.35);const d=fwd(-0.35,1.1);
     interAdd({id:'bancada',kind:'bancada',x:x+d[0],z:z+d[1],label:'Usar o rádio',sub:'bancada de trabalho'});}
   // caixas
-  const crate=(x,z,s,yaw,yo)=>{const g=ground(x,z)+yo,base=mat(x,g,z,0,yaw,0),c=mixc(lin(0x8a6a42),lin(0x74573a),R());
-    add(C,boxTris(0.62*s,0.62*s,0.62*s),mm(base,mat(0,0.31*s,0)),c,{j:0.06,rnd:R});
-    add(C,boxTris(0.645*s,0.07*s,0.645*s),mm(base,mat(0,0.08*s,0)),scl(c,0.6));add(C,boxTris(0.645*s,0.07*s,0.645*s),mm(base,mat(0,0.54*s,0)),scl(c,0.6));};
+  const Cc=prpAcamp('caixas',{})?D:C,crate=(x,z,s,yaw,yo)=>{const g=ground(x,z)+yo,base=mat(x,g,z,0,yaw,0),c=mixc(lin(0x8a6a42),lin(0x74573a),R());
+    add(Cc,boxTris(0.62*s,0.62*s,0.62*s),mm(base,mat(0,0.31*s,0)),c,{j:0.06,rnd:R});
+    add(Cc,boxTris(0.645*s,0.07*s,0.645*s),mm(base,mat(0,0.08*s,0)),scl(c,0.6));add(Cc,boxTris(0.645*s,0.07*s,0.645*s),mm(base,mat(0,0.54*s,0)),scl(c,0.6));};
   crate(5.6,0.2,1,0.3,0);crate(5.68,0.22,0.85,-0.2,0.62);crate(6.35,-0.6,1,0.1,0);colCircle(5.9,-0.1,0.75);
   // barril de água
-  {const x=-1.5,z=-4.8,g=ground(x,z),b=mat(x,g,z);add(C,cylTris(0.32,0.32,0.92,10),b,lin(0x2f5a78),{j:0.05,rnd:R});
-    add(C,cylTris(0.336,0.336,0.06,10),mm(b,mat(0,0.16,0)),lin(0x22374a));add(C,cylTris(0.336,0.336,0.06,10),mm(b,mat(0,0.72,0)),lin(0x22374a));
-    add(C,cylTris(0.28,0.28,0.02,10),mm(b,mat(0,0.92,0)),lin(0x23435a));colCircle(x,z,0.36);
+  {const x=-1.5,z=-4.8,g=ground(x,z),b=mat(x,g,z),Cb=prpAcamp('barril',{x,y:g,z})?D:C;add(Cb,cylTris(0.32,0.32,0.92,10),b,lin(0x2f5a78),{j:0.05,rnd:R});
+    add(Cb,cylTris(0.336,0.336,0.06,10),mm(b,mat(0,0.16,0)),lin(0x22374a));add(Cb,cylTris(0.336,0.336,0.06,10),mm(b,mat(0,0.72,0)),lin(0x22374a));
+    add(Cb,cylTris(0.28,0.28,0.02,10),mm(b,mat(0,0.92,0)),lin(0x23435a));colCircle(x,z,0.36);
     interAdd({id:'barril',kind:'agua',x,z:z+0.9,label:'Barril de água',sub:'beber ou encher garrafas'});}
   // lenha
   {const x=-2.9,z=-4.6,g=ground(x,z),base=mat(x,g,z,0,0.25,0),rows=[5,4,3];
     for(let r=0;r<3;r++)for(let i=0;i<rows[r];i++)add(C,cylTris(0.11,0.11,0.8,7),mm(base,mat((i-(rows[r]-1)/2)*0.235,0.11+r*0.2,-0.4,Math.PI/2,0,0)),mixc(lin(0x6b4a2e),lin(0x7d5835),R()),{j:0.1,rnd:R});
     colBox(x,z,0.65,0.45,0.25);}
   // poste com lampião
-  {const x=5.6,z=-4.2,g=ground(x,z),b=mat(x,g,z);add(C,cylTris(0.055,0.07,2.15,6),b,lin(0x4a3424));
-    add(C,boxTris(0.55,0.05,0.05),mm(b,mat(0.25,2.05,0)),lin(0x4a3424));add(C,boxTris(0.17,0.25,0.17),mm(b,mat(0.48,1.83,0)),lin(0x242424));
-    add(C,cylTris(0,0.13,0.1,4,{phase:Math.PI/4}),mm(b,mat(0.48,1.955,0)),lin(0x242424));
-    add(N,boxTris(0.13,0.19,0.18),mm(b,mat(0.48,1.83,0)),lin(0xffbf6a),{e:2.6});add(N,boxTris(0.18,0.19,0.13),mm(b,mat(0.48,1.83,0)),lin(0xffbf6a),{e:2.6});
-    LANTERN=xf(b,0.48,1.83,0);colCircle(x,z,0.15);}
+  {const x=5.6,z=-4.2,g=ground(x,z),b=mat(x,g,z),lp=prpAcamp('lampiao',{x,y:g,z}),Cl=lp?D:C,yl=lp?1.775:1.83,kl=lp?0.42:1;add(C,cylTris(0.055,0.07,2.15,6),b,lin(0x4a3424));
+    add(C,boxTris(0.55,0.05,0.05),mm(b,mat(0.25,2.05,0)),lin(0x4a3424));add(Cl,boxTris(0.17,0.25,0.17),mm(b,mat(0.48,1.83,0)),lin(0x242424));
+    add(Cl,cylTris(0,0.13,0.1,4,{phase:Math.PI/4}),mm(b,mat(0.48,1.955,0)),lin(0x242424));
+    add(N,boxTris(0.13*kl,0.19*kl,0.18*kl),mm(b,mat(0.48,yl,0)),lin(0xffbf6a),{e:2.6});add(N,boxTris(0.18*kl,0.19*kl,0.13*kl),mm(b,mat(0.48,yl,0)),lin(0xffbf6a),{e:2.6});   // a chama (dentro do lampião de verdade, menor)
+    LANTERN=xf(b,0.48,yl,0);colCircle(x,z,0.15);}
   // toco de cortar lenha
-  {const x=SPAWN[0]+0.2,z=SPAWN[1]-1.4,g=ground(x,z)-0.05;add(C,cylTris(0.36*0.92,0.36,0.42,8),mat(x,g,z),lin(0x5a4330),{j:0.12,rnd:R});
-    add(C,cylTris(0.33,0.33,0.025,8),mat(x,g+0.42,z),lin(0xa07a4c));colCircle(x,z,0.36);}
+  {const x=SPAWN[0]+0.2,z=SPAWN[1]-1.4,g=ground(x,z)-0.05,Ct=prpAcamp('toco',{x,y:g,z})?D:C;add(Ct,cylTris(0.36*0.92,0.36,0.42,8),mat(x,g,z),lin(0x5a4330),{j:0.12,rnd:R});
+    add(Ct,cylTris(0.33,0.33,0.025,8),mat(x,g+0.42,z),lin(0xa07a4c));colCircle(x,z,0.36);}
 }
 
 function gasStation(C,N,R){const P=placeById('posto'),cx=P.x,cz=P.z,white=lin(0xd9d6cc),teal=lin(0x2f6f73);

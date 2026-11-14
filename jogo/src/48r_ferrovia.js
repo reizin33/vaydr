@@ -79,8 +79,9 @@ function ferroGeo(){const g=new GB(1<<15,8),R=rng(7733),F=FERRO,P0=F.ponte;
     add(g,boxTris(1.6,1.0,0.05),mat(E.x+2.2,yb+1.6,z0+0.13),lin(0x8a6a40),{b:0.6});add(g,boxTris(1.2,0.6,0.06),mat(E.x+2.2,yb+1.6,z0+0.16),lin(0xe0d8c0),{b:0.6});
     add(g,boxTris(2.6,0.5,0.08),mat(E.x,yb+H-0.2,z1+0.06),lin(0x2a4a3a));}
   // portal do túnel da serra
-  {const p=F.portal,yy=p.y,gy=ground(p.x,p.z),cc=lin(0x8a8680);add(g,boxTris(0.9,7,9),mat(p.x-0.4,yy+3.5-0.6,p.z),cc,{j:0.05,rnd:R});
-    add(g,boxTris(0.95,4.2,4.0),mat(p.x+0.06,yy+2.1-0.3,p.z),lin(0x0a0908));for(let i=0;i<9;i++){const a=R()*Math.PI;add(g,icoSubTris(1.1+R()*0.8,0.4,R,1),mat(p.x-1.6-R()*2,yy+1+Math.sin(a)*5,p.z+Math.cos(a)*5.5),lin(0x5f5750),{j:0.12,rnd:R});}
+  // v10.2.2: concreto velho (mais escuro, manchado) e sem as bolas de pedra soltas no ar: o morro de pedra em volta vem do 62yc_entradas
+  {const p=F.portal,yy=p.y,gy=ground(p.x,p.z),cc=lin(0x6c6860);add(g,boxTris(0.9,7,9),mat(p.x-0.4,yy+3.5-0.6,p.z),cc,{j:0.09,rnd:R});
+    add(g,boxTris(0.95,4.2,4.0),mat(p.x+0.06,yy+2.1-0.3,p.z),lin(0x0a0908));for(let i=0;i<5;i++)add(g,boxTris(0.05,1.2+R()*2.4,0.06+R()*0.1),mat(p.x+0.06,yy+3.6+R()*2.2,p.z+(R()<0.5?-1:1)*(2.3+R()*2.0)),lin(0x4a463e),{j:0.1,rnd:R});   // escorridos finos de sujeira
     add(g,boxTris(0.12,0.5,3.0),mat(p.x+0.55,yy+4.6,p.z),lin(0x6a6a5a));for(let y=-1;y<2;y++)add(g,boxTris(0.5,0.08,4.2),mat(p.x-0.6,gy+y,p.z),cc);}
   return litMesh(g.data());}
 /* o trem: locomotiva, vagão de passageiros (com interior) e vagão blindado */

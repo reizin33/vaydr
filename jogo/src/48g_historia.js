@@ -28,34 +28,15 @@ let BASEM_PRONTA=false;
 function baseMilitarGeo(){const R=rng(808),g=new GB(16384,8),X=BASEM.x,Zc=BASEM.z,G0=ground(X,Zc),oli=lin(0x4a5236),oli2=lin(0x3c4430),aco=lin(0x6a7076),aco2=lin(0x8a9096),con=lin(0x8c8a84),
     lona=lin(0xd8d6cc),areia=lin(0xa99a72),preto=lin(0x1c1c1c),madeira=lin(0x6b4e30),W=(lx,lz)=>[X+lx,Zc+lz],M=(lx,ly,lz,ry,rx,rz,sx,sy,sz)=>mat(X+lx,G0+ly,Zc+lz,rx||0,ry||0,rz||0,sx??1,sy??(sx??1),sz??(sx??1));
   const P=(lx,lz,ly)=>ground(X+lx,Zc+lz)-G0+(ly||0);
-  // cerca de tela: postes, três fios e painéis em grade (o lado leste tem o portão)
-  const lados=[[[-15,-15],[15,-15]],[[15,-15],[15,-3.2]],[[15,3.2],[15,15]],[[15,15],[-15,15]],[[-15,15],[-15,-15]]];
-  for(const[a,b]of lados){const L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.round(L/3)),ry=Math.atan2(b[0]-a[0],b[1]-a[1]);
-    for(let i=0;i<=n;i++){const k=i/n,lx=lerp(a[0],b[0],k),lz=lerp(a[1],b[1],k);add(g,cylTris(0.05,0.05,2.5,6),M(lx,P(lx,lz),lz),aco,{j:0.05,rnd:R});}
-    for(const y of[0.15,1.25,2.4]){const cx=(a[0]+b[0])/2,cz=(a[1]+b[1])/2;add(g,boxTris(0.03,0.03,L),M(cx,P(cx,cz,y),cz,ry),aco2);}
-    for(let i=0;i<n;i++){const k0=i/n,k1=(i+1)/n,cx=lerp(a[0],b[0],(k0+k1)/2),cz=lerp(a[1],b[1],(k0+k1)/2);
-      for(let q=0;q<8;q++){const t=(q+0.5)/8-0.5;add(g,boxTris(0.012,2.25,0.012),mm(M(cx+Math.sin(ry)*t*L/n,P(cx,cz,1.27),cz+Math.cos(ry)*t*L/n,ry),mat(0,0,0,0,0,0.35)),aco2);add(g,boxTris(0.012,2.25,0.012),mm(M(cx+Math.sin(ry)*t*L/n,P(cx,cz,1.27),cz+Math.cos(ry)*t*L/n,ry),mat(0,0,0,0,0,-0.35)),aco2);}}
-    // arame no alto
-    {const cx=(a[0]+b[0])/2,cz=(a[1]+b[1])/2;for(const s of[-0.12,0.12])add(g,cylTris(0.035,0.035,L,6),mm(M(cx,P(cx,cz,2.62),cz+0,ry),mat(s,0,L/2,Math.PI/2,0,0)),aco);}}
-  // portão aberto (duas folhas encostadas para fora) e guarita de sacos de areia
-  for(const s of[-1,1]){add(g,boxTris(0.08,2.3,3.0),mm(M(16.4,P(16.4,s*4.7,1.15),s*4.7,0),mat(0,0,0,0,s*0.25,0)),aco,{j:0.04,rnd:R});
-    for(let i=0;i<5;i++)add(g,boxTris(0.02,2.2,0.02),mm(M(16.4,P(16.4,s*4.7,1.15),s*4.7,0),mat(0.03,0,-1.2+i*0.6)),aco2);}
-  for(let i=0;i<7;i++)for(let r=0;r<3;r++){const lz=-6.6+i*0.62+(r%2)*0.3,lx=17.6;add(g,boxTris(0.62,0.26,0.4,{tx:0.85,tz:0.8}),M(lx,P(lx,lz,0.13+r*0.25),lz,(R()-0.5)*0.2),areia,{j:0.1,rnd:R});}
-  for(let i=0;i<7;i++)for(let r=0;r<3;r++){const lz=4.0+i*0.62+(r%2)*0.3,lx=17.6;add(g,boxTris(0.62,0.26,0.4,{tx:0.85,tz:0.8}),M(lx,P(lx,lz,0.13+r*0.25),lz,(R()-0.5)*0.2),areia,{j:0.1,rnd:R});}
-  // dois alojamentos compridos (paredes, telhado de zinco, porta e janelas escuras)
-  for(const[lx,lz]of[[-6,-9.5],[-6,9.5]]){const y=P(lx,lz);add(g,boxTris(10,2.8,5),M(lx,y+1.4,lz),con,{j:0.04,rnd:R});
-    add(g,boxTris(10.6,0.12,6,{tz:0.92}),mm(M(lx,y+3.05,lz),mat(0,0,0,0.0,0,0)),lin(0x7a7f84),{j:0.05,rnd:R});for(let i=0;i<14;i++)add(g,boxTris(0.05,0.06,6),M(lx-5.1+i*0.75,y+3.13,lz),lin(0x6a6f74));
-    const fz=lz>0?-2.52:2.52;add(g,boxTris(1.1,2.1,0.06),M(lx+2.5,y+1.05,lz+fz),lin(0x3a3a34));for(const wx of[-3.2,-1.2,0.8])add(g,boxTris(1.0,0.7,0.06),M(lx+wx,y+1.75,lz+fz),lin(0x1e2226),{e:0.02});
-    add(g,boxTris(10.2,0.2,5.2),M(lx,y+0.1,lz),lin(0x6a6862));}
+  /* v10.2.2: a cerca de palitos, o portão, a guarita, os dois alojamentos de caixa, o caminhão de caixa, as caixas verdes e os tambores
+     saíram. No lugar entram modelos escaneados (62u_lugares.js, "Base Militar destruída"): bloco de garagens em ruína, helicóptero
+     caído no heliponto, blindado e caminhão-baú abandonados, muros de sacos de areia com trechos caídos, barreiras de concreto
+     na entrada e caixas militares de madeira onde ficam as caixas de saquear. Aqui ficam o heliponto, a tenda do laboratório
+     (a centrífuga da história) e o mastro com a bandeira rasgada. */
   // heliponto
   {const y=P(-4,0)+0.02;add(g,cylTris(4.2,4.2,0.06,28),M(-4,y,0),lin(0x55575a));add(g,cylTris(3.9,3.9,0.07,28,{top:true}),M(-4,y+0.005,0),lin(0x4b4d50));
     for(const s of[-1,1])add(g,boxTris(0.45,0.02,3.0),M(-4+s*1.0,y+0.075,0),lin(0xd8d0b0));add(g,boxTris(2.0,0.02,0.45),M(-4,y+0.075,0),lin(0xd8d0b0));
     for(let i=0;i<12;i++){const a=i/12*6.283;add(g,boxTris(0.5,0.02,0.18),M(-4+Math.cos(a)*3.55,y+0.075,Math.sin(a)*3.55,-a),lin(0xd8c060));}}
-  // caminhão militar parado perto do portão
-  {const lx=9.5,lz=-1.5,y=P(lx,lz);add(g,boxTris(2.3,1.3,2.2),M(lx+2.4,y+1.25,lz,Math.PI/2),oli,{j:0.04,rnd:R});add(g,boxTris(2.2,0.9,2.0),M(lx+2.6,y+2.3,lz,Math.PI/2),oli2,{j:0.04,rnd:R});
-    add(g,boxTris(0.06,0.55,1.7),M(lx+3.62,y+2.2,lz,Math.PI/2),lin(0x2a3438),{e:0.03});add(g,boxTris(5.0,0.25,2.3),M(lx-1.2,y+0.9,lz,Math.PI/2),oli2);
-    add(g,boxTris(5.0,1.6,2.3,{tx:0.96}),M(lx-1.2,y+1.85,lz,Math.PI/2),lin(0x5a6044),{j:0.06,rnd:R});for(let i=0;i<5;i++)add(g,boxTris(0.06,0.2,2.36),M(lx-3.4+i*1.1,y+2.72,lz,Math.PI/2),oli2);
-    for(const wx of[2.6,-0.6,-2.6])for(const s of[-1,1])add(g,cylTris(0.48,0.48,0.38,12),mm(M(lx+wx,y+0.48,lz+s*1.05),mat(0,0,0,Math.PI/2,0,0)),preto);}
   // tenda do laboratório (lona branca com cruz) e mesa
   {const lx=5,lz=8.5,y=P(lx,lz);add(g,boxTris(6.2,0.06,4.4),M(lx,y+0.03,lz),lin(0x6a6862));for(const s of[-1,1])add(g,boxTris(6.0,0.05,2.6),mm(M(lx,y+2.35,lz+s*1.05),mat(0,0,0,s*0.55,0,0)),lona,{j:0.03,rnd:R});
     add(g,boxTris(6.0,1.7,0.05),M(lx,y+0.85,lz+2.15),lona,{j:0.03,rnd:R});for(const s of[-1,1])add(g,boxTris(0.05,2.2,4.3,{tz:0.02}),M(lx+s*3.0,y+1.1,lz),lona,{j:0.03,rnd:R});
@@ -65,23 +46,18 @@ function baseMilitarGeo(){const R=rng(808),g=new GB(16384,8),X=BASEM.x,Zc=BASEM.
     add(g,boxTris(0.3,0.25,0.25),M(lx-1.4,y+1.07,lz+1.2),lin(0xdcdcd6));add(g,cylTris(0.05,0.05,0.18,8),M(lx-0.6,y+0.95,lz+1.15),lin(0x8ab0c0),{e:0.15});}
   // mastro com bandeira rasgada, caixas e tambores
   add(g,cylTris(0.06,0.06,7.5,6),M(1,P(1,-3),-3),aco2);add(g,boxTris(0.02,0.9,1.4,{tz:0.8}),M(1,P(1,-3,6.9),-3.75),lin(0x4a5a3a),{j:0.1,rnd:R});
-  for(const[lx,lz]of[[-12,-4],[-12,-2.6],[-11.4,-3.3],[-12,4.2],[11,11],[11.8,11]]){add(g,boxTris(1.1,0.7,0.75),M(lx,P(lx,lz,0.35),lz,(R()-0.5)*0.4),oli,{j:0.06,rnd:R});add(g,boxTris(1.12,0.08,0.77),M(lx,P(lx,lz,0.72),lz),oli2);}
-  for(const[lx,lz]of[[-1,-12],[-0.3,-12.4],[0.4,-11.9]])add(g,cylTris(0.3,0.3,0.9,10),M(lx,P(lx,lz),lz),lin(0x3a5a3a),{j:0.08,rnd:R});
   MESH.baseMil=litMesh(g.data());BASEM_PRONTA=true;}
 /* colisores, caixas militares e as peças que são obras de verdade (torres, gerador, postes) */
 function baseMilitarMontar(){const X=BASEM.x,Zc=BASEM.z;
-  const lados=[[[-15,-15],[15,-15]],[[15,-15],[15,-3.2]],[[15,3.2],[15,15]],[[15,15],[-15,15]],[[-15,15],[-15,-15]]];
-  for(const[a,b]of lados){const cx=(a[0]+b[0])/2,cz=(a[1]+b[1])/2,L=Math.hypot(b[0]-a[0],b[1]-a[1]),ry=Math.atan2(b[0]-a[0],b[1]-a[1]);colBox(X+cx,Zc+cz,0.08,L/2,ry,{solid:true});}
-  for(const[lx,lz]of[[-6,-9.5],[-6,9.5]])colBox(X+lx,Zc+lz,5,2.5,0,{solid:true});
-  colBox(X+9.5,Zc-1.5,1.15,3.9,0,{solid:true});colBox(X+17.6,Zc-4.75,0.3,2.2,0,{solid:true});colBox(X+17.6,Zc+5.85,0.3,2.2,0,{solid:true});
+  /* v10.2.2: os colisores da cerca, dos alojamentos, do caminhão e do portão saíram com eles (os modelos novos trazem os seus,
+     no 62u_lugares.js). Ficam os da tenda e os pontos de saque: as caixas militares e o alojamento, agora na porta das garagens */
   colBox(X+5,Zc+10.6,3,0.06,0,{solid:true});for(const s of[-1,1])colBox(X+5+s*3.0,Zc+8.5,0.06,2.15,0,{solid:true});
-  for(const[lx,lz]of[[-12,-4],[-12,-2.6],[-11.4,-3.3],[-12,4.2],[11,11],[11.8,11]])colBox(X+lx,Zc+lz,0.55,0.38,0,{solid:true});
   const caixas=[[-12,-4],[-12,4.2],[11,11],[-11.4,-3.3]];caixas.forEach(([lx,lz],i)=>interAdd({id:'base-caixa'+i,kind:'bau',x:X+lx-0.9,z:Zc+lz,label:'Revistar a caixa militar',tabela:'militar',respawn:3}));
-  interAdd({id:'base-aloj',kind:'bau',x:X-3.5,z:Zc-6.7,label:'Revistar o alojamento',tabela:'militar',respawn:4});}
+  interAdd({id:'base-aloj',kind:'bau',x:X-3.5,z:Zc-4.6,label:'Revistar as garagens',tabela:'militar',respawn:4});}
 function baseMilitarObras(){const X=BASEM.x,Zc=BASEM.z,tem=t=>OB.some(o=>o.tipo===t&&Math.hypot(o.x-X,o.z-Zc)<25);
   if(!tem('torreVigia')){criarObra('torreVigia',X+11.5,Zc-11.5,Math.PI/4);criarObra('torreVigia',X-11.5,Zc+12.2,-Math.PI*0.75);}
   if(!tem('geradorBase')){const o=criarObra('geradorBase',X+5,Zc-8,0);o.ext.comb=0;o.ext.ligado=true;}
-  if(!tem('poste')){for(const[lx,lz,y]of[[12,-6,Math.PI],[-1,6,0],[-8,0,Math.PI/2],[6,13,0]])criarObra('poste',X+lx,Zc+lz,y);}}
+  if(!tem('poste')){for(const[lx,lz,y]of[[12,-6,Math.PI],[0,7.6,0],[-12.6,0.6,Math.PI/2],[6,13,0]])criarObra('poste',X+lx,Zc+lz,y);}}   // v10.2.2: dois postes mudaram de lugar (o helicóptero caído ocupa o meio)
 /* ---------- interação da história (caderno, amostra, centrífuga, vacina) ---------- */
 const HIST_PONTOS=[];
 function histLab(){if(!CID||!CID.predios)return null;const p=CID.predios.find(q=>q.nome.indexOf('Hospital')>=0);if(!p)return null;

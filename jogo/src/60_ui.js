@@ -1,6 +1,17 @@
 /* ================= interface: HUD, menus, mochila, construção e controles ================= */
 const hudEl=$('hud'),radioEl=$('radio'),feedEl=$('feed');
-const svgUse=(id,cls)=>'<svg class="ico'+(cls?' '+cls:'')+'" aria-hidden="true"><use href="#'+id+'"/></svg>';
+/* v10.2.2: ícone de item tirado do modelo 3D (21j_icones3d.js, ICO3D). As fotos entram uma vez como classes de CSS (fundo da peça),
+   para o HTML da mochila não carregar a imagem inteira a cada redesenho. Onde só se sabe o ícone (svgUse), a foto entra quando
+   todos os itens com aquele ícone têm a mesma foto; onde se sabe o item (icoItem: barra, mochila, detalhes, fabricação), sempre */
+let ICO3D_IC=null;
+function ico3dPrepara(){if(ICO3D_IC)return;ICO3D_IC={};if(typeof ICO3D==='undefined')return;let css='';
+  for(const id in ICO3D)css+='.i3d-'+id+'{background-image:url('+ICO3D[id]+')}\n';
+  const st=document.createElement('style');st.id='ico3d-css';st.textContent=css;(document.body||document.head).appendChild(st);   // no fim da página: depois do CSS do jogo
+  const por={};for(const id in ITEMS){const ic=ITEMS[id].icon;if(ic)(por[ic]=por[ic]||[]).push(id);}
+  for(const ic in por){const L=por[ic];if(L.every(i=>ICO3D[i]&&ICO3D[i]===ICO3D[L[0]]))ICO3D_IC[ic]=L[0];}}
+const ico3dTag=(item,cls)=>'<i class="ico ico3d i3d-'+item+(cls?' '+cls:'')+'" aria-hidden="true"></i>';
+const svgUse=(id,cls)=>{ico3dPrepara();const it=ICO3D_IC[id];return it?ico3dTag(it,cls):'<svg class="ico'+(cls?' '+cls:'')+'" aria-hidden="true"><use href="#'+id+'"/></svg>';};
+function icoItem(item,cls){ico3dPrepara();return typeof ICO3D!=='undefined'&&ICO3D[item]?ico3dTag(item,cls):svgUse(ITEMS[item]?ITEMS[item].icon:'i-mochila',cls);}
 const KIND={conquista:['Conquista','#e8c060','i-trofeu'],radio:['Rádio · 104,3','var(--ember)','i-radio'],alerta:['Alerta','var(--blood)','i-alerta'],clima:['Clima','var(--water)','i-chuva'],
   habilidade:['Progresso','var(--moss)','i-subir'],corpo:['Sobrevivência','var(--grain)','i-fome'],grupo:['Grupo','#6fb7e8','i-grupo']};
 const toastFila=[];
@@ -22,7 +33,7 @@ function flashDano(){const d=$('dano');d.style.opacity='1';setTimeout(()=>d.styl
 const slotsEl=$('slots');
 function slotHTML(s,i,key){if(!s)return'<span class="k so-pc">'+(key?i+1:'')+'</span>';const d=ITEMS[s.id];let q='';
   if(d.fogo)q='<span class="q">'+s.mun+'/'+invCount(d.municao)+'</span>';else if(d.cantil)q='<span class="q'+(s.mun&&s.dur>0?' suja':'')+'">'+cantilGoles(s)+'/'+d.cantil+'</span>';else if(d.durMax)q='<span class="dur"><i style="width:'+Math.round(100*s.dur/d.durMax)+'%"></i></span>';else if(s.n>1||d.max>1)q='<span class="q">'+s.n+'</span>';
-  return(key?'<span class="k so-pc">'+(i+1)+'</span>':'')+svgUse(d.icon)+q;}
+  return(key?'<span class="k so-pc">'+(i+1)+'</span>':'')+icoItem(s.id)+q;}
 function hudBarra(){let h='';for(let i=0;i<BAR_N;i++){const s=P.inv[i];h+='<button class="slot'+(s?'':' vazio')+'" type="button" data-i="'+i+'" aria-pressed="'+(P.sel===i)+'" aria-label="'+(s?ITEMS[s.id].nome:'Vazio')+'">'+slotHTML(s,i,true)+'</button>';}
   slotsEl.innerHTML=h;const d=selDef();if(OBRA.ativo)hudObras();else $('item-nome').textContent=d?d.nome:maosVaziasTxt();
   let ic='i-machado',lb='Atacar';if(d&&selItem().id==='pedra'){ic='i-pedra';lb='Bater';}else if(!d||!d.tipo||d.tipo==='material'||d.tipo==='util'||d.tipo==='municao'||d.tipo==='missao'||d.tipo==='garrafa'||d.tipo==='roupa'){ic='i-mao';lb='Socar';}
@@ -62,7 +73,7 @@ function bauPegar(j){const B=bauAberto&&bauAberto.itens,s=B&&B[j];if(!s)return t
 function pertoBancada(){const b=INTER.find(i=>i.id==='bancada');if(b&&Math.hypot(b.x-P.x,b.z-P.z)<4.5)return true;return!!bancadaPerto();}   // a da clareira ou uma construída (48yd)
 const TIPO_NOME={util:'Utensílio',arma:'Arma e ferramenta',material:'Material',comida:'Comida',bebida:'Bebida',cura:'Cura',roupa:'Roupa',municao:'Munição',missao:'Peça da missão',garrafa:'Recipiente'};
 function custoLista(c){return Object.entries(c).map(([k,n])=>n+' '+ITEMS[k].nome.toLowerCase()).join(', ');}
-function detTopo(nome,icon,sub){return'<div class="det-tit">'+nome+'</div><div class="det-ico">'+svgUse(icon)+(sub?'<small>'+sub+'</small>':'')+'</div>';}
+function detTopo(nome,icon,sub,item){return'<div class="det-tit">'+nome+'</div><div class="det-ico">'+(item?icoItem(item):svgUse(icon))+(sub?'<small>'+sub+'</small>':'')+'</div>';}
 function barraStat(nome,f,txt,cor){return'<div class="stat"><span>'+nome+'</span><i><b style="width:'+Math.round(clamp(f,0,1)*100)+'%'+(cor?';background:'+cor:'')+'"></b></i><em>'+txt+'</em></div>';}
 function statsItem(s,d){let h='';
   if(d.durMax&&s&&s.dur!==undefined){const f=s.dur/Math.max(1,durMaxDe(s));h+=barraStat('Estado',f,s.dur<=0&&d.tipo==='roupa'?'rasgada':Math.round(f*100)+'%',f<0.25?'var(--blood)':'');}
@@ -72,7 +83,7 @@ function statsItem(s,d){let h='';
     if(d.quente)h+=barraStat('Calor',d.quente,Math.round(d.quente*qe*100)+'%','var(--grain)');if(d.chuva)h+=barraStat('Chuva',d.chuva,Math.round(d.chuva*100)+'%','var(--water)');if(d.esporos)h+=barraStat('Esporos',d.esporos,Math.round(d.esporos*100)+'%','var(--grain)');if(d.peso)h+=barraStat('Peso',d.peso/3,d.peso.toFixed(1)+' kg','');}
   if(d.fome>0)h+=barraStat('Fome',d.fome/45,'+'+d.fome,'var(--grain)');if(d.sede>0)h+=barraStat('Sede',d.sede/45,'+'+d.sede,'var(--water)');if(d.vida>0)h+=barraStat('Vida',d.vida/65,'+'+d.vida,'var(--blood)');
   return h?'<div class="stats-i">'+h+'</div>':'';}
-function reqLinhas(c){return Object.entries(c).map(([k,n])=>{const t=invCount(k),ok=t>=n;return'<div class="req '+(ok?'ok':'falta')+'">'+svgUse(ITEMS[k].icon)+'<span>'+ITEMS[k].nome+'</span><b class="n">'+Math.min(t,999)+'/'+n+'</b></div>';}).join('');}
+function reqLinhas(c){return Object.entries(c).map(([k,n])=>{const t=invCount(k),ok=t>=n;return'<div class="req '+(ok?'ok':'falta')+'">'+icoItem(k)+'<span>'+ITEMS[k].nome+'</span><b class="n">'+Math.min(t,999)+'/'+n+'</b></div>';}).join('');}
 function slotBtn(i){const s=P.inv[i];return'<button class="slot'+(i<BAR_N?' barra-r':'')+(s?'':' vazio')+'" type="button" data-i="'+i+'" aria-pressed="'+(invSel===i)+'" aria-label="'+(s?ITEMS[s.id].nome+(s.n>1?' × '+s.n:''):'Vazio')+'">'+slotHTML(s,i,i<BAR_N)+'</button>';}
 function invRender(){if($('inv').hidden)return;if(invAba==='bau'&&!bauAberto)invAba='mochila';$('aba-bau').hidden=!bauAberto;$('aba-tarefas').hidden=$('aba-nivel').hidden=$('aba-mochila').hidden=$('aba-fabricar').hidden=!!bauAberto;   // baú ou chão aberto: só o menu dele
   for(const a of['mochila','fabricar','tarefas','nivel','bau']){$('aba-'+a).setAttribute('aria-pressed',String(invAba===a));$('inv-'+a).hidden=invAba!==a;}
@@ -103,12 +114,12 @@ function mochilaRender(){const lim=invLimite();
   $('grade').innerHTML=h;$('inv-cap').textContent='Livre '+invSpace()+' de '+lim;
   const det=$('detalhe');
   if(roupaSel&&P.roupa[roupaSel]){const id=P.roupa[roupaSel],d=ITEMS[id];
-    const I=roupaInfoDe(roupaSel),ci=d.durMax?consertoInfo(roupaSel):null;let h3=detTopo(nomeItem(I),d.icon,'Vestindo · '+ROUPA_NOME[roupaSel])+'<p>'+d.desc+'</p>'+statsItem(I,d)+(I&&I.rep?'<p class="det-nota">'+svgUse('i-remendo')+'<span>Consertada '+I.rep+'× fora da estação: máximo '+Math.round(durMaxDe(I)/d.durMax/QUAL_DUR[I.q??1]*100)+'%</span></p>':'');
+    const I=roupaInfoDe(roupaSel),ci=d.durMax?consertoInfo(roupaSel):null;let h3=detTopo(nomeItem(I),d.icon,'Vestindo · '+ROUPA_NOME[roupaSel],id)+'<p>'+d.desc+'</p>'+statsItem(I,d)+(I&&I.rep?'<p class="det-nota">'+svgUse('i-remendo')+'<span>Consertada '+I.rep+'× fora da estação: máximo '+Math.round(durMaxDe(I)/d.durMax/QUAL_DUR[I.q??1]*100)+'%</span></p>':'');
     if(ci&&!ci.vazio)h3+='<p class="det-nota">'+svgUse('i-agulha')+'<span>Conserto: '+custoLista(ci.c)+(ci.metal?' · na bancada':' · precisa de agulha'+(ci.est?' (na estação: sem perder o máximo)':''))+'</span></p>';
     det.innerHTML=h3+'<div class="det-acoes">'+(ci&&!ci.vazio?'<button class="btn prim" type="button" data-acao="consertarR"'+(ci.ok?'':' disabled')+'>'+svgUse('i-agulha')+'Consertar</button>':'')+'<button class="btn" type="button" data-acao="tirar">Tirar</button></div>';return;}
   const s=invSel>=0?P.inv[invSel]:null;
   if(!s){det.innerHTML='<div class="det-tit">Mochila</div><p>Toque num item para ver o que ele faz. Toque em outro espaço para mover ou trocar de lugar. O que está em <b>Na mão</b> é a barra rápida.</p>'+(P.roupa.costas?'':'<p class="msg-falta">Sem mochila você só tem os bolsos. Faça uma na bancada da clareira.</p>');return;}
-  const d=ITEMS[s.id];let h2=detTopo(nomeItem(s)+(s.n>1?' × '+s.n:''),d.icon,TIPO_NOME[d.tipo]||'')+'<p>'+d.desc+'</p>'+statsItem(s,d);
+  const d=ITEMS[s.id];let h2=detTopo(nomeItem(s)+(s.n>1?' × '+s.n:''),d.icon,TIPO_NOME[d.tipo]||'',s.id)+'<p>'+d.desc+'</p>'+statsItem(s,d);
   if(d.fogo)h2+='<p>No pente: '+s.mun+' de '+d.pente+'. Na mochila: '+invCount(d.municao)+'.</p>';
   if(d.cantil)h2+='<p>No cantil: <b>'+cantilTexto(s)+'</b>.</p>';
   if(d.arco)h2+='<p>Flechas na mochila: '+invCount('flecha')+'.</p>';
@@ -133,7 +144,7 @@ function fabRender(){const banc=pertoBancada();
   $('fab-cats').innerHTML=h;
   const vis=receitasVisiveis();if(!vis.includes(fabSel)){const p=vis.find(i=>podeFabricar(RECIPES[i]));fabSel=p!==undefined?p:(vis.length?vis[0]:-1);}
   h='';for(const i of vis){const r=RECIPES[i],d=ITEMS[r.faz],st=receitaEstado(r),pode=podeFabricar(r);
-    h+='<button class="tile'+(pode?' pode':'')+(st==='travada'?' trav':'')+'" type="button" data-k="'+i+'" aria-pressed="'+(fabSel===i)+'" aria-label="'+d.nome+(st==='travada'?' (bloqueada)':'')+'">'+svgUse(d.icon)+'<span>'+(r.nome||d.nome)+(r.n>1?' ×'+r.n:'')+'</span>'+(st==='travada'?svgUse('i-cadeado','cad'):r.est?svgUse(estIcone(r.est),'est'):'')+'</button>';}
+    h+='<button class="tile'+(pode?' pode':'')+(st==='travada'?' trav':'')+'" type="button" data-k="'+i+'" aria-pressed="'+(fabSel===i)+'" aria-label="'+d.nome+(st==='travada'?' (bloqueada)':'')+'">'+icoItem(r.faz)+'<span>'+(r.nome||d.nome)+(r.n>1?' ×'+r.n:'')+'</span>'+(st==='travada'?svgUse('i-cadeado','cad'):r.est?svgUse(estIcone(r.est),'est'):'')+'</button>';}
   $('receitas').innerHTML=h;
   {const dk=$('fab-dica');if(dk){dk.hidden=banc;if(!banc)dk.textContent='Longe da bancada você faz só o básico de sobrevivência na mão. Tábuas, munição, armas e o resto ficam na bancada: use a da clareira ou construa uma (B → Bancada de trabalho: 6 madeira, 4 pedras e 2 cordas).';}}
   $('fab-cap').textContent=RECIPES.filter(receitaLiberada).length+' de '+RECIPES.length+' liberadas';
@@ -143,7 +154,7 @@ function fabDetalhe(){const el=$('fab-info'),r=RECIPES[fabSel];if(!r){el.innerHT
   const d=ITEMS[r.faz],st=receitaEstado(r),{c}=custoReceita(r);
   // quantidade: volta para 1 ao trocar de receita; os materiais mostram o total da quantidade escolhida
   if(fabQtdDe!==fabSel){fabQtdDe=fabSel;fabQtd=1;}const qMax=Math.max(1,fabMaximo(r));fabQtd=clamp(fabQtd,1,qMax);const cq={};for(const k in c)cq[k]=c[k]*fabQtd;
-  let h=detTopo((r.nome||d.nome)+(r.n>1?' × '+r.n:''),d.icon,null);
+  let h=detTopo((r.nome||d.nome)+(r.n>1?' × '+r.n:''),d.icon,null,r.faz);
   h+='<div class="chips"><span class="chip-e e'+r.etapa+'">'+ETAPA_NOME[r.etapa]+'</span><span class="chip-e">'+estNome(r.est)+'</span>'+(st==='nova'?'<span class="chip-e nova">Descoberta</span>':'')+'</div>';
   h+='<p>'+d.desc+'</p>';
   if(st==='travada')h+='<div class="trava">'+svgUse('i-cadeado')+'<p><b>Bloqueada.</b> '+desbTexto(r)+'</p></div>';

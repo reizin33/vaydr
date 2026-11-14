@@ -16,7 +16,12 @@ function lanternaGeo(lente){const g=new GB(4096,8),corpo=lin(0x2a2e33),escuro=li
   add(g,cylTris(0.0168,0.0158,0.014,20,{bottom:true}),mat(0,0.05,0),escuro);                    // tampa traseira
   add(g,bevelTris(0.009,0.016,0.006,0.002),mat(0,-0.03,0.0175),escuro);                         // botão
   return g.data();}
-etapaMalha('fim','lugares',1,()=>{if(MESH.arma){MESH.arma.lanterna=litMesh(lanternaGeo(false));MESH.lanternaLente=litMesh(lanternaGeo(true));}});
+/* v10.2.2: com o modelo de verdade (MOD3D.lanterna, a lanterna plástica da Poly Haven) a lanterna da mão é ele; a lente que acende
+   e o ponto de onde a luz sai vão para a ponta dele */
+etapaMalha('fim','lugares',1,()=>{if(!MESH.arma)return;const M=typeof MOD3D!=='undefined'&&MOD3D.lanterna;
+  if(M&&MESH.arma.lanterna&&MESH.arma.lanterna.mod3d){const y=(M.ponta?M.ponta[1]:-0.155),r=M.raio||0.02;LANT_PONTA[1]=y-0.004;
+    const g=new GB(512,8);add(g,cylTris(r,r,0.002,20,{bottom:true}),mat(0,y-0.001,0),lin(0xfff1d0),{e:2.6});MESH.lanternaLente=litMesh(g.data());return;}
+  MESH.arma.lanterna=litMesh(lanternaGeo(false));MESH.lanternaLente=litMesh(lanternaGeo(true));});
 /* ligada e na mão: o braço da lanterna vai para a frente (como mirar a pistola, só o braço direito) */
 {const _aj=animarJogador;animarJogador=function(dt){_aj.apply(this,arguments);
   const alvo=lanternaNaMao()&&P.lanterna&&!P.acao&&!P.escala&&!P.montado?1:0;P.lantK=approach(P.lantK||0,alvo,dt*5);const k=P.lantK,o=P.ch.r;

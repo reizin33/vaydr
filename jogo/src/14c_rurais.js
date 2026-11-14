@@ -304,7 +304,7 @@ function sitiosMontar(C,N){const cores=[[0xd8c8a0,0xe6dccb,0x8a6e52,0x7a3a28],[0
 /* ---------- desenho: casas de fora da cidade (perto e longe), portas delas ---------- */
 function desenharRurais(Pg,sombra,alc){const cx=cam.pos[0],cz=cam.pos[2];
   for(const p of RURAIS){const px=clamp(cx,p.x0,p.x1),pz=clamp(cz,p.z0,p.z1),d=Math.hypot(cx-px,cz-pz);if(d>(sombra?alc:230))continue;
-    trs(TMP,p.ox,0,p.oz,0,p.yaw,0,1,1,1);drawStat(Pg,sombra||d>65?p.mLonge:p.mPerto,TMP);}
+    trs(TMP,p.ox,0,p.oz,0,p.yaw,0,1,1,1);const perto=!sombra&&d<=65;drawStat(Pg,perto?p.mPerto:p.mLonge,TMP);if(perto&&p.props3d)prpPredio(Pg,p,TMP);}   // v10.2.2: móveis de verdade (62yf)
   if(sombra)return;
   for(const d of CID.portas){if(!d.p||!d.p.rural||d.estado==='quebrada'||Math.abs(d.y-cam.pos[1])>7||d2(d.x,d.z,cx,cz)>32*32)continue;desenharPorta(Pg,d);}
   for(const a of CID.poroes){if(!a.p.rural||d2(a.x,a.z,cx,cz)>28*28||Math.abs(a.y-cam.pos[1])>6)continue;const p=a.p,w=pw(p,a.u,a.aberto?a.v-0.95:a.v);trs(TMP,w[0],a.y+(a.aberto?0.01:-0.035),w[1],0,p.yaw,0,1.25,1,1.25);drawStatI(Pg,MESH.porta.alcapaoMad,TMP,0.62);}}

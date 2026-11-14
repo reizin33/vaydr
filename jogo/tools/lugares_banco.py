@@ -33,6 +33,25 @@ MODELOS = {
     # túnel do metrô (vai no subsolo, depois da linha da estação escondida): veio ~2,2x maior (21 m de largura); 0,45 deixa a bitola
     # da linha e o túnel de duas vias com uns 9,5 m de largura e 7,4 m de altura. As luminárias (Material.004) acendem.
     # Luminária, caixa dela (005), canos (006) e cabos (007) entram inteiros: simplificadas viravam cacos (manchas claras soltas na parede)
+    # v10.2.2 · Base Militar destruída (lote 1 de 13/11/2026, baixado pelo Himalaia e pelo navegador do app). Escalas a conferir na prévia
+    'helicoptero': dict(zip=UP + 'Downloads/crashed_helicopter.zip', tex=2048, alvo=30000, escala=1, chao='min',
+                     credito='Crashed helicopter, de J1G4R (CC BY 4.0)'),
+    'ruinaPredio': dict(zip=UP + 'Downloads/ruin_building.zip', tex=1024, alvo=30000, escala=1, chao='min',
+                     credito='Ruin Building, de nermin (CC BY 4.0)'),
+    'garagens': dict(zip=UP + 'Downloads/abandoned_garage_block_rusty_ruined_game-ready.zip', tex=2048, alvo=9000, escala=1, chao='min',
+                     credito='Abandoned Garage Block Rusty Ruined Game-Ready, de olegolegperepelica (CC BY 4.0)'),
+    'blindado': dict(zip=UP + 'Downloads/abandoned_soviet_btr_-_80.zip', tex=1024, alvo=25000, escala=1, chao='min',
+                     credito='Abandoned Soviet BTR - 80, de GameDev Nick (CC BY 4.0)'),
+    'caminhaoBau': dict(zip=UP + 'Downloads/abandoned_soviet_military_body-van_kung.zip', tex=1024, alvo=25000, escala=1, chao='min',
+                     credito='Abandoned soviet military body-van KUNG, de Mikhail Volkov (CC BY 4.0)'),
+    'sacosAreia': dict(zip=UP + 'Downloads/sandbag_barrier_ready_for_unreal_engine.zip', tex=1024, alvo=6000, escala=1, chao='min',
+                     credito='Sandbag Barrier (Ready for Unreal Engine), de G4AGamingLabs (CC BY 4.0)'),
+    'barreira': dict(zip=UP + 'Downloads/concrete_road_barrier_2k.gltf.zip', tex=1024, alvo=2500, escala=1, chao='min',
+                     credito='Concrete Road Barrier, de Amal Kumar (Poly Haven, CC0)'),
+    'tambor': dict(zip=UP + 'Downloads/Barrel_02_2k.gltf.zip', tex=512, alvo=2700, escala=1, chao='min',
+                     credito='Barrel 02 (Poly Haven, CC0)'),
+    'caixaMilitar': dict(zip=UP + 'Downloads/wooden_military_crate_2k.gltf.zip', tex=1024, alvo=3000, escala=1, chao='min',
+                     credito='Wooden Military Crate (Poly Haven, CC0)'),
     'tunelMetro': dict(zip=AT + '90b18db5-corrosed_subway_tunnel_gltf.zip', tex=2048, alvo=130000, escala=0.45, chao={'y': -0.01}, emissivo={'Material.004': 1.6},   # chão = topo do lastro (senão os trilhos viram parede)
                      inteiro=['Material.004', 'Material.005', 'Material.006', 'Material.007'], credito='Corroded subway tunnel (Fab, licença Standard)'),
 }
@@ -46,10 +65,34 @@ def trs(n):
                   [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
     M = np.eye(4); M[:3, :3] = R * np.array(s)[None, :]; M[:3, 3] = t; return M
 
+def _abrir_glb(dados):
+    """GLB (glTF binário, um arquivo só, como o Sketchfab entrega com a textura já reduzida): o JSON e o bloco binário saem do
+    contêiner, e as imagens embutidas viram arquivos de um zip na memória (img_N.ext), para o resto do código ler igual ao glTF"""
+    mag, ver, tot = struct.unpack_from('<III', dados, 0); assert mag == 0x46546C67, 'não é GLB'
+    o = 12; js = None; binc = b''
+    while o < tot:
+        n, t = struct.unpack_from('<II', dados, o); c = dados[o + 8:o + 8 + n]; o += 8 + n
+        if t == 0x4E4F534A: js = json.loads(c)
+        elif t == 0x004E4942: binc = c
+    mem = io.BytesIO(); zw = zipfile.ZipFile(mem, 'w', zipfile.ZIP_STORED)
+    for i, im in enumerate(js.get('images', [])):
+        if 'bufferView' in im:
+            bv = js['bufferViews'][im['bufferView']]; o0 = bv.get('byteOffset', 0); b = binc[o0:o0 + bv['byteLength']]
+            ext = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'}.get(im.get('mimeType'), 'png')
+            nome = 'img_%d.%s' % (i, ext); zw.writestr(nome, b); im['uri'] = nome
+    zw.close(); mem.seek(0)
+    return zipfile.ZipFile(mem), js, [binc], ''
+
 def ler_gltf(caminho):
-    z = zipfile.ZipFile(caminho); nomes = z.namelist()
-    gn = [n for n in nomes if n.endswith('.gltf')][0]; base = gn.rsplit('/', 1)[0] + '/' if '/' in gn else ''
-    g = json.loads(z.read(gn)); bins = [z.read(base + b['uri']) for b in g['buffers']]
+    if caminho.lower().endswith('.glb'):
+        z, g, bins, base = _abrir_glb(open(caminho, 'rb').read())
+    else:
+        z = zipfile.ZipFile(caminho); nomes = z.namelist(); gl = [n for n in nomes if n.endswith('.gltf')]
+        if gl:
+            gn = gl[0]; base = gn.rsplit('/', 1)[0] + '/' if '/' in gn else ''
+            g = json.loads(z.read(gn)); bins = [z.read(base + b['uri']) for b in g['buffers']]
+        else:   # zip com um .glb dentro
+            z, g, bins, base = _abrir_glb(z.read([n for n in nomes if n.lower().endswith('.glb')][0]))
     def acc(i):
         a = g['accessors'][i]; bv = g['bufferViews'][a['bufferView']]; dt, sz = CT[a['componentType']]; n = NC[a['type']]; c = a['count']
         o = bv.get('byteOffset', 0) + a.get('byteOffset', 0); st = bv.get('byteStride') or n * sz; buf = bins[bv.get('buffer', 0)]
@@ -82,6 +125,8 @@ def ler_gltf(caminho):
     for mi, L in partes.items():
         mat = g['materials'][mi] if mi >= 0 else {}; pb = mat.get('pbrMetallicRoughness') or {}
         img = None; bt = pb.get('baseColorTexture')
+        sg = (mat.get('extensions') or {}).get('KHR_materials_pbrSpecularGlossiness')   # modelos antigos do Sketchfab: a cor vem em diffuseTexture
+        if bt is None and sg: bt = sg.get('diffuseTexture'); pb = dict(pb, baseColorFactor=sg.get('diffuseFactor', [1, 1, 1, 1]))
         if bt is not None:
             src = g['textures'][bt['index']].get('source')
             if src is not None: img = base + g['images'][src]['uri']

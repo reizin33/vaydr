@@ -1,7 +1,8 @@
 /* ================= Ferramentas com modelo de verdade (Poly Haven, licença CC0) =================
    MOD3D (21c_mod3d_dados.js) traz cada modelo inteiro, já no espaço da mão (osso 11: cabo ao longo de +z; lâmina, cano ou
    ponta para -y), e a textura de cor em 1K. Aqui eles viram malhas com textura e entram no lugar das feitas de caixinha:
-   pistola (cabo de madeira), machado de incêndio, picareta, pá e corta-cadeado. Valem na mão (1ª e 3ª pessoa), no chão
+   pistola (cabo de madeira), machado de incêndio, picareta, pá e corta-cadeado; v10.2.2 (tools/mao_banco.py, dos GLB da Poly Haven):
+   faca, facão, taco (e o com pregos), pé de cabra e lanterna de mão. Valem na mão (1ª e 3ª pessoa), no chão
    quando a peça é largada e na mão dos sobreviventes. A ponta do cano da pistola (clarão e fumaça) vem do próprio modelo. */
 const MOD3D_TEX={};
 let MOD3D_INFO={};

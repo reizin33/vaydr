@@ -64,11 +64,13 @@ function survLoco(ch,dt){const s=ch.sk;
   const ferido=(P.vida<28)||(typeof pernaRuim==='function'&&pernaRuim());
   // no ar: pulo (uma vez) e depois caindo; pouso forte (a queda machucou): queda
   // no palco da criação o corpo não tem física: conta como no chão (sem isso ele "caía" parado no ar)
-  const chao=P.noChao||G.modo==='criacao';
+  const voando=!!P.voo&&!P.noChao;   // v10.2.2: voo do modo criativo, corpo de pé (o 62_criativo.js inclina para a frente)
+  const chao=P.noChao||G.modo==='criacao'||voando;
   if(!chao){SURV.ar+=dt;if(SURV.pulo>=0)SURV.pulo+=dt;}else{SURV.ar=0;SURV.pulo=-1;}
   if(SURV.queda>=0){SURV.queda+=dt;if(SURV.queda>survDur('sQueda')-0.05||(SURV.queda>0.9&&sp>0.6))SURV.queda=-1;}
   survZerar(L);let estado;
-  if(SURV.queda>=0){estado='queda';survSoma(L,'sQueda',SURV.queda,1);}
+  if(voando){estado='voando';SURV.queda=-1;survSoma(L,'sParado',(SURV.faseP+=dt)%survDur('sParado'),1);}
+  else if(SURV.queda>=0){estado='queda';survSoma(L,'sQueda',SURV.queda,1);}
   else if(!chao&&SURV.pulo>=0&&SURV.pulo<survDur('sPulo')*0.55){estado='pulo';survSoma(L,'sPulo',0.1+SURV.pulo,1);}
   else if(!chao&&SURV.ar>0.28){estado='caindo';SURV.faseP+=dt;survSoma(L,'sCaindo',SURV.faseP%survDur('sCaindo'),1);}
   else{
@@ -95,7 +97,10 @@ function survLoco(ch,dt){const s=ch.sk;
   SURV.estado=estado;
   // máscara: com algo na mão (ou mirando, golpeando, usando) os braços ficam com a pose do jogo
   const d=selDef(),acao=P.acao&&P.acao.tipo,mira=(P.aim||0)>0.25||acao==='arco'||acao==='golpe'||acao==='mirar';
-  const maoCheia=!!d&&d.tipo!=='material'&&d.tipo!=='comida'&&d.tipo!=='missao'||!!acao;
+  // v10.2.2: só o que aparece na mão (arma, ferramenta, lanterna, pedra...) usa os braços da pose do jogo. Antes qualquer coisa
+  // escolhida (chave, mapa, bilhete, utensílio sem modelo) também usava, e os braços ficavam tortos segurando nada.
+  const sid=selItem()?selItem().id:null,naMao=!!(d&&sid&&MESH.arma&&MESH.arma[sid]&&(d.tipo==='arma'||d.mao));
+  const maoCheia=naMao||!!acao;
   for(let i=0;i<SK_N;i++)L.m[i]=1;
   if(maoCheia&&estado!=='queda')for(let i=SKI.LeftShoulder;i<=SKI.RightHand;i++)L.m[i]=0;
   if(mira&&estado!=='queda')for(const i of[SKI.Spine1,SKI.Spine2,SKI.Neck,SKI.Head])L.m[i]=0.15;

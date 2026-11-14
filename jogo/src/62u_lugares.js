@@ -30,6 +30,28 @@ const LUGARES=[
   // no terreno nem na mata de cima; só aparece com a câmera lá embaixo; colisão só vale lá embaixo; luz de interior (escuro)
   {id:'tunelMetro',m:'tunelMetro',nome:'Túnel do metrô abandonado',x:-73,z:-84.75,yaw:Math.PI/2,sub:true,dist:70},
 ];
+/* v10.2.2 · Base Militar Serra Velha destruída (pedido do Himalaia, 13/11/2026): no lugar das caixas, os modelos escaneados.
+   Coordenadas locais da base (BASEM, 48g_historia.js): o portão é o lado leste (+x), o heliponto fica em (-4, 0) e a tenda da
+   centrífuga em (5, 8,5). Os muros de sacos de areia seguem a linha da cerca antiga, com trechos caídos (vãos). As caixas
+   militares ficam nos mesmos pontos de saque de antes. */
+(function baseDestruida(){const X=BASEM.x,Z=BASEM.z,H=Math.PI/2;
+  const add=(id,m,lx,lz,yaw,o)=>LUGARES.push(Object.assign({id:'bm_'+id,m,nome:'Base Militar Serra Velha',x:X+lx,z:Z+lz,yaw,dist:150,semChao:true},o||{}));
+  add('garagens','garagens',-6,-9.5,-H,{semChao:false,blend:4,plano:1,limpa:2,dist:240});
+  add('heli','helicoptero',-3,1.5,1.87,{dist:230,limpa:3});
+  add('blindado','blindado',8.6,-2.2,0.28,{dist:200,limpa:1});
+  add('bau','caminhaoBau',-7,9.6,0.42,{dist:180,limpa:1});
+  // muros de sacos de areia (4,5 m cada) na linha da cerca antiga; os vãos são os trechos caídos
+  const muro=[[-12.7,-15,0],[-8.2,-15,0],[0.8,-15,0],[5.3,-15,0],[12.7,-15,0],
+              [15,-12.7,H],[15,-8.2,H],[15,8.2,H],[15,12.7,H],
+              [-12.7,15,0],[-3.7,15,0],[0.8,15,0],[9.8,15,0],[12.7,15.2,0.12],
+              [-15,-12.7,H],[-15,-3.7,H],[-15,0.8,H],[-15,9.8,H],[-15,13.5,H-0.15]];
+  muro.forEach(([lx,lz,y],i)=>add('sacos'+i,'sacosAreia',lx,lz,y,{dist:130}));
+  // barreiras de concreto na entrada (zigue-zague para os carros não passarem direto) e duas tombadas
+  [[17.4,-2.6,H],[17.4,2.6,H],[19.6,0,H+0.15],[21.4,-3.1,H-0.2],[21.6,3.0,H+0.1],[16.2,-5.2,0.3],[16.4,5.4,-0.25]]
+    .forEach(([lx,lz,y],i)=>add('barreira'+i,'barreira',lx,lz,y,{dist:110}));
+  // caixas militares de madeira nos pontos de saque, e uma pilha perto da tenda
+  [[-12,-4,0.2],[-12,4.2,-0.15],[11,11,0.5],[-11.4,-3.3,1.35],[7.3,6.0,0.1],[8.9,6.1,0.05]]
+    .forEach(([lx,lz,y],i)=>add('caixa'+i,'caixaMilitar',lx,lz,y,{dist:70}));})();
 const LUG={malhas:{},info:{},col:0};
 /* meia-largura e meia-profundidade do modelo (com folga f) e o giro */
 function lugRet(L,f){const t=LUGX[L.m].tam,c=Math.cos(L.yaw),s=Math.sin(L.yaw),hx=t[0]/2+f,hz=t[2]/2+f;return{c,s,hx,hz};}

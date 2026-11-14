@@ -1,0 +1,224 @@
+{
+"machado": {
+"m": "wooden_axe_02"
+},
+"picareta": {
+"m": "picke_dirty_01",
+"zoom": 1.1
+},
+"faca": {
+"m": "fish_knife"
+},
+"taco": {
+"m": "baseball_bat"
+},
+"tacoCravado": {
+"m": "baseball_bat"
+},
+"facao": {
+"m": "machete"
+},
+"pistola": {
+"m": "service_pistol",
+"caixa": [
+0.3,
+1,
+0.5,
+1,
+0,
+1
+],
+"zoom": 1.15
+},
+"municao9": {
+"m": "ammo_box"
+},
+"madeira": {
+"m": "dead_tree_trunk_02"
+},
+"pedra": {
+"m": "stone_01"
+},
+"graveto": {
+"m": "dry_branches_medium_01",
+"zoom": 1.1
+},
+"sucata": {
+"m": "rusted_wheel_rim_01"
+},
+"kit": {
+"m": "medical_box"
+},
+"isqueiro": {
+"m": "vintage_lighter"
+},
+"fita": {
+"m": "medical_tape"
+},
+"lanterna": {
+"m": "small_plastic_torch"
+},
+"caderno": {
+"m": "binder_notebook",
+"jeito": "chato"
+},
+"feijao": {
+"m": "russian_food_cans_01"
+},
+"biscoito": {
+"m": "long_life_food"
+},
+"racao": {
+"m": "long_life_food"
+},
+"maca": {
+"m": "food_apple_01"
+},
+"laranja": {
+"m": "lemon"
+},
+"batata": {
+"m": "sweet_potato"
+},
+"agua": {
+"m": "plastic_bottle_gallon"
+},
+"garrafa": {
+"m": "wine_bottles_01",
+"caixa": [
+0,
+0.2,
+0,
+1,
+0,
+1
+],
+"jeito": "empe"
+},
+"gasolina": {
+"m": "metal_jerrycan"
+},
+"peDeCabra": {
+"m": "crowbar_01"
+},
+"pneu": {
+"m": "old_tyre"
+},
+"pneuCarro": {
+"m": "old_tyre"
+},
+"oleoMotor": {
+"m": "small_oil_can_01"
+},
+"kitFerramentas": {
+"m": "metal_tool_chest"
+},
+"rifle": {
+"m": "bolt_action_rifle_7_62"
+},
+"mascaraGas": {
+"m": "old_gas_mask",
+"jeito": "empe",
+"caixa": [
+0,
+1,
+0.55,
+1,
+0,
+1
+]
+},
+"cafe": {
+"m": "can_rusted"
+},
+"botijaoGas": {
+"m": "small_lpg_tank"
+},
+"serrote": {
+"m": "handsaw_wood"
+},
+"pa": {
+"m": "rusted_spade_01"
+},
+"alicate": {
+"m": "pliers"
+},
+"cortaCadeado": {
+"m": "bolt_cutters_01"
+},
+"sinalizador": {
+"m": "signal_flashlight"
+},
+"vela": {
+"m": "wooden_candlestick"
+},
+"bone": {
+"m": "fishermans_hat"
+},
+"botasTrilha": {
+"m": "rubber_boots",
+"jeito": "empe",
+"caixa": [
+0,
+0.5,
+0,
+1,
+0,
+1
+]
+},
+"botasCouro": {
+"m": "rubber_boots",
+"jeito": "empe",
+"caixa": [
+0,
+0.5,
+0,
+1,
+0,
+1
+]
+},
+"minerioFerro": {
+"m": "rock_07"
+},
+"leite": {
+"m": "metal_jug"
+},
+"sopa": {
+"m": "pot_enamel_01"
+},
+"luvasCouro": {
+"m": "garden_gloves_01"
+},
+"isca": {
+"m": "boombox"
+},
+"molotov": {
+"m": "wine_bottles_01",
+"caixa": [
+0,
+0.2,
+0,
+1,
+0,
+1
+],
+"jeito": "empe"
+},
+"antisseptico": {
+"m": "multi_cleaner_bottle"
+},
+"pecaVeiculo": {
+"m": "old_military_compressor"
+},
+"cabo": {
+"m": "garden_hose_wall_mounted_01"
+},
+"mel": {
+"m": "jug_01"
+},
+"pecasMaquina": {
+"m": "Drill_01"
+}
+}

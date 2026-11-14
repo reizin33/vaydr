@@ -110,10 +110,11 @@ function acender(z,t){if(!z.vivo)return;if(!(z.queima>0))sfx('fogo',z.x,z.z,0.3)
 function updateChamas(dt){
   for(let i=CHAMAS.length-1;i>=0;i--){const c=CHAMAS[i];c.t+=dt;if(c.t>=c.dur){CHAMAS.splice(i,1);continue;}
     const k=Math.min(1,c.t*4)*Math.min(1,(c.dur-c.t)/2.5),r=c.r*(0.7+0.3*Math.min(1,c.t*3));c.rr=r;c.k=k;
-    const n=Math.floor(dt*95*k+Math.random());
+    const n=Math.floor(dt*(typeof fogo3dOk==='function'&&fogo3dOk()?(c.mata?3:16):95)*k+Math.random());   // v10.2.2: com as chamas de verdade (62yd_fogo), só umas faíscas
     for(let j=0;j<n;j++){const a=Math.random()*6.283,q=Math.sqrt(Math.random())*r,x=c.x+Math.cos(a)*q,z=c.z+Math.sin(a)*q,y=chaoEm(x,z,c.y+0.6);
-      part(x,y+0.05,z,(Math.random()-0.5)*0.5,1.1+Math.random()*1.9,(Math.random()-0.5)*0.5,0.45+Math.random()*0.4,0.18+Math.random()*0.24*(1-q/r),[1,0.34+Math.random()*0.4,0.06,0.95],true,-0.7);}
-    if(Math.random()<dt*6*k)part(c.x+(Math.random()-0.5)*r,c.y+1.4,c.z+(Math.random()-0.5)*r,(Math.random()-0.5)*0.3,1.2,(Math.random()-0.5)*0.3,2.4,0.5,[0.1,0.09,0.08,0.4],false,-0.35);
+      if(typeof fogo3dOk==='function'&&fogo3dOk())part(x,y+0.2+Math.random()*0.8,z,(Math.random()-0.5)*0.9,2.2+Math.random()*2.2,(Math.random()-0.5)*0.9,0.7+Math.random()*0.7,0.035+Math.random()*0.035,[1,0.5+Math.random()*0.35,0.12,1],true,-1.0);   // faísca miúda (a chama é o 62yd)
+      else part(x,y+0.05,z,(Math.random()-0.5)*0.5,1.1+Math.random()*1.9,(Math.random()-0.5)*0.5,0.45+Math.random()*0.4,0.18+Math.random()*0.24*(1-q/r),[1,0.34+Math.random()*0.4,0.06,0.95],true,-0.7);}
+    if(!(typeof fogo3dOk==='function'&&fogo3dOk())&&Math.random()<dt*6*k)part(c.x+(Math.random()-0.5)*r,c.y+1.4,c.z+(Math.random()-0.5)*r,(Math.random()-0.5)*0.3,1.2,(Math.random()-0.5)*0.3,2.4,0.5,[0.1,0.09,0.08,0.4],false,-0.35);
     if(k<0.3)continue;
     for(const z of Z){if(z.vivo&&Math.abs(z.y-c.y)<1.6&&d2(z.x,z.z,c.x,c.z)<r*r)acender(z,z.tipo==='colosso'?3:5);}
     for(const b of BICHOS){if(b.vivo&&Math.abs(b.y-c.y)<1.6&&d2(b.x,b.z,c.x,c.z)<r*r){b.queimaT=(b.queimaT||0)-dt;if(b.queimaT<=0){b.queimaT=0.5;ferirBicho(b,10,0,0,'fogo');}}}

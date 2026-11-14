@@ -30,7 +30,7 @@ function cheiaEntulho(){for(let i=0;i<6;i++){const s=0.15+Math.random()*0.75,p=r
   if(lagoR(x,z)<1.1||(aguaNivel(x,z)!==null&&aguaProf(x,z)>0.2))continue;const L=rollLoot('enchente').filter(q=>ITEMS[q[0]]);if(L.length)soltarItens(L,x,z);}}
 /* ---------- incêndio na mata ---------- */
 let fogoT=0;
-function arvoreComFogo(t,dur){if(!t||!t.alive||t.fogo||t.agua)return false;t.fogo=true;t.fogoT=dur||18+Math.random()*16;const g=ground(t.x,t.z);CHAMAS.push({x:t.x,y:g,z:t.z,r:1.9,t:0,dur:t.fogoT+3,rr:0,mata:true});return true;}
+function arvoreComFogo(t,dur){if(!t||!t.alive||t.fogo||t.agua)return false;t.fogo=true;t.fogoT=dur||18+Math.random()*16;t.fogo0=t.fogoT;t.fogoEt=0;const g=ground(t.x,t.z);CHAMAS.push({x:t.x,y:g,z:t.z,r:1.9,t:0,dur:t.fogoT+3,rr:0,mata:true});return true;}
 function incendioComecar(t,motivo){const M=mundoD();if(M.fogo)return false;if(!arvoreComFogo(t,26))return false;M.fogo={x:t.x,z:t.z,ids:[t.id],n:1,dia:G.dia,motivo:motivo||'seca'};
   const lugar=typeof zonaEm==='function'&&zonaEm(t.x,t.z)?zonaEm(t.x,t.z).nome:'na mata';
   evAviso('alerta','Fumaça subindo '+(lugar==='na mata'?'na mata':'perto de '+lugar)+'! A mata está pegando fogo. Fique longe do vento e da fumaça.','Incêndio na mata'+(lugar!=='na mata'?' ('+lugar+')':''));return true;}
@@ -38,8 +38,9 @@ function incendioDeRaio(t){if(Math.random()<0.35)incendioComecar(t,'raio');}
 function incendioPasso(dt){const M=mundoD(),F=M.fogo;if(!F)return;fogoT-=dt;if(fogoT>0)return;fogoT=1.5;const chuva=G.chuva>0.4;
   const vivos=[];for(const id of F.ids){const t=TREES[id];if(!t||!t.fogo)continue;t.fogoT-=1.5*(chuva?3:1);
     if(t.fogoT<=0){t.fogo=false;if(t.alive){t.alive=false;colRemove(COLL.find(c=>c.tree===t)||{});vegDirty=true;M.tocos.push({id:t.id,x:t.x,z:t.z,dia:G.dia});}continue;}vivos.push(id);
+    {const et=Math.floor(clamp(1-t.fogoT/(t.fogo0||30),0,1)*6);if(et!==t.fogoEt){t.fogoEt=et;vegDirty=true;}}   // v10.2.2: a árvore escurece e perde a folha aos poucos (rebuildVeg)
     if(F.n<70&&vivos.length<26)for(const c of colQuery(t.x,t.z,7)){const q=c.tree;if(!q||!q.alive||q.fogo||q.agua)continue;if(d2(q.x,q.z,t.x,t.z)>49)continue;if(Math.random()<(chuva?0.02:0.16)){if(arvoreComFogo(q)){F.ids.push(q.id);F.n++;}}}
-    if(Math.random()<0.5)part(t.x+(Math.random()-0.5)*2,ground(t.x,t.z)+4+Math.random()*4,t.z+(Math.random()-0.5)*2,(Math.random()-0.5)*0.5,2+Math.random(),(Math.random()-0.5)*0.5,7,1.4+Math.random(),[0.22,0.2,0.19,0.4],false,-0.25);}
+    if(!(typeof fogo3dOk==='function'&&fogo3dOk())&&Math.random()<0.5)part(t.x+(Math.random()-0.5)*2,ground(t.x,t.z)+4+Math.random()*4,t.z+(Math.random()-0.5)*2,(Math.random()-0.5)*0.5,2+Math.random(),(Math.random()-0.5)*0.5,7,1.4+Math.random(),[0.22,0.2,0.19,0.4],false,-0.25);}
   F.ids=F.ids.filter(id=>TREES[id]&&TREES[id].fogo);
   if(!F.ids.length){M.fogo=null;const tem=F.n>=6&&Math.random()<0.75;if(tem)M.ev.push({id:M.id++,tipo:'esconderijo',x:F.x+(Math.random()-0.5)*3,z:F.z+(Math.random()-0.5)*3,dia:G.dia,aberto:false});
     evAviso('alerta','O fogo apagou. '+F.n+' árvores queimaram.'+(tem?' No meio das cinzas apareceu um alçapão que estava escondido no mato.':''),'O incêndio apagou'+(tem?': apareceu um esconderijo':''));}}
@@ -104,7 +105,7 @@ function mundoAmanhece(){const M=mundoD();
   for(const e of M.ev){if(!e.fim&&e.tipo==='infestacao'&&G.dia>e.ate){e.fim='sumiu';e.fimDia=G.dia;}if(!e.fim&&e.tipo==='comboio'&&G.dia-e.dia>8){e.fim='sumiu';e.fimDia=G.dia;}}
   for(let i=M.ev.length-1;i>=0;i--){const e=M.ev[i];if(e.fim&&G.dia-(e.fimDia||G.dia)>=1&&e.tipo!=='estrada'){if(e.cols)for(const c of e.cols)colRemove(c);M.ev.splice(i,1);}else if(e.tipo==='estrada'&&e.fim)M.ev.splice(i,1);}
   // tocos de árvore queimada: a mata volta depois de 6 dias
-  for(let i=M.tocos.length-1;i>=0;i--){const q=M.tocos[i];if(G.dia-q.dia>=6){const t=TREES[q.id];if(t&&!t.alive&&!t.agua){t.alive=true;t.hp=5;if(!COLL.find(c=>c.tree===t))colCircle(t.x,t.z,TREE_R*t.s,{tree:t});vegDirty=true;}M.tocos.splice(i,1);}}
+  for(let i=M.tocos.length-1;i>=0;i--){const q=M.tocos[i];if(G.dia-q.dia>=6){const t=TREES[q.id];if(t)colRemove(COLL.find(c=>c.queimada===t)||{});if(t&&!t.alive&&!t.agua){t.alive=true;t.hp=5;if(!COLL.find(c=>c.tree===t))colCircle(t.x,t.z,TREE_R*t.s,{tree:t});vegDirty=true;}M.tocos.splice(i,1);}}
   if(G.dia<2||Math.random()>EVM.chanceDia)return;const ativos=M.ev.filter(e=>!e.fim&&e.tipo!=='esconderijo').length;if(ativos>=EVM.maxAtivos)return;
   const pesos=Object.assign({},EVM.peso);if(G.dia<3)pesos.infestacao=0;if(G.dia<4)pesos.comboio=0;if((G.clima&&G.clima.atual==='tempestade')||G.chuva>0.5)pesos.estrada*=2.2;
   let tot=0;for(const k in pesos)tot+=pesos[k];let r=Math.random()*tot,esc=null;for(const k in pesos){r-=pesos[k];if(r<=0){esc=k;break;}}
@@ -163,7 +164,15 @@ function evDesenhar(Pg,sombra){const M=G.mundo;if(!M||!MESH.evTronco||cam.pos[1]
     else if(e.tipo==='esconderijo')drawStat(Pg,MESH.evAlcapao,mat(e.x,ground(e.x,e.z),e.z));
     else if(e.tipo==='comboio'){for(const v of e.vs){const g=ground(v.x,v.z);drawStat(Pg,v.tipo==='jipe'?MESH.evJipe:MESH.evCaminhao,v.tomb?mm(mat(v.x,g+1.15,v.z,0,v.yaw,0),mat(0,0,0,0,0,Math.PI/2*0.92)):mat(v.x,g,v.z,0,v.yaw,0));}
       if(!sombra)for(const c of e.caixas)if(!(c.aberta&&c.itens&&!c.itens.some(Boolean)))drawStat(Pg,MESH.evCaixa,mat(c.x,ground(c.x,c.z),c.z,0,e.yaw,0));}}
-  if(!sombra)for(const q of M.tocos)if(d2(q.x,q.z,cx,cz)<120*120)drawStat(Pg,MESH.evToco,mat(q.x,ground(q.x,q.z),q.z,0,q.x*7%6,0));}
+  if(!sombra&&!queimadasSet())for(const q of M.tocos)if(d2(q.x,q.z,cx,cz)<120*120)drawStat(Pg,MESH.evToco,mat(q.x,ground(q.x,q.z),q.z,0,q.x*7%6,0));}
+/* v10.2.2 ("olha como fica as árvores quando queimadas"): com a mata de verdade pronta, a árvore queimada fica de pé, carbonizada
+   (50_render.js rebuildVeg + 62y mataDistribuir), no lugar do toco com espeto preto; o tronco dela continua sólido */
+let QM_SET=null,QM_ASS='';
+function queimadasSet(){if(typeof mataLigada!=='function'||!mataLigada()||!mataProntas())return null;const M=G.mundo;if(!M||!Array.isArray(M.tocos))return null;
+  let ass=M.tocos.length+':';for(const q of M.tocos)ass+=q.id+',';
+  if(ass!==QM_ASS){QM_ASS=ass;QM_SET=new Set(M.tocos.map(q=>q.id));
+    for(const id of QM_SET){const t=TREES[id];if(t&&!t.alive&&!t.agua&&!COLL.some(c=>c.queimada===t))colCircle(t.x,t.z,Math.max(0.22,0.3*(t.s||1)),{queimada:t});}}
+  return QM_SET;}
 DESENHO.opaco.push(Pg=>evDesenhar(Pg,false));DESENHO.sombra.push(Pg=>evDesenhar(Pg,true));
 MAPA_DESENHOS.push((g,X,Y,k,n)=>{const M=G.mundo;if(!M)return;const ico=(x,y,cor,f)=>{g.fillStyle=cor;g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.2;g.beginPath();f(x,y);g.fill();g.stroke();};
   for(const e of M.ev){if(e.fim)continue;const x=X(e.x),y=Y(e.z);

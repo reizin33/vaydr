@@ -125,12 +125,19 @@ function buildWorld(){const C=new GB(1<<16,8),N=new GB(1<<16,8),TWR=new GB(1<<12
 function rebuildVeg(force){vegT-=1;if(!vegDirty&&!force&&vegT>0)return;vegT=30;vegDirty=false;
   const pine=[],round=[],dead=[],stump=[],birch=[],pN=[],rN=[],dN=[],bN=[];
   const nr=GF().arvPerto,far=GF().arvLonge;
-  for(const t of TREES){if(t.agua)continue;const dd=d2(t.x,t.z,P.x,P.z);if(dd>far*far)continue;if(!t.alive){stump.push({x:t.x,y:t.y+0.1,z:t.z,r:t.r,s:t.s*0.9,t:t.t});continue;}
-    const it={x:t.x,y:t.y,z:t.z,r:t.r,s:t.s,t:t.t,tr:t.tr,tg:t.tg,tb:t.tb};const near=dd<nr*nr;
+  /* v10.2.2: com a mata de verdade pronta (62y), a árvore queimada fica de pé, carbonizada (só a madeira da espécie, preta) no lugar
+     do toco com espeto preto, e a que está pegando fogo escurece aos poucos e perde as folhas (marca: tr >= 9, ver mataDistribuir) */
+  const qm=typeof queimadasSet==='function'?queimadasSet():null;
+  for(const t of TREES){if(t.agua)continue;const dd=d2(t.x,t.z,P.x,P.z);if(dd>far*far)continue;
+    if(!t.alive){if(qm&&qm.has(t.id)){const v=0.8+0.2*pinhoHash(t.x+1.3,t.z),it={x:t.x,y:t.y,z:t.z,r:t.r,s:t.s,tr:10+0.15*v,tg:0.135*v,tb:0.125*v};(t.kind===0?pN:t.kind===3?bN:rN).push(it);continue;}
+      stump.push({x:t.x,y:t.y+0.1,z:t.z,r:t.r,s:t.s*0.9,t:t.t});continue;}
+    const it={x:t.x,y:t.y,z:t.z,r:t.r,s:t.s,t:t.t,tr:t.tr,tg:t.tg,tb:t.tb};let near=dd<nr*nr;
+    if(t.fogo&&qm){const k=clamp(1-t.fogoT/(t.fogo0||30),0,1),b0=t.tr??t.t??1,c=lerp(1,0.17,k*k*(3-2*k));it.tr=b0*c*(1+0.25*k*(1-k)*4);it.tg=(t.tg??t.t??1)*c*(1-0.35*k);it.tb=(t.tb??t.t??1)*c*(1-0.5*k);
+      if(k>0.55)it.tr+=10;near=true;}
     if(near)(t.kind===0?pN:t.kind===1?rN:t.kind===3?bN:dN).push(it);else(t.kind===0?pine:t.kind===1?round:t.kind===3?birch:dead).push(it);}
   instUpload(MESH.pine,pine);instUpload(MESH.round,round);instUpload(MESH.dead,dead);instUpload(MESH.stump,stump);instUpload(MESH.birch,birch);
   instUpload(MESH.pineN,pN);instUpload(MESH.roundN,rN);instUpload(MESH.deadN,dN);instUpload(MESH.birchN,bN);
-  const inR=o=>d2(o.x,o.z,P.x,P.z)<far*far;instUpload(MESH.rock,ROCKS.filter(r=>r.alive&&inR(r)));instUpload(MESH.bush,BUSHES.filter(b=>!b.agua&&inR(b)));instUpload(MESH.berries,BUSHES.filter(b=>b.frutas&&inR(b)));
+  const inR=o=>d2(o.x,o.z,P.x,P.z)<far*far;instUpload(MESH.rock,ROCKS.filter(r=>r.alive&&inR(r)));instUpload(MESH.bush,BUSHES.filter(b=>!b.agua&&inR(b)));instUpload(MESH.berries,BUSHES.filter(b=>b.frutas&&!b.agua&&inR(b)));
   instUpload(MESH.pedra,PICKS.filter(p=>p.alive&&p.kind==='pedra'));instUpload(MESH.galho,PICKS.filter(p=>p.alive&&p.kind==='galho'));instUpload(MESH.cogumelo,PICKS.filter(p=>p.alive&&p.kind==='cogumelo'));instUpload(MESH.fibra,PICKS.filter(p=>p.alive&&p.kind==='fibra'));}
 function rebuildGrass(){const lim=GRAF[cfg.graf].grama,R2=GF().grRaio**2,out=[],limpo=G.modo==='criacao'?36:0;for(const g of GRASS){const d=d2(g.x,g.z,P.x,P.z);if(d<R2&&d>=limpo){out.push(g);if(out.length>=lim)break;}}instUpload(MESH.grass,out);   // na criação o chão em volta do personagem fica limpo (o capim não tampa a câmera)
   const fl=[],RF2=(GF().grRaio+8)**2,lf=Math.round(lim*GF().flores);for(const f of FLORES){const d=d2(f.x,f.z,P.x,P.z);if(d<RF2&&d>=limpo){fl.push(f);if(fl.length>=lf)break;}}instUpload(MESH.flor,fl);
@@ -150,7 +157,7 @@ function setLit(Pg){const u=Pg.u,sh=GRAF[cfg.graf].sombra>0,post=!!GDEF;gl.usePr
   gl.uniformMatrix4fv(u.uViewProj,false,VP);gl.uniform3fv(u.uCam,cam.pos);gl.uniform3f(u.uTint,1,1,1);gl.uniform1f(u.uAlpha,1);
   gl.uniform3fv(u.uHemiS,E.hs);gl.uniform3fv(u.uHemiG,E.hg);gl.uniform3fv(u.uDirD,E.dd);gl.uniform3fv(u.uDirC,E.dc);
   gl.uniform4fv(u.uPL,PLv);gl.uniform3fv(u.uPC,PCv);gl.uniform1i(u.uNPL,NPL);gl.uniform1f(u.uTaps,cfg.graf==='ultra'?4:cfg.graf==='alto'?3:2);
-  gl.uniform3fv(u.uSpotP,spotP);gl.uniform3fv(u.uSpotD,spotD);gl.uniform3fv(u.uSpotC,E.spot);if(CARRO.ativo){gl.uniform2f(u.uSpotK,Math.cos(0.62),Math.cos(0.28));gl.uniform1f(u.uSpotR,48);}else{gl.uniform2f(u.uSpotK,Math.cos(0.42),Math.cos(0.17));gl.uniform1f(u.uSpotR,30);}
+  gl.uniform3fv(u.uSpotP,spotP);gl.uniform3fv(u.uSpotD,spotD);gl.uniform3fv(u.uSpotC,E.spot);if(CARRO.ativo){gl.uniform2f(u.uSpotK,Math.cos(0.62),Math.cos(0.28));gl.uniform1f(u.uSpotR,75);}else{gl.uniform2f(u.uSpotK,Math.cos(0.5),Math.cos(0.2));gl.uniform1f(u.uSpotR,60);}   // v10.2.2: facho mais largo e alcance de 42 m (era 30)
   gl.uniform3fv(u.uFog,post?E.fogL:E.hor);gl.uniform3fv(u.uFogSun,post?E.fogSunL:E.fogSun);gl.uniform3fv(u.uSunD,E.sunFogD);gl.uniform1f(u.uMist,E.mist);
   gl.uniform1f(u.uFogD,E.fogD);gl.uniform1f(u.uExp,E.exp);gl.uniform1f(u.uDetail,GRAF[cfg.graf].detalhe);if(u.uWet)gl.uniform1f(u.uWet,E.wet||0);gl.uniform1f(u.uEmis,post?2.2:1);
   gl.uniform3fv(u.uRim,E.rim);gl.uniform1f(u.uTime,G.t);gl.uniform2fv(u.uWind,E.wind);
@@ -172,7 +179,7 @@ function luzes(){let n=0;PLv.fill(0);PCv.fill(0);const nMax=Math.min(4,GF().luze
   let best=null,bd=1e9;for(const f of FIRES){const d=d2(f.x,f.z,P.x,P.z);if(d<bd){bd=d;best=f;}}
   if(best){if(best.branca)put(best.x,best.y-0.15,best.z,19,scl([0.9,0.95,1],lerp(1.6,5.2,E.n)));else if(best.eletrica)put(best.x,best.y-0.12,best.z,17,scl([1,0.86,0.62],lerp(1.4,4.4,E.n)));else if(best.lamp)put(best.x,best.y+0.35,best.z,11,scl([1,0.62,0.28],lerp(1.4,3.6,E.n)));else put(best.x,best.y+0.6,best.z,18,scl([1,0.45,0.15],lerp(3,7,E.n)*E.flick));}
   if(G.ev&&G.ev.ativo)put(G.ev.x,G.ev.y+1.2,G.ev.z,10,scl([1,0.15,0.08],2.5+Math.sin(G.t*9)));
-  {let ch=null,cd=1e9;for(const c of CHAMAS){const d=d2(c.x,c.z,P.x,P.z);if(d<cd&&(c.k||0)>0.05){cd=d;ch=c;}}if(ch&&cd<60*60)put(ch.x,ch.y+0.8,ch.z,14,scl([1,0.45,0.15],(3.5+Math.sin(G.t*13)*0.6)*(ch.k||0)));}luzesCidade(put);
+  {let ch=null,cd=1e9;for(const c of CHAMAS){const d=d2(c.x,c.z,P.x,P.z);if(d<cd&&(c.k||0)>0.05){cd=d;ch=c;}}if(ch&&cd<70*70)put(ch.x,ch.y+(ch.mata?3.2:0.8),ch.z,ch.mata?22:14,scl([1,0.45,0.15],(3.5+Math.sin(G.t*13)*0.6)*(ch.k||0)*(ch.mata?1.6:1)));}   // v10.2.2: árvore em chamas ilumina mais alto e mais longeluzesCidade(put);
   /* a segunda lâmpada elétrica mais perto também ilumina, se sobrar vaga */
   {let b2=null,dd=45*45;for(const f of FIRES){if(f===best||!f.eletrica)continue;const d=d2(f.x,f.z,P.x,P.z);if(d<dd){dd=d;b2=f;}}if(b2)put(b2.x,b2.y-0.15,b2.z,16,b2.branca?scl([0.9,0.95,1],lerp(1.4,4.6,E.n)):scl([1,0.86,0.62],lerp(1.2,4,E.n)));}
   NPL=n;}
@@ -252,8 +259,12 @@ function render(){
   const chest=P.ch.m.subarray(16,32);
   if(CARRO.ativo){spotP=carroLocal(0,1.0,2.7);spotD=norm([Math.sin(CARRO.yaw),-0.13,Math.cos(CARRO.yaw)]);}
   else if(cfg.cam==='1'){spotP=lanternaNaMao()?[cam.pos[0]+cam.fwd[0]*0.58+cam.right[0]*0.17-cam.up[0]*0.17,cam.pos[1]+cam.fwd[1]*0.58-cam.up[1]*0.17,cam.pos[2]+cam.fwd[2]*0.58+cam.right[2]*0.17-cam.up[2]*0.17]:[cam.pos[0]+cam.right[0]*0.2,cam.pos[1]-0.15,cam.pos[2]+cam.right[2]*0.2];spotD=norm([cam.fwd[0],cam.fwd[1]-0.08,cam.fwd[2]]);}
-  else{spotP=lanternaNaMao()?xf(P.ch.m.subarray(11*16,12*16),LANT_PONTA[0],LANT_PONTA[1],LANT_PONTA[2]):xf(chest,0,0.41,0.3);   // lanterna na mão: a luz sai da ponta dela
-    const fd=lookDir(P.yaw,P.pitch-0.12);spotD=norm(fd);}
+  else{const fd=lookDir(P.yaw,P.pitch-0.12);spotD=norm(fd);
+    /* lanterna na mão: a luz sai da ponta dela. Sem ela na mão (v10.2.2): sai da altura da cabeça, um palmo à frente na direção
+       da mira. Antes saía da frente do peito apontando para a mira: virado para a câmera, ele acendia a luz no próprio corpo
+       (o círculo claro no peito) e o brilho da lente ficava como uma bola no peito. */
+    if(lanternaNaMao())spotP=xf(P.ch.m.subarray(11*16,12*16),LANT_PONTA[0],LANT_PONTA[1],LANT_PONTA[2]);
+    else{const hy=P.y+lerp(1.6,1.08,P.agK||0)*(P.ch.s||1);spotP=[P.x+spotD[0]*0.5,hy+spotD[1]*0.5,P.z+spotD[2]*0.5];}}
   luzes();
   const hand=P.ch.m.subarray(11*16,12*16),selId=selItem()?selItem().id:null,armaMesh=selId&&MESH.arma[selId]&&(ITEMS[selId].tipo==='arma'||ITEMS[selId].mao)?MESH.arma[selId]:null;
   // sombra (com cascatas: perto à esquerda da textura, longe à direita)
@@ -354,7 +365,7 @@ function render(){
   const blink=(Math.sin(G.t*3.2)>0.2?1:0.08);bb(TOWER_TOP[0],TOWER_TOP[1],TOWER_TOP[2],post?2.6:3.4,1,0.16,0.1,blink*lerp(post?0.12:0.5,post?0.75:0.95,n));
   if(P.flash>0&&P.muzzle)bb(P.muzzle[0],P.muzzle[1],P.muzzle[2],0.45,1,0.8,0.45,1);
   /* faróis: desenhados pelo módulo dos veículos (DESENHO.aditivo) */
-  if(P.lanterna&&n>0.05&&cfg.cam!=='1'&&!CARRO.ativo)bb(spotP[0],spotP[1],spotP[2],post?0.16:0.32,1,0.95,0.8,(post?0.6:0.85)*n);
+  if(P.lanterna&&n>0.05&&cfg.cam!=='1'&&!CARRO.ativo&&lanternaNaMao())bb(spotP[0],spotP[1],spotP[2],post?0.05:0.08,1,0.95,0.8,(post?0.45:0.6)*n);   // brilho só na lente da lanterna de mão (v10.2.2: pequeno; grande ele virava a "bola" na mão)
   for(const d of DROPS){const dd=d2(d.x,d.z,P.x,P.z);if(dd<7*7)continue;bb(d.x,d.y+0.45+Math.sin(G.t*3)*0.04,d.z,0.18,1,0.85,0.4,0.2*Math.min(1,(Math.sqrt(dd)-7)/4));}   // o brilho só ajuda a achar de longe; de perto valem o modelo e a etiqueta
   vagalumes(n);desenharOlhos();
   gl.bindBuffer(gl.ARRAY_BUFFER,BBBUF);gl.bufferSubData(gl.ARRAY_BUFFER,0,bbData,0,bbN*60);gl.bindVertexArray(BBV);

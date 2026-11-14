@@ -4,13 +4,13 @@
    (nnc_adm_...), sem tocar no jogo normal. Ao voltar ao menu, o jogo normal volta a ser o de sempre.
    No jogo criativo, a tecla ' (a que fica do lado do 1) ou o botão "Painel criativo" da pausa abrem o painel:
    · Jogador: voar (Espaço sobe; Ctrl ou Z desce; Shift mais rápido), imortal, fabricar e construir sem gastar material,
-     liberar todas as receitas e construções (também sem estação), encher vida/fome/sede/energia, curar, subir de nível,
-     inspecionar o que está na mira.
+     liberar todas as receitas e construções (também sem estação), encher vida/fome/sede/energia, curar e subir de nível.
+     (v10.2.2: saiu o "inspecionar a mira", que escrevia "Nada na mira (até 9 m)" e as coordenadas na tela; o dono não pediu.)
    · Ir para: os lugares do mapa, prédios da cidade e destroços.
    · Tempo: hora do dia, clima, lua de sangue.
    · Criar: itens (com busca), bichos, zumbis (inclusive os chefes) e veículos prontos para andar, na sua frente.
    · Eventos: enchente, incêndio, estrada bloqueada, infestação, comboio, fartura, cardume, suprimentos de avião e o Colosso. */
-const ADM={ativo:false,voar:false,imortal:false,gratis:false,liberar:false,inspecionar:false,aba:'jogador',qtd:1,busca:'',msg:''};
+const ADM={ativo:false,voar:false,imortal:false,gratis:false,liberar:false,aba:'jogador',qtd:1,busca:'',msg:''};
 const ADM_CHAVES=/^nnc_(jogo_v1|recorde|recordes|conq)/;
 TELAS_NOVAS.push('t-criativo');
 if(typeof TELAS!=='undefined'&&Array.isArray(TELAS)&&!TELAS.includes('t-criativo'))TELAS.push('t-criativo');   // a lista de telas já foi montada pela interface
@@ -34,13 +34,24 @@ function admChave(k){return ADM.ativo&&typeof k==='string'&&ADM_CHAVES.test(k)?'
 {const _fo=ferramentaOk;ferramentaOk=function(r){if(ADM.ativo&&ADM.liberar)return true;return _fo.apply(this,arguments);};}
 /* voar: sem gravidade; Espaço sobe, Ctrl ou Z desce (Shift: mais rápido); nunca abaixo do chão */
 {const _fv=fisicaVertical;fisicaVertical=function(dt){if(!(ADM.ativo&&ADM.voar))return _fv.apply(this,arguments);
-  const sobe=KEYS.Space?1:0,desce=(KEYS.ControlLeft||KEYS.ControlRight||KEYS.KeyZ)?1:0,v=(IN.run?16:7)*(sobe-desce);
+  const sobe=KEYS.Space?1:0,desce=(KEYS.ControlLeft||KEYS.ControlRight||KEYS.KeyZ)?1:0,v=(IN.run?24:9)*(sobe-desce);
   P.vy=0;P.y+=v*dt;const chao=chaoEm(P.x,P.z,P.y+0.3);if(P.y<chao)P.y=chao;P.noChao=P.y<=chao+0.002;P.air=P.y-chao;P.coyote=0;};}
 /* ao voltar ao menu, o jogo normal volta a valer */
 {const _mm=mostrarMenu;mostrarMenu=function(){if(ADM.ativo)admSair();const r=_mm.apply(this,arguments);admBotoes();return r;};}
 {const _aj=ajustesUI;ajustesUI=function(){const r=_aj.apply(this,arguments);const el=$('aj-criativo');
   if(el)el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===String(cfg.criativo===1?1:0))));return r;};}
-PASSOS.push(function criativoPasso(dt){if(!ADM.ativo)return;if(ADM.imortal){P.vida=100;}});
+PASSOS.push(function criativoPasso(dt){P.voo=ADM.ativo&&ADM.voar&&P.alive&&!CARRO.ativo&&!P.montado&&!P.nada&&!P.escala;if(!ADM.ativo)return;if(ADM.imortal){P.vida=100;}});
+/* v10.2.2: pose de voo. Antes o corpo ficava com a pose de quem está caindo (braços abertos e joelhos dobrados) parado no ar.
+   Agora, no ar com o voo ligado, o corpo fica de pé, relaxado (o clipe de parado, no 62z_sobrevivente.js), e inclina para a
+   frente conforme a velocidade (até uns 30 graus com Shift), girando em volta do meio do corpo e não dos pés; parado no ar,
+   balança de leve. */
+{const _aj=animarJogador;animarJogador=function(dt){_aj.apply(this,arguments);const ch=P.ch;
+  const voando=P.voo&&!P.noChao,b=P.body,fr=(P.vx*Math.sin(b)+P.vz*Math.cos(b)),lat=(P.vx*Math.cos(b)-P.vz*Math.sin(b));
+  P.vooK=approach(P.vooK||0,voando?1:0,dt*4);
+  const alvo=voando?clamp(fr/34,-0.35,1)*0.55:0;P.vooP=lerp(P.vooP||0,alvo,1-Math.exp(-dt*5));
+  if(P.vooK<0.001&&Math.abs(P.vooP)<0.001)return;
+  const th=P.vooP*P.vooK,c=0.95;ch.pitch=th;
+  ch.x-=Math.sin(b)*c*Math.sin(th);ch.z-=Math.cos(b)*c*Math.sin(th);ch.y+=c*(1-Math.cos(th))+Math.sin(G.t*1.7)*0.035*P.vooK*(1-clamp(Math.hypot(fr,lat)/6,0,1));};}
 
 /* ---------- entrar e sair ---------- */
 function admBotoes(){const m=$('m-criativo');if(m)m.hidden=cfg.criativo!==1;const p=$('p-criativo');if(p)p.hidden=!ADM.ativo;
@@ -49,7 +60,7 @@ function admEntrar(){if(cfg.criativo!==1)return false;ADM.ativo=true;admBotoes()
   if(temSave()&&carregarJogo()){jogar();admAviso();return true;}
   novoJogo();jogar();admAviso();return true;}
 function admAviso(){feed('Modo criativo: aperte \' (do lado do 1) para abrir o painel. Este jogo fica separado do normal.');}
-function admSair(){ADM.ativo=false;ADM.voar=ADM.imortal=ADM.gratis=ADM.liberar=ADM.inspecionar=false;admBotoes();const i=$('ad-insp');if(i)i.hidden=true;}
+function admSair(){ADM.ativo=false;ADM.voar=ADM.imortal=ADM.gratis=ADM.liberar=false;admBotoes();}
 function admRecomecar(){if(!ADM.ativo)return;apagarSaves();novoJogo();admFechar();feed('Mundo criativo novo.');}
 
 /* ---------- painel ---------- */
@@ -60,9 +71,8 @@ function admBtn(id,t,s,on){return'<button type="button" class="btn'+(on?' prim':
 function admRender(){const abas=$('ad-abas'),c=$('ad-corpo');if(!abas||!c)return;
   abas.innerHTML=ADM_ABAS.map(([k,n])=>'<button type="button" data-aba="'+k+'" aria-pressed="'+(ADM.aba===k)+'">'+n+'</button>').join('');
   let h='';const A=ADM.aba;
-  if(A==='jogador'){h+='<div class="vc-acoes">'+admBtn('voar','Voar',ADM.voar?'ligado · Espaço sobe, Ctrl ou Z desce':'desligado',ADM.voar)+admBtn('imortal','Imortal',ADM.imortal?'ligado':'desligado',ADM.imortal)
+  if(A==='jogador'){h+='<div class="vc-acoes">'+admBtn('voar','Voar',ADM.voar?'ligado · Espaço sobe, Ctrl ou Z desce, Shift acelera':'desligado',ADM.voar)+admBtn('imortal','Imortal',ADM.imortal?'ligado':'desligado',ADM.imortal)
       +admBtn('gratis','Sem gastar material',ADM.gratis?'ligado: fabricar e construir de graça':'desligado',ADM.gratis)+admBtn('liberar','Liberar tudo',ADM.liberar?'ligado: receitas, construções e estações':'desligado',ADM.liberar)
-      +admBtn('inspecionar','Inspecionar a mira',ADM.inspecionar?'ligado: mostra o que está na sua frente':'desligado',ADM.inspecionar)
       +admBtn('encher','Encher tudo','vida, fome, sede e energia')+admBtn('curar','Curar','sangramento, perna, vírus e esporos')+admBtn('nivel','Subir um nível','+1 ponto de talento')
       +admBtn('recomecar','Recomeçar o mundo criativo','apaga só o jogo criativo')+admBtn('sair','Sair do modo criativo','salva e volta ao menu')+'</div>';}
   else if(A==='ir'){h+='<div class="vc-acoes">'+admLugares().map((l,i)=>admBtn('ir:'+i,l.nome,l.sub||'')).join('')+'</div>';}
@@ -100,11 +110,10 @@ function admFrente(d){const x=P.x+Math.sin(P.yaw)*d,z=P.z+Math.cos(P.yaw)*d;retu
 
 function admAcao(a){const[k,v]=a.split(/:(.*)/s);
   switch(k){
-    case'voar':ADM.voar=!ADM.voar;if(!ADM.voar)P.vy=0;break;
+    case'voar':ADM.voar=!ADM.voar;if(!ADM.voar)P.vy=0;P.voo=ADM.voar;break;
     case'imortal':ADM.imortal=!ADM.imortal;break;
     case'gratis':ADM.gratis=!ADM.gratis;break;
     case'liberar':ADM.liberar=!ADM.liberar;break;
-    case'inspecionar':ADM.inspecionar=!ADM.inspecionar;{const i=$('ad-insp');if(i)i.hidden=!ADM.inspecionar;}break;
     case'encher':P.vida=100;P.fome=100;P.sede=100;P.energia=100;if('sono'in P)P.sono=100;ADM.msg='Vida, fome, sede, energia e sono cheios.';break;
     case'curar':if(P.lesoes)Object.assign(P.lesoes,{sangra:0,sangraT:0,perna:0,tala:false,pernaH:0,virus:0});if('esporo'in P)P.esporo=0;P.vida=100;ADM.msg='Ferimentos, vírus e esporos curados.';break;
     case'nivel':G.nivel=(G.nivel||1)+1;G.pontos=(G.pontos||0)+1;ADM.msg='Nível '+G.nivel+': 1 ponto de talento a mais.';break;
@@ -135,16 +144,6 @@ function admEvento(t){const M=mundoD();
   if(t==='aviao')return aereoLancar(P.x+10,P.z+10,'criativo')?'O avião está vindo: a caixa cai perto de você.':'Já tem um avião a caminho.';
   if(t==='colosso'){const f=admFrente(25);const z=typeof criarChefe==='function'?criarChefe(f.x,f.z):null;return z?'O Colosso apareceu.':'Não deu para criar o Colosso.';}
   return'';}
-
-/* ---------- inspecionar: o que está na mira ---------- */
-function admAlvo(){const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let best=null,bd=10;
-  const ver=(x,z,txt)=>{const dx=x-P.x,dz=z-P.z,d=Math.hypot(dx,dz);if(d>9||d<0.15)return;if((dx*fx+dz*fz)/d<0.94)return;if(d<bd){bd=d;best=txt;}};
-  for(const z of Z)if(z.vivo)ver(z.x,z.z,()=>(ADM_ZNOME[z.tipo]||z.tipo)+' · vida '+Math.round(z.hp)+' · '+z.st);
-  for(const b of BICHOS)if(b.vivo)ver(b.x,b.z,()=>FAUNA[b.tipo].nome+' · vida '+Math.round(b.hp)+'/'+Math.round(b.hpMax)+' · '+b.st);
-  for(const o of OB)ver(o.x,o.z,()=>OBRAS[o.tipo].nome+' · vida '+Math.round(o.hp)+'/'+(o.hpMax||OBRAS[o.tipo].hp)+(o.y!==undefined?' · altura '+(Math.round(o.y*10)/10):''));
-  for(const v of VEICS)ver(v.x,v.z,()=>{const p=v.pecas||{};return VTIPOS[v.tipo].nome+' · gasolina '+Math.round(v.comb)+'% · motor '+Math.round(p.motor??100)+'% · óleo '+Math.round(p.oleo??0)+'%'+(VTIPOS[v.tipo].bateria?' · bateria '+(p.bateria?'sim':'não'):'')+(VTIPOS[v.tipo].rotor?' · rotor '+(p.rotor||0)+'/2':'');});
-  return best?best()+' · '+bd.toFixed(1)+' m':'Nada na mira (até 9 m)';}
-HUDS.push(function criativoHud(){const i=$('ad-insp');if(!i)return;const on=ADM.ativo&&ADM.inspecionar&&G.modo==='jogo';i.hidden=!on;if(on)i.textContent=admAlvo()+' · x '+P.x.toFixed(1)+' z '+P.z.toFixed(1)+' y '+P.y.toFixed(1);});
 
 /* ---------- botões e teclas ---------- */
 {const m=$('m-criativo');if(m)m.addEventListener('click',()=>{sfx('clique');admEntrar();});

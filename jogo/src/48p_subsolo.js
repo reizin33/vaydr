@@ -326,7 +326,7 @@ function subDesenhar(Pg){if(!SUB_MALHAS)return;const cy=cam.pos[1],sub=P.y<SUB_F
     for(const c of SUB.caixas)if(d2(c.x,c.z,px,pz)<50*50)drawStat(Pg,/Armário|Prateleira/.test(c.nome)?MESH.subArmario:MESH.subCaixa,mat(c.x,Y_SUB,c.z,0,subYaw(c),0));
     for(const v of SUB.veios)if(!(D.veios[v.id]&&G.tm<D.veios[v.id])&&d2(v.x,v.z,px,pz)<50*50)drawStat(Pg,MESH.subVeio,mat(v.x,Y_SUB,v.z,0,subYaw(v),0));
     for(const l of SUB.lampadas)if((D.energia[l.e]||l.e==='lab')&&d2(l.x,l.z,px,pz)<50*50)drawStat(Pg,l.e==='lab'?MESH.subLampLab:MESH.subLamp,mat(l.x,l.y,l.z));}
-  if(cy>SUB_FUNDO)for(const e of SUB.entradas){if(e.tipo==='portal'||d2(e.sup[0],e.sup[1],cam.pos[0],cam.pos[2])>150*150)continue;const m=e.tipo==='caverna'?MESH.subCaverna:e.tipo==='mina'?MESH.subMina:e.id==='abrigo'?MESH.subAlcapaoMadeira:MESH.subAlcapao;
+  if(cy>SUB_FUNDO)for(const e of SUB.entradas){if(e.tipo==='portal'||d2(e.sup[0],e.sup[1],cam.pos[0],cam.pos[2])>150*150)continue;const m=e.tipo==='caverna'?(MESH.subCavernaBoca&&typeof entrPronta==='function'&&entrPronta()?MESH.subCavernaBoca:MESH.subCaverna):e.tipo==='mina'?MESH.subMina:e.id==='abrigo'?MESH.subAlcapaoMadeira:MESH.subAlcapao;
     drawStat(Pg,m,mat(e.sup[0],ground(e.sup[0],e.sup[1])-(e.tipo==='alcapao'?0.06:0.25),e.sup[1],0,e.sup[2],0));}}
 DESENHO.opaco.push(subDesenhar);
 DESENHO.sombra.push(Pg=>{if(!SUB_MALHAS||P.y>SUB_FUNDO)return;for(const M of SUB_MALHAS)if(subPerto(M,P.x,P.z,40))drawStat(Pg,M.m,ID);});
@@ -348,4 +348,4 @@ V8.salvar.subsolo=()=>G.sub;
 V8.carregar.subsolo=s=>{G.sub=s&&s.codigo?s:subNovo();const D=G.sub;for(const k of['abertas','docs','energia','visitou','caixas','veios','populou','salaVista'])D[k]=D[k]||{};
   for(const d of SUB.portas){d.aberta=!!D.abertas[d.id];subPortaColisor(d);}};
 /* o cartão militar: no armário do comandante, no alojamento norte da base (só na primeira vez) */
-INIT_MALHAS.push(()=>{const X=BASEM.x,Zc=BASEM.z;if(!INTER.some(i=>i.id==='base-comandante'))interAdd({id:'base-comandante',kind:'bau',x:X-3.5,z:Zc+6.7,label:'Revistar o armário do comandante',tabela:'comandante',respawn:5,primeiro:[['cartaoMilitar',1]]});});
+INIT_MALHAS.push(()=>{const X=BASEM.x,Zc=BASEM.z;if(!INTER.some(i=>i.id==='base-comandante'))interAdd({id:'base-comandante',kind:'bau',x:X-2.9,z:Zc+7.8,label:'Revistar o armário do comandante',tabela:'comandante',respawn:5,primeiro:[['cartaoMilitar',1]]});});

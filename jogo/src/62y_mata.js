@@ -48,11 +48,16 @@ etapaMalha('mata','mata',7,()=>{try{mataMontar();}catch(e){console.error('mata n
 /* as árvores de perto (redondas e bétulas) vão para a espécie de cada uma: de perto o LOD0, até o fim do "perto" o LOD1 */
 function mataDistribuir(){if(!MATAV.ok)return;const R0=(MATA_R0[cfg.graf]??22)**2,R1=(MATA_R1[cfg.graf]??60)**2,liga=mataLigada()&&mataProntas(),tmp=MATAV.tmp||(MATAV.tmp=new Float32Array(8));
   for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)p.m.n=0;MATAV.restoR.n=0;MATAV.restoB.n=0;if(MATAV.restoP)MATAV.restoP.n=0;MATAV.nExtra=0;
-  const poe=(e,d,a,o)=>{if(d>=R1){MATAV.extra.set(a.subarray(o,o+8),MATAV.nExtra*8);MATAV.nExtra++;return;}for(const p of e.lods[d<R0?0:1])copiarInst(p.m,a,o);};
+  /* tr >= 9 (marca do rebuildVeg e das árvores mortas, v10.2.2): só a madeira, sem folhas, e nunca a placa de longe (a foto tem folha) */
+  const poe=(e,d,a,o)=>{const sf=a[o+5]>=9;if(d>=R1&&!sf){MATAV.extra.set(a.subarray(o,o+8),MATAV.nExtra*8);MATAV.nExtra++;return;}
+    for(const p of e.lods[d<R0?0:1]){if(sf&&p.fol)continue;const n0=p.m.n;copiarInst(p.m,a,o);if(sf&&p.m.n>n0)p.m.arr[n0*8+5]-=10;}};
   for(const[src,re,ks]of[[MESH.roundN,MATAV.restoR,1],[MESH.birchN,MATAV.restoB,1],[MESH.pineN,MATAV.restoP,MATAV.kPinho]]){if(!src||!re)continue;const a=src.arr;
-    for(let i=0;i<src.n;i++){const o=i*8;if(!liga){copiarInst(re,a,o);continue;}
+    for(let i=0;i<src.n;i++){const o=i*8;if(!liga){if(a[o+5]>=9)continue;copiarInst(re,a,o);continue;}
       const e=MATAV.esp[mataEsp(a[o],a[o+2])],d=d2(a[o],a[o+2],P.x,P.z);
       if(ks!==1){for(let k=0;k<8;k++)tmp[k]=a[o+k];tmp[4]*=ks;poe(e,d,tmp,0);}else poe(e,d,a,o);}}
+  /* v10.2.2: árvores mortas de perto (eram um espeto de cilindro com três gravetos): a madeira da espécie, sem folha, cinza-clara */
+  if(liga&&MESH.deadN){const a=MESH.deadN.arr;for(let i=0;i<MESH.deadN.n;i++){const o=i*8;for(let k=0;k<8;k++)tmp[k]=a[o+k];const v=0.85+0.15*pinhoHash(a[o]-2.2,a[o+2]);
+      tmp[5]=10+0.68*v;tmp[6]=0.63*v;tmp[7]=0.58*v;poe(MATAV.esp[mataEsp(a[o],a[o+2])],d2(a[o],a[o+2],P.x,P.z),tmp,0);}}
   /* árvores de fruta dos quintais e dos sítios: a copa vira a ilha1 (copa redonda e cheia, como a de uma laranjeira, 4 m),
      com as frutas dentro da copa (as mais ralas deixavam as frutas soltas no ar) */
   if(liga&&MATAV.peq>=0&&typeof FRUTEIRAS!=='undefined'){const e=MATAV.esp[MATAV.peq];for(const F of FRUTEIRAS){const d=d2(F.x,F.z,P.x,P.z);if(d>R1*1.5)continue;
@@ -110,7 +115,8 @@ PASSOS.push(function mataFotos(){if(MATAV.longe||MATAV.erroFoto||!MATAV.ok||!mat
 /* desenho com luz: no lugar das redondas e bétulas de perto entram as espécies (madeira com o lado de trás escondido, folhas dos
    dois lados); de longe, as placas da própria espécie */
 {const _di=drawInst;drawInst=function(Pg,m){
-  if(Pg===PDI&&MATAV.sombraPerto&&(m===MESH.roundN||m===MESH.birchN||m===MESH.pineN))return;   // sombra de perto: quem faz é a árvore nova (mataSombra)
+  if(Pg===PDI&&MATAV.sombraPerto&&(m===MESH.roundN||m===MESH.birchN||m===MESH.pineN||m===MESH.deadN))return;
+  if(Pg===PLI&&m===MESH.deadN&&MATAV.ok&&mataLigada()&&mataProntas())return;   // a morta de perto já foi desenhada como madeira da espécie   // sombra de perto: quem faz é a árvore nova (mataSombra)
   if(Pg===PLI&&MATAV.ok&&(m===MESH.roundN||m===MESH.birchN||(m===MESH.pineN&&MATAV.restoP))){_di(Pg,m===MESH.roundN?MATAV.restoR:m===MESH.birchN?MATAV.restoB:MATAV.restoP);
     if(m===MESH.roundN&&mataLigada()&&mataProntas()){for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)if(!p.fol&&p.m.n)_di(Pg,p.m);
       const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)if(p.fol&&p.m.n)_di(Pg,p.m);if(cf)gl.enable(gl.CULL_FACE);}

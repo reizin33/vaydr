@@ -600,6 +600,12 @@ input[type=range]{width:100%;accent-color:var(--ember)}
 .det-tit{margin:0 -12px;padding:11px 12px 10px;background:var(--ember-deep);color:#fff7ee;font:800 15px/1.1 var(--f-ui);letter-spacing:.07em;text-transform:uppercase;overflow-wrap:anywhere}
 .det-ico{position:relative;display:grid;place-items:center;height:88px;border-radius:9px;background:rgba(0,0,0,.28);border:1px solid var(--edge)}
 .det-ico .ico{width:52px;height:52px}
+.ico3d{display:inline-block;background-position:center;background-size:contain;background-repeat:no-repeat;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.65))}
+.slot .ico3d{width:84%;height:84%}
+.slot:has(.q) .ico3d,.slot:has(.dur) .ico3d{width:70%;height:70%;margin-bottom:14%}
+.det-ico .ico3d{width:80px;height:80px}
+.tile>.ico3d{width:46px;height:46px}
+.req .ico3d{width:24px;height:24px}
 .det-ico small{position:absolute;left:8px;bottom:6px;font:700 10px/1 var(--f-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--ash)}
 .detalhe h4{margin:12px 0 0;font:800 17px/1.1 var(--f-ui)}
 .detalhe p{margin:0;font:600 13.5px/1.4 var(--f-ui);color:var(--ash)}
@@ -975,7 +981,6 @@ body.sem-cursor,body.sem-cursor *{cursor:none!important}
 .ad-linha .segs{min-width:150px}
 .ad-selo{display:none;position:fixed;top:6px;left:50%;transform:translateX(-50%);z-index:15;padding:3px 10px;border-radius:999px;background:#7a2f1c;color:#fff;font:700 11px/1.4 var(--f-ui);letter-spacing:.06em;text-transform:uppercase;pointer-events:none}
 body.criativo .ad-selo{display:block}
-.ad-insp{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:15;max-width:min(680px,92vw);padding:6px 12px;border-radius:8px;background:rgba(0,0,0,.62);color:#fff;font:600 12px/1.4 var(--f-ui);pointer-events:none;text-align:center}
 /* tela de carregamento (13/11/2026): a imagem aprovada pelo dono (carregamento_1920.png, um conceito). As medidas, as cores
    e os esfumados foram tirados dela (1920×1080) e andam com --k, que acompanha o tamanho da janela; os textos têm um
    tamanho mínimo para dar para ler */
@@ -1263,7 +1268,6 @@ body.criativo .ad-selo{display:block}
 <div class="prompt painel escondido" id="prompt" aria-hidden="true"><span class="anel" id="prompt-anel" hidden></span><kbd class="so-pc">E</kbd><svg class="ico so-celular" aria-hidden="true"><use href="#i-mao"/></svg><span id="prompt-t"></span><small id="prompt-s"></small></div>
 
 <div class="ad-selo" id="ad-selo" aria-hidden="true">Modo criativo</div>
-<div class="ad-insp" id="ad-insp" role="status" hidden></div>
 <div class="tela" id="t-titulo">
   <img class="cg-foto" id="cg-foto" src="__IMG_CARGA__" alt="" aria-hidden="true" decoding="async">
   <div class="cg-veu" aria-hidden="true"></div>

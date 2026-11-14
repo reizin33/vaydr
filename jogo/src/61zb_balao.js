@@ -32,7 +32,7 @@ INTER_K.balaoCesto={texto:()=>{const B=balD();
     if(B.gas<=1){if(!invCount('botijaoGas')){feed('Sem gás',true);sfx('vazio');return;}invRemove('botijaoGas',1);B.gas+=BALAO_GAS;feed('Botijão no maçarico');invRender();}
     balaoEntrar();}};
 function balaoEntrar(){const B=balD();if(P.escala)return;P.balao=true;P.agachado=false;P.vx=P.vz=0;P.vy=0;BV.calor=0;BV.vy=0;BV.queima=0;BV.vent=0;
-  P.x=B.x;P.z=B.z;P.y=B.y+0.32;sfx('pegar');feed('No cesto: Espaço acende o maçarico');}
+  P.x=B.x;P.z=B.z;P.y=B.y+0.08;sfx('pegar');feed('No cesto: Espaço acende o maçarico');}
 function balaoSair(){const B=balD();P.balao=false;const a=P.yaw+Math.PI/2;let x=B.x+Math.sin(a)*1.6,z=B.z+Math.cos(a)*1.6;if(pointBlocked(x,z,0.35)||!dentroMapa(x,z,1)){x=B.x-Math.sin(a)*1.6;z=B.z-Math.cos(a)*1.6;}
   P.x=x;P.z=z;P.y=chaoEm(x,z,B.y+1);P.vy=0;P.noChao=true;B.st='parado';sfx('clique');}
 /* Espaço e C (teclado, controle e toque passam por pular e agachar) */
@@ -55,7 +55,7 @@ function balaoPasso(dt){const B=balD();if(!P.alive){P.balao=false;return;}
     let nx=B.x+(v[0]+ex)*dt,nz=B.z+(v[1]+ez)*dt;
     if(!dentroMapa(nx,nz,10)){const dx=-nx,dz=-nz,dl=Math.hypot(dx,dz)||1;nx=B.x+dx/dl*2.2*dt;nz=B.z+dz/dl*2.2*dt;if(!dentroMapa(nx,nz,0)){nx=B.x;nz=B.z;}}
     B.x=nx;B.z=nz;if(alt>35)G.obsAte=Math.max(G.obsAte||0,G.t+4);}
-  P.x=B.x;P.z=B.z;P.y=B.y+0.32;P.vx=P.vz=0;P.vy=0;P.noChao=true;P.agachado=false;
+  P.x=B.x;P.z=B.z;P.y=B.y+0.08;P.vx=P.vz=0;P.vy=0;P.noChao=true;P.agachado=false;   // de pé no fundo do cesto (a borda na cintura)
   if(typeof sobreviver==='function')sobreviver(dt,false);
   const ch=P.ch;if(ch){ch.x=P.x;ch.z=P.z;ch.y=P.y;ch.yaw=P.yaw;}}
 /* desenho: envelope cheio (gomos coloridos), cesto, maçarico e cordas */
@@ -63,7 +63,13 @@ function geoBalaoVoo(){const g=new GB(1<<14,8),R=rng(2219),cores=[0xc8302a,0xe8b
   const pt=(i,j)=>{const a=i/N*Math.PI*2,t=j/M,r=t<0.08?lerp(0.9,2.2,t/0.08):Rm*Math.sin(Math.PI*Math.min(1,0.2+t*0.85))*(t>0.5?1:0.75+0.5*t),y=base+t*H;return[Math.cos(a)*r,y,Math.sin(a)*r];};
   for(let i=0;i<N;i++){const T=[];for(let j=0;j<M;j++){const a=pt(i,j),b=pt(i,j+1),c=pt(i+1,j+1),d=pt(i+1,j);T.push([a,c,b],[a,d,c]);}add(g,T,ID,cores[i%cores.length],{j:0.04,rnd:R});}
   add(g,cylTris(0.01,1.2,0.25,12),mat(0,base+H-0.05,0),lin(0xe8e4dc));
-  add(g,bvTris(1.25,1.05,1.25),mat(0,0.52,0),lin(0x8a6a3a),{j:0.08,rnd:R});for(let i=0;i<5;i++)add(g,boxTris(1.27,0.03,1.27),mat(0,0.12+i*0.2,0),lin(0x6a4a2a));
+  /* v10.2.2 ("jogador em pé no balão"): o cesto era uma caixa maciça e a pessoa aparecia em cima dela ou cortada na tampa. Agora o
+     cesto é oco, de vime: fundo, quatro paredes, faixas trançadas por fora e a borda de couro na altura da cintura; a pessoa fica dentro */
+  {const vime=lin(0x8a6a3a),trama=lin(0x6a4a2a),couro=lin(0x3e2a1a),W=1.25,Hc=1.05,e=0.05;
+    add(g,boxTris(W,0.08,W),mat(0,0.04,0),trama,{j:0.05,rnd:R});
+    for(const s of[-1,1]){add(g,boxTris(W,Hc,e),mat(0,Hc/2,s*(W/2-e/2)),vime,{j:0.06,rnd:R});add(g,boxTris(e,Hc,W-2*e),mat(s*(W/2-e/2),Hc/2,0),vime,{j:0.06,rnd:R});}
+    for(let i=0;i<5;i++){const y=0.12+i*0.2;for(const s of[-1,1]){add(g,boxTris(W+0.02,0.03,0.02),mat(0,y,s*(W/2+0.005)),trama);add(g,boxTris(0.02,0.03,W+0.02),mat(s*(W/2+0.005),y,0),trama);}}
+    for(const s of[-1,1]){add(g,boxTris(W+0.06,0.07,0.09),mat(0,Hc+0.02,s*(W/2)),couro,{j:0.05,rnd:R});add(g,boxTris(0.09,0.07,W+0.06),mat(s*(W/2),Hc+0.02,0),couro,{j:0.05,rnd:R});}}
   for(const[sx,sz]of[[1,1],[1,-1],[-1,1],[-1,-1]]){add(g,cylTris(0.02,0.02,2.3,4),alignY(sx*0.6,1.0,sz*0.6,-sx*0.35,2.2,-sz*0.35),lin(0x55595c));add(g,cylTris(0.012,0.012,2.4,4),alignY(sx*0.55,3.0,sz*0.55,sx*0.9,2.2,sz*0.9),lin(0xc8b890));}
   add(g,cylTris(0.22,0.18,0.35,10),mat(0,2.85,0),lin(0x3a3d40));for(const s of[-0.4,0.4])add(g,cylTris(0.15,0.15,0.55,10),mat(s,0.06,0.35),lin(0xc8c8c0));
   return litMesh(g.data());}

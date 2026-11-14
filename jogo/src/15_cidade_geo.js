@@ -11,8 +11,9 @@ function geoPredio(p,longe){const g=new GB(1<<15,8),R=rng(500+p.id*13);
       for(let i=0;i<nf;i++){const t=Math.pow(Rh(),1.6),yy=h.y0+t*h.h,ss=h.s+(Rh()-0.5)*h.w*(1-0.55*t),d=0.03+Rh()*0.05,sz=0.11+Rh()*0.1;
         const fx=h.eixo==='u'?ss:h.k+h.fora*d,fz=h.eixo==='u'?h.k+h.fora*d:ss;
         add(g,boxTris(sz,sz*0.85,0.025),mat(fx,yy,fz,(Rh()-0.5)*0.8,(h.eixo==='u'?0:Math.PI/2)+(Rh()-0.5)*0.9,(Rh()-0.5)*1.2),mixc(lin(0x2f5222),lin(0x4f7330),Rh()),{j:0.12,rnd:Rh});}}}
-  if(!longe){
+  if(!longe){p.props3d=[];   // v10.2.2: móveis e armários com modelo de verdade (62yf_props.js) ficam fora desta malha
     for(const m of CID.moveis){if(m.p!==p)continue;const w=m.u1-m.u0,d=m.v1-m.v0,cu=(m.u0+m.u1)/2,cv=(m.v0+m.v1)/2,b=m.s.escura;
+      if(prpMovel(p,m,b,g,R))continue;
       if(m.k==='cama'){add(g,bvTris(w,0.3,d),mat(cu,m.y+0.15,cv),lin(m.c1),{b});add(g,bvTris(w-0.1,0.18,d-0.1),mat(cu,m.y+0.39,cv),lin(m.c2),{b,j:0.05,rnd:R});add(g,bvTris(w-0.2,0.12,0.4),mat(cu,m.y+0.52,m.v0+0.3),lin(0xe8e2d4),{b});}
       else if(m.k==='sofa'){add(g,bvTris(w,0.45,d),mat(cu,m.y+0.22,cv),lin(m.c1),{b,j:0.05,rnd:R});add(g,bvTris(w,0.45,0.2),mat(cu,m.y+0.65,m.v1-0.1),lin(m.c2),{b});}
       else if(m.k==='mesa'||m.k==='bancada'){add(g,bvTris(w,0.06,d),mat(cu,m.y+m.h-0.03,cv),lin(m.c1),{b,j:0.04,rnd:R});for(const su of[-1,1])for(const sv of[-1,1])add(g,bvTris(0.06,m.h-0.06,0.06),mat(cu+su*(w/2-0.06),m.y+(m.h-0.06)/2,cv+sv*(d/2-0.06)),lin(m.c2),{b});}
@@ -25,6 +26,7 @@ function geoPredio(p,longe){const g=new GB(1<<15,8),R=rng(500+p.id*13);
         for(const su of[-0.5,0.5])add(g,bvTris(0.06,2.0,0.06),mat(cu+su,m.y+1.05,cv+d*0.38),lin(0x2b2b2b),{b});for(const su of[-0.45,0.45])add(g,bvTris(0.1,2.1,0.1),mat(cu+su,m.y+1.05,cv-d*0.3),lin(0x3a3d40),{b});
         for(const su of[-0.25,0.25])add(g,bvTris(0.12,0.05,0.9),mat(cu+su,m.y+0.1,cv-d*0.5),lin(0x55595c),{b});for(const sv of[-0.6,0.6])for(const su of[-0.55,0.55])add(g,cylTris(0.2,0.2,0.18,8),mat(cu+su,m.y+0.2,cv+sv*d*0.5,0,0,Math.PI/2),lin(0x181818),{b});}}
     for(const c of CID.conts){if(c.p!==p||c.oculto)continue;const D=CONT_DEF[c.tipo];if(!D)continue;const b=c.sala?c.sala.escura:0.6,M=mat(c.u,c.y,c.v,0,c.yawL,0);
+      if(prpCont(p,c,b,g,R))continue;
       add(g,bvTris(D.hw*2,D.h,D.hd*2),mm(M,mat(0,D.h/2,0)),lin(D.cor),{b,j:0.05,rnd:R});
       if(c.tipo==='geladeira'||c.tipo==='armario'||c.tipo==='guardaRoupa'||c.tipo==='armarioMed')add(g,bvTris(0.03,0.25,0.03),mm(M,mat(D.hw*0.6,D.h*0.55,D.hd+0.02)),lin(0x9aa1a6),{b});
       if(c.tipo==='gaveta'||c.tipo==='arquivo')for(let i=0;i<3;i++)add(g,bvTris(D.hw*1.7,0.02,0.02),mm(M,mat(0,D.h*(0.25+i*0.28),D.hd+0.01)),lin(0x55595c),{b});
@@ -143,8 +145,8 @@ function geoCidadeChao(){const g=new GB(1<<15,8),R=rng(8080),asf=lin(0x3a3a38),a
     if(lt==='estacionamento')for(let x=L.x0+2;x<L.x1-2;x+=2.8)for(const zz of[L.z0+3,L.z1-3])add(g,boxTris(0.1,0.014,4.6),mat(x,QUADRA_Y+0.008,zz),lin(0xc9c6b5));}
   return g.data();}
 /* objetos de rua: carros, ônibus, barreiras, entulho, postes, bancos e lixeiras */
-function geoCidadeProps(){const g=new GB(1<<15,8),R=rng(9191);
-  for(const o of CID.props){const y=quadraEm(o.x,o.z)?QUADRA_Y:0;
+function geoCidadeProps(){const g=new GB(1<<15,8),R=rng(9191);PRP.rua.length=0;
+  for(const o of CID.props){if(prpRua(o))continue;const y=quadraEm(o.x,o.z)?QUADRA_Y:0;   // v10.2.2: o que virou modelo de verdade é desenhado pelo 62yf_props.js
     if(o.k==='carro')carroGeo(g,o.x,o.z,o.yaw,o.cor,R,o.aberto,y);
     else if(o.k==='onibus'){const b=mat(o.x,y,o.z,0,o.yaw,0);add(g,bvTris(2.6,2.6,11.6),mm(b,mat(0,1.55,0)),lin(0xc9a227),{j:0.04,rnd:R});add(g,bvTris(2.65,0.9,10.6),mm(b,mat(0,2.1,0.2)),lin(0x1c2830));
       add(g,bvTris(2.62,0.25,11.62),mm(b,mat(0,0.4,0)),lin(0x55595c));for(const wz of[3.6,-3.8])for(const wx of[1.2,-1.2])add(g,cylTris(0.5,0.5,0.3,10),mm(b,mat(wx+0.15*Math.sign(wx),0.5,wz,0,0,Math.PI/2)),lin(0x181818));}
@@ -220,7 +222,7 @@ function desenharCidade(Pg,sombra,alc){if(!CID.predios.length)return;const cx=ca
   // de longe só a silhueta dos prédios altos (a cidade é reconhecível da estrada e da mata)
   if(dc>160){if((sombra&&dc>alc+60)||dc>460)return;if(sombra){for(const p of CID.predios){if(p.andares<3||p.rural)continue;trs(TMP,p.ox,0,p.oz,0,p.yaw,0,1,1,1);drawStat(Pg,p.mLonge,TMP);}return;}for(const p of CID.predios){if(p.andares<4||p.rural)continue;trs(TMP,p.ox,0,p.oz,0,p.yaw,0,1,1,1);drawStat(Pg,p.mLonge,TMP);}return;}
   for(const p of CID.predios){if(p.rural)continue;const px=clamp(cx,p.x0,p.x1),pz=clamp(cz,p.z0,p.z1),d=Math.hypot(cx-px,cz-pz);if(sombra&&d>alc)continue;
-    trs(TMP,p.ox,0,p.oz,0,p.yaw,0,1,1,1);drawStat(Pg,sombra||d>GF().cidLod?p.mLonge:p.mPerto,TMP);}
+    trs(TMP,p.ox,0,p.oz,0,p.yaw,0,1,1,1);const perto=!sombra&&d<=GF().cidLod;drawStat(Pg,perto?p.mPerto:p.mLonge,TMP);if(perto&&p.props3d)prpPredio(Pg,p,TMP);}
   if(sombra){drawStat(Pg,MESH.cidProps,ID);return;}
   drawStat(Pg,MESH.cidChao,ID);drawStat(Pg,MESH.cidProps,ID);for(const pa of CID.passarelas)drawStat(Pg,pa.quebrada?pa.mQuebrada:pa.mInteira,ID);
   if(cam.pos[1]<-0.5||CID.metro.bocas.some(b=>Math.hypot(cx-b.x0,cz-b.z1)<45))drawStat(Pg,MESH.metro,ID);

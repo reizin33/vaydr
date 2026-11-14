@@ -144,15 +144,17 @@ function updatePlayer(dt){const ch=P.ch;
   if(P.rola){updateRola(dt);P.cd-=dt;sobreviver(dt,true);return;}
   let mx=IN.mx,mz=IN.mz;const ml=Math.hypot(mx,mz);if(ml>1){mx/=ml;mz/=ml;}
   {const esf=P.acao&&P.acao.tipo==='revistar'&&P.acao.alvo&&P.acao.alvo.k==='carcaca';P.agK=approach(P.agK||0,P.agachado||esf?1:0,dt*5);}   // esfolando: agacha junto do bicho
-  const moving=ml>0.15,running=IN.run&&moving&&P.energia>3&&mz>-0.2&&!P.agachado&&!pernaRuim();
+  const moving=ml>0.15,running=IN.run&&moving&&P.energia>3&&mz>-0.2&&!P.agachado&&!pernaRuim()&&!P.voo;
   let spd=running?6.2*(1+0.08*perk('corrida')):(P.agachado?1.9:3.7);if(P.acao&&(P.acao.tipo==='usar'||P.acao.tipo==='revistar'||P.acao.tipo==='recarga'))spd*=0.45;if(P.fome<=0||P.sede<=0)spd*=0.8;if(P.aim>0.5)spd*=0.6;if(P.acao&&P.acao.tipo==='arco')spd*=0.85;if(naAgua(P.x,P.y,P.z))spd*=0.55;spd*=lesaoVel()*sonoVel()*(P.lentoMata||1);
+  if(P.voo)spd=IN.run?34:13;   // voando no modo criativo (v10.2.2): 13 m/s, com Shift 34 m/s (antes era o passo de andar, 3,7 m/s)
   if(P.travaAnda>0){P.travaAnda-=dt;mx=mz=0;}const px0=P.x,pz0=P.z;
   const sy=Math.sin(P.yaw),cy=Math.cos(P.yaw);const dx=sy*mz-cy*mx,dz=cy*mz+sy*mx;
-  const k=1-Math.exp(-dt*(moving?(running?8:11):13));P.vx+=(dx*spd-P.vx)*k;P.vz+=(dz*spd-P.vz)*k;P.runK=approach(P.runK||0,running&&Math.hypot(P.vx,P.vz)>4?1:0,dt*2.5);P.correndo=running&&Math.hypot(P.vx,P.vz)>3;
+  const k=1-Math.exp(-dt*(P.voo?3.5:moving?(running?8:11):13));P.vx+=(dx*spd-P.vx)*k;P.vz+=(dz*spd-P.vz)*k;P.runK=approach(P.runK||0,running&&Math.hypot(P.vx,P.vz)>4?1:0,dt*2.5);P.correndo=running&&Math.hypot(P.vx,P.vz)>3;
   {const ox=P.x,oz=P.z;P.x+=P.vx*dt;P.z+=P.vz*dt;
     /* beirada: andando no alto, não despenca sem querer (correndo ou pulando dá para saltar) */
     if(P.noChao&&!running&&P.y-ground(ox,oz)>2.2&&chaoEm(P.x,P.z,P.y)<P.y-1.2){P.x=ox;P.z=oz;P.vx*=0.2;P.vz*=0.2;dica('beirada','corpo','Beirada! Andando você não cai. Para saltar daqui, corra ou pule.');}}
-  {const x0=P.x,z0=P.z;collide(P,0.3,c=>!c.portao);const px=P.x-x0,pz=P.z-z0,pl=Math.hypot(px,pz);
+  {const x0=P.x,z0=P.z,alto=P.voo&&P.y-ground(P.x,P.z)>2.4;collide(P,0.3,c=>!c.portao&&!(alto&&(c.tree||c.rock||c.brenha||c.gigante)));   // voando acima das moitas: passa por cima de árvore e pedra (o tronco não vira parede invisível até o céu)
+   const px=P.x-x0,pz=P.z-z0,pl=Math.hypot(px,pz);
     if(pl>1e-5){const nx=px/pl,nz=pz/pl,vn=P.vx*nx+P.vz*nz;if(vn<0){P.vx-=vn*nx;P.vz-=vn*nz;}}}
   if(!dentroMapa(P.x,P.z)&&!(P.y<-20&&salaSubEm(P.x,P.y+0.3,P.z))){voltarMapa(P,px0,pz0);P.vx*=0.3;P.vz*=0.3;if(G.t-G.limiteT>6){G.limiteT=G.t;toast('corpo',P.x>150?'Destroços e mato fechado bloqueiam a passagem por aqui.':'A mata é fechada demais por aqui. Volte para a clareira.');}}
   fisicaVertical(dt);
@@ -263,6 +265,7 @@ function golpeAcerta(a){const s=a.arma,d=s?ITEMS[s.id]:a.pedra?BALANCO.brancas.p
   if(s&&d.minera){const r=perto(ROCKS,P.x+fx*1.0,P.z+fz*1.0,1.2+1.2,r=>r.alive&&Math.hypot(r.x-P.x,r.z-P.z)<2.4+r.s*0.8);
     if(r){r.hp--;ganhar('pedra',2);if(Math.random()<(r.serra?0.5:0.1))ganhar('minerioFerro',1);lascas(r.x,r.y+r.s*0.6,r.z,[0.5,0.5,0.47,1]);sfx('pedra',r.x,r.z);barulho(P.x,P.z,12,true);gastar(s,1);
       if(r.hp<=0){r.alive=false;colRemove(COLL.find(c=>c.rock===r)||{});poeira(r.x,r.y+0.5,r.z,12);vegDirty=true;ganharXP(6);progresso('rocha');}return;}}
+  if(s&&d.minera&&typeof minerarExtra==='function'&&minerarExtra(s,fx,fz))return;   // v10.2.2: parede e chão de pedra da gruta (62x_serra.js)
   if(s&&d.corta){const r=perto(ROCKS,P.x+fx,P.z+fz,2.0,r=>r.alive);if(r)dica('picareta','corpo','O machado não quebra rocha. Faça uma picareta: 2 pedras, 2 gravetos e 3 fibras.');}}
 function derrubarArvore(t){t.alive=false;colRemove(COLL.find(c=>c.tree===t)||{});ganhar('madeira',Math.max(2,Math.round(1.5*(t.s||1))));poeira(t.x,t.y+2,t.z,14);vegDirty=true;ganharXP(8);progresso('arvore');
   dica('tabuas','corpo','Transforme madeira em tábuas na bancada (aba Fabricar): a da clareira ou uma que você construir (B → Bancada de trabalho). Tábuas constroem e consertam defesas.');}

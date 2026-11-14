@@ -169,7 +169,7 @@ for(int i=0;i<4;i++){if(i>=uNPL)break;vec3 lv=uPL[i].xyz-p;float d=length(lv);fl
 L+=uPC[i]*max(dot(n,lv/d),0.0)*pow(clamp(1.0-pow(d/r,4.0),0.0,1.0),2.0)/(d*d+1.0);}}
 if(uSpotC.r>0.0){vec3 ls=uSpotP-p;float ds=length(ls);vec3 ln=ls/max(ds,0.001);
 float cone=smoothstep(uSpotK.x,uSpotK.y,dot(-ln,uSpotD));
-L+=uSpotC*cone*max(dot(n,ln),0.0)*pow(clamp(1.0-pow(ds/uSpotR,4.0),0.0,1.0),2.0)/(ds*ds*0.11+4.5);}
+L+=uSpotC*cone*max(dot(n,ln),0.0)*pow(clamp(1.0-pow(ds/uSpotR,4.0),0.0,1.0),2.0)/(ds*ds*0.0194+3.07);}   /* v10.2.2: alcança longe (a 20 m ainda 30% da luz de perto) */
 return L;}
 vec4 acabar(vec3 c,vec3 p,float e){vec3 dv=p-uCam;float d=length(dv);vec3 v=dv/max(d,0.001);
 float f=1.0-exp(-pow(uFogD*d,2.0));
