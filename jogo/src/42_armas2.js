@@ -201,7 +201,8 @@ function desenharArco1P(Pg,CWm){if(!MESH.flecha)arma2Mesh();const a=P.acao&&P.ac
   const T1=xf(_M1,0,0.15,0.62),T2=xf(_M1,0,0.15,-0.62),tem=a||invCount('flecha')>0,cauda=[px+0.03,py-0.012,pz+lerp(0.15,0.78,e)];
   const nock=tem?cauda:xf(_M1,0,0.15,0),w=v=>xf(CWm,v[0],v[1],v[2]);
   drawStat(Pg,MESH.corda,matSeg(_M2,w(T1),w(nock),0.0022));drawStat(Pg,MESH.corda,matSeg(_M2,w(nock),w(T2),0.0022));
-  if(tem)drawStat(Pg,MESH.flecha,matDir(_M2,w(cauda),cam.fwd[0],cam.fwd[1],cam.fwd[2]));}
+  if(tem)drawStat(Pg,MESH.flecha,matDir(_M2,w(cauda),cam.fwd[0],cam.fwd[1],cam.fwd[2]));
+  if(typeof bracoEsqFP==='function')bracoEsqFP(Pg,CWm,[px,py,pz],[-s,c,0],1);}   // 14/11: a mão esquerda fechada na empunhadura
 /* brilho das chamas e o arco do arremesso (billboards somando luz) */
 function bbArmas2(){const n=E.n||0;
   for(const f of FLECHAS)if(f.voa)for(let k=1;k<=4;k++)bb(f.x-f.vx*0.012*k,f.y-f.vy*0.012*k,f.z-f.vz*0.012*k,0.022,1,0.95,0.85,0.22*(1-k/5));   // rastro da flecha
