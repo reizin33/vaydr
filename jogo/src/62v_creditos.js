@@ -18,7 +18,9 @@ const CREDITOS=[
     {obra:'Abandoned soviet military body-van KUNG',autor:'Mikhail Volkov',link:'sketchfab.com/3d-models/abandoned-soviet-military-body-van-kung-ed8dd9fe963347b1bedf3a46fc3aa42c',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
     {obra:'Abandoned Garage Block Rusty Ruined Game-Ready',autor:'olegolegperepelica',link:'sketchfab.com/3d-models/abandoned-garage-block-rusty-ruined-game-ready-a1959927a98e4752bdb01b6e1f7f7d26',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
     {obra:'Sandbag Barrier (Ready for Unreal Engine)',autor:'G4AGamingLabs',link:'sketchfab.com/3d-models/sandbag-barrier-ready-for-unreal-engine-593800671c8e45eca93b8b7c765c0f77',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
-    {obra:'Ruin Building',autor:'nermin',link:'sketchfab.com/3d-models/ruin-building-184d70cc473540749206cc7d8f9917b8',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'}]},
+    {obra:'Ruin Building',autor:'nermin',link:'sketchfab.com/3d-models/ruin-building-184d70cc473540749206cc7d8f9917b8',lic:'CC BY 4.0',licLink:'creativecommons.org/licenses/by/4.0',mod:'simplificado e convertido para o jogo'},
+    /* v10.2.2 · etapa 4: as peças das fachadas e dos telhados da cidade (o download não traz texto de licença, só os links do autor) */
+    {obra:'Post Apocalypse Kitbash (versão gratuita)',autor:'Oleg Ushenok',link:'artstation.com/olegushenok',lic:'versão gratuita distribuída pelo autor',mod:'peças simplificadas e montadas nas fachadas e nos telhados da cidade'}]},
   {tit:'Personagem',itens:[
     {obra:'Corpos, peles, olhos, sobrancelhas, cabelos, barbas, roupas e sapatos do Personalizado, e o braço da 1ª pessoa',autor:'MakeHuman',link:'makehumancommunity.org',lic:'CC0',mod:'ajustado ao esqueleto do jogo'}]},
   {tit:'Texturas e modelos',itens:[
