@@ -63,7 +63,7 @@ function rotulosTeclas(){const k=id=>nomeTecla(teclaDe(id)),el=$('teclas');
   for(const[sel,id]of[['#o-girar kbd','recarregar'],['#o-sair kbd','construir'],['#o-consertar kbd','consertarTudo'],['#prompt kbd','usar'],['#mapa-x kbd','mapa']]){const e=document.querySelector(sel);if(e)e.textContent=k(id);}}
 const PAD_AJUDA=[['Analógico esquerdo','andar (aperte: correr)'],['Analógico direito','olhar (aperte: 1ª/3ª pessoa)'],['A','pular e subir'],['B','agachar · correndo, rolar'],
   ['X','usar · segure: revistar'],['Y','trocar de arma'],['RT','atacar'],['LT','mirar'],['LB','empurrar · no carro: buzina'],['RB','recarregar'],['↑','lanterna'],['↓','construir'],
-  ['← →','item da mão'],['Select','mochila · segure: mapa'],['Start','pausa'],['Construindo','← → peça · LB aba · RB gira · RT constrói · Y conserta tudo · B sai'],
+  ['← →','item da mão'],['Select','mochila · segure: mapa'],['Start','pausa'],['Construindo','← → peça · LB aba (segure: roda de peças) · RB gira · RT constrói · Y conserta tudo · B sai'],
   ['Nos menus','direcional escolhe · A aperta · B volta · LB e RB trocam a aba · analógico direito rola']];
 function abrirTeclas(){capturaTecla=null;teclasMsg='';tela('t-teclas');teclasRender();}
 function teclasRender(){const el=$('tk-lista');if(!el)return;let h='';

@@ -209,8 +209,8 @@ function clearingProps(C,N,R){const fx=FIRE[0],fz=FIRE[2],y=FIRE[1];
     add(Cb,cylTris(0.28,0.28,0.02,10),mm(b,mat(0,0.92,0)),lin(0x23435a));colCircle(x,z,0.36);
     interAdd({id:'barril',kind:'agua',x,z:z+0.9,label:'Barril de água',sub:'beber ou encher garrafas'});}
   // lenha
-  {const x=-2.9,z=-4.6,g=ground(x,z),base=mat(x,g,z,0,0.25,0),rows=[5,4,3];
-    for(let r=0;r<3;r++)for(let i=0;i<rows[r];i++)add(C,cylTris(0.11,0.11,0.8,7),mm(base,mat((i-(rows[r]-1)/2)*0.235,0.11+r*0.2,-0.4,Math.PI/2,0,0)),mixc(lin(0x6b4a2e),lin(0x7d5835),R()),{j:0.1,rnd:R});
+  {const x=-2.9,z=-4.6,g=ground(x,z),base=mat(x,g,z,0,0.25,0),rows=[5,4,3],Cw=prpAcamp('lenha',{x,y:g,z,yaw:0.25})?D:C;
+    for(let r=0;r<3;r++)for(let i=0;i<rows[r];i++)add(Cw,cylTris(0.11,0.11,0.8,7),mm(base,mat((i-(rows[r]-1)/2)*0.235,0.11+r*0.2,-0.4,Math.PI/2,0,0)),mixc(lin(0x6b4a2e),lin(0x7d5835),R()),{j:0.1,rnd:R});
     colBox(x,z,0.65,0.45,0.25);}
   // poste com lampião
   {const x=5.6,z=-4.2,g=ground(x,z),b=mat(x,g,z),lp=prpAcamp('lampiao',{x,y:g,z}),Cl=lp?D:C,yl=lp?1.775:1.83,kl=lp?0.42:1;add(C,cylTris(0.055,0.07,2.15,6),b,lin(0x4a3424));

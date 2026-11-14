@@ -49,7 +49,7 @@ MODELOS = {
     'carroCoberto': ('covered_car', 4000, 1024), 'barreiraConcreto': ('concrete_road_barrier_02', 1500, 1024),
     # acampamento do jogador (clareira)
     'fogueiraPedras': ('stone_fire_pit', 3000, 1024), 'lampiao': ('Lantern_01', 1500, 512, r'^Lantern_01$'), 'troncoCaido': ('dead_tree_trunk_02', 2500, 1024),
-    'tambor2': ('Barrel_02', 1500, 512), 'galaoVerde': ('metal_jerrycan_green', 1500, 512), 'tocoCorte': ('tree_stump_01', 2500, 1024),
+    'tambor2': ('Barrel_02', 1500, 512), 'galaoVerde': ('metal_jerrycan_green', 1500, 512), 'tocoCorte': ('tree_stump_01', 2500, 1024), 'tocoCorte2': ('tree_stump_02', 2500, 1024), 'troncoReto': ('dead_tree_trunk', 2500, 1024),
 }
 
 def acha(m):
