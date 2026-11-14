@@ -231,8 +231,9 @@ async function fumaca() {
   await foto(SMOKE === '1' ? '0-carregando' : '0-carregando-reaberto');
   passo('tela de carregamento', { ok: carga, pct: await js('Math.round((window.__cargaPct||0)*100)'), etapa: await js("String(window.__cargaEtapa||'')"),
     status: await js("(document.getElementById('cg-status')||{}).textContent||''"), dica: await js("(document.getElementById('cg-dica')||{}).textContent||''") });
-  /* 10.2.2: com os modelos de verdade (objetos, base militar, personagem do MakeHuman, peças da cidade) a montagem no Windows da
-     nuvem, que desenha por software, passou de ~2,7 para ~5,5 minutos: o menu pode levar até 7 minutos lá */
+  /* 10.2.2: na primeira tentativa o menu passou do limite de 3 minutos no Windows da nuvem (na segunda saiu em 2,6): lá o jogo
+     desenha por software e o tempo varia de uma máquina para outra; com os modelos de verdade (objetos, base militar,
+     personagem do MakeHuman) a montagem também cresceu. O menu pode levar até 7 minutos lá */
   const menu = await esperar("!!document.getElementById('t-menu')&&!document.getElementById('t-menu').hidden&&typeof __nnc!=='undefined'", 420000);
   menuVisto = true; rel.videoCarga = await video;
   await dormir(2500);
