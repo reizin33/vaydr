@@ -10,6 +10,8 @@ do MakeHuman. Cabelo "Curto grisalho" (o curto castanho recolorido) para o Sobre
 - Pele (pesos): os do MakeHuman (default_weights.mhw, 163 ossos) somados nos 22 ossos; as peças herdam os pesos do corpo
   pelo próprio encaixe (cada vértice da peça é a mistura de 3 vértices do corpo base).
 - Peças que cobrem o corpo escondem os triângulos que ficam por baixo (delete_verts do MakeHuman), para a pele não furar.
+- Roupas do jogo em 3D (ROUPAS3D): a camiseta, as camisas, o colete, os casacos, as calças, a bermuda e as botas são partes das roupas
+  prontas do MakeHuman, tingidas na cor da peça do jogo (as cascas sobre o corpo marcavam o corpo).
 - Vértice de 28 bytes como o do sobrevivente: posição f32×3, normal i8×3, UV u16×2, ossos u8×4, pesos u8×4.
 Saída: src/21m_mh_dados.js (const MHP). Uso:
   python3 -I tools/mh_personagem.py DATA_MH sistema.zip partes.zip pasta_fbx saida.js [so_homem]"""
@@ -64,6 +66,21 @@ PECAS += [('cilios_h', 'Cílios', 'cilios', ['homem'], 'S', 'eyelashes/eyelashes
 OLHOS = [('castanho', 'Castanhos', 'brown'), ('castanho_claro', 'Castanhos claros', 'brownlight'), ('verde', 'Verdes', 'green'),
          ('azul', 'Azuis', 'blue'), ('azul_escuro', 'Azuis escuros', 'deepblue'), ('cinza', 'Cinzentos', 'grey'), ('azul_verde', 'Azul-esverdeados', 'bluegreen')]
 # peças recoloridas a partir de outra (a mesma malha e a textura mudada)
+# roupas do jogo em 3D (14/11): cada peça do jogo é a parte de cima ou de baixo de uma roupa pronta do MakeHuman (CC0; no .obj elas
+# são malhas separadas), tingida na cor da peça do jogo. extra: sem_manga (tira as mangas: colete), corte (bermuda: corta a calça
+# tantos metros acima do joelho)
+ROUPAS3D = [  # (peça do jogo, nome, {corpo: (roupa do MakeHuman, parte)}, cor, extra)
+    ('camiseta', 'Camiseta', {'homem': ('male_casualsuit06', 'cima'), 'mulher': ('female_casualsuit01', 'cima')}, 0x7c8590, {}),
+    ('camisaLeve', 'Camisa leve', {'homem': ('male_casualsuit02', 'cima'), 'mulher': ('female_elegantsuit01', 'cima')}, 0x2f3742, {}),
+    ('camisaCouro', 'Camisa de couro', {'homem': ('male_casualsuit02', 'cima'), 'mulher': ('female_elegantsuit01', 'cima')}, 0x8a5a36, {}),
+    ('colete', 'Colete', {'homem': ('male_casualsuit05', 'cima'), 'mulher': ('male_casualsuit05', 'cima')}, 0x3d4430, {'sem_manga': True}),
+    ('casacoPele', 'Casaco de pele', {'homem': ('male_casualsuit05', 'cima'), 'mulher': ('male_casualsuit05', 'cima')}, 0x7a5638, {}),
+    ('casacoGrande', 'Casaco grande', {'homem': ('male_casualsuit05', 'cima'), 'mulher': ('male_casualsuit05', 'cima')}, 0x6c4b2f, {}),
+    ('calcaCouro', 'Calça de couro', {'homem': ('male_casualsuit06', 'baixo'), 'mulher': ('female_casualsuit01', 'baixo')}, 0x6b4a30, {}),
+    ('calcaCargo', 'Calça cargo', {'homem': ('male_casualsuit06', 'baixo'), 'mulher': ('female_casualsuit01', 'baixo')}, 0x5b5a43, {}),
+    ('bermuda', 'Bermuda simples', {'homem': ('male_casualsuit06', 'baixo'), 'mulher': ('female_casualsuit01', 'baixo')}, 0x5a6470, {'corte': 0.06}),
+    ('botasCouro', 'Botas de couro', {'homem': ('shoes03', 'tudo'), 'mulher': ('shoes03', 'tudo')}, 0x5a3a24, {}),
+    ('botasTrilha', 'Botas de trilha', {'homem': ('shoes03', 'tudo'), 'mulher': ('shoes03', 'tudo')}, 0x4a3b2c, {})]
 def grisalho(im):
     """cabelo grisalho: o tom vira cinza claro, os fios escuros continuam mais escuros (sal e pimenta)"""
     a = np.asarray(im.convert('RGBA'), float) / 255; L = a[..., :3] @ [0.3, 0.59, 0.11]
@@ -291,6 +308,46 @@ def vestir_baixo(im, masc, cor):
     pano = np.array(cor, float) * luz * (1 - 0.3 * E[..., None])
     out = a * (1 - m) + pano * m
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+def encaixar(z, pasta, P, miny):
+    """a roupa do MakeHuman no corpo: posições (Q, no corpo parado, em metros), pesos dos 22 ossos, triângulos, UVs e o .mhclo"""
+    mh = [n for n in z.namelist() if n.startswith(pasta + '/') and n.endswith('.mhclo')]
+    if not mh: return None
+    obj, mat, esc, ref, dele = ler_mhclo(zler(z, mh[0]))
+    Pd = P * 10.0 + np.array([0, miny * 10, 0])
+    s3 = [abs(Pd[e[0], n] - Pd[e[1], n]) / e[2] if e else 1.0 for n, e in enumerate(esc)]
+    v1, v2, v3 = ref[:, 0].astype(int), ref[:, 1].astype(int), ref[:, 2].astype(int)
+    Q = (ref[:, 3:4] * Pd[v1] + ref[:, 4:5] * Pd[v2] + ref[:, 5:6] * Pd[v3] + ref[:, 6:9] * np.array(s3)) / 10.0 - np.array([0, miny, 0])
+    Wq = ref[:, 3:4] * W22[v1] + ref[:, 4:5] * W22[v2] + ref[:, 5:6] * W22[v3]
+    Vq, VTq, Fq, FTq = ler_obj_txt(zler(z, pasta + '/' + obj))
+    if len(Vq) != len(Q): return None
+    Tq, TUq = tri_de(Fq, FTq)
+    pai = np.arange(len(Q))   # partes ligadas (a camisa e a calça são malhas separadas)
+    def raiz(a):
+        while pai[a] != a: pai[a] = pai[pai[a]]; a = pai[a]
+        return a
+    for t in Tq:
+        for k in (1, 2):
+            x, y = raiz(t[0]), raiz(t[k])
+            if x != y: pai[x] = y
+    comp = np.array([raiz(i) for i in range(len(Q))])
+    return dict(Q=Q, W=Wq, T=Tq, TU=TUq, VT=VTq, ref=ref, dele=dele, mat=mat, comp=comp, N=normais(Q, Tq))
+def tingir(z, pasta, mat, TU, VT, cor, lado):
+    """a textura da roupa levada para a cor da peça do jogo: fica a luz do tecido (dobras, costuras, oclusão) e some a cor de antes"""
+    mm = ler_mhmat(zler(z, pasta + '/' + mat)) if mat else {}
+    im = Image.open(io.BytesIO(z.read(pasta + '/' + mm['diffuseTexture']))).convert('RGB')
+    a = np.asarray(im, float); L = a @ [0.3, 0.59, 0.11]
+    ao = mm.get('aomapTexture')
+    if ao and (pasta + '/' + ao) in z.namelist():
+        o = np.asarray(Image.open(io.BytesIO(z.read(pasta + '/' + ao))).convert('L').resize(im.size, Image.LANCZOS), float) / 255
+        L = L * (0.55 + 0.45 * o)
+    m = Image.new('L', im.size, 0); d = ImageDraw.Draw(m); uv = np.c_[VT[:, 0], 1 - VT[:, 1]] * np.array(im.size)
+    for t in TU:
+        if (t < 0).any(): continue
+        d.polygon([tuple(uv[k]) for k in t], fill=255)
+    m = np.asarray(m) > 0; Lm = float(np.median(L[m])) if m.any() else float(np.median(L))
+    f = np.clip(L / max(Lm, 1), 0.35, 1.45)[..., None]
+    c = np.array([(cor >> 16) & 255, (cor >> 8) & 255, cor & 255], float)
+    return img_b64(Image.fromarray(np.clip(c * f, 0, 255).astype(np.uint8)), lado, False, 80)
 def img_b64(im, lado, alfa, q=84):
     if lado and max(im.size) > lado: im = im.resize((lado, lado), Image.LANCZOS)
     b = io.BytesIO()
@@ -396,6 +453,37 @@ for cid, c in CORPOS.items():
                 if pid in TINGE: im = TINGE[pid](im)
                 e['tex'] = img_b64(im, lado, alfa); e['alfa'] = bool(alfa); BYTES[pid] = len(e['tex'])
         log('  %-12s %-11s %5d vértices %5d triângulos%s' % (pid, cat, pk['nv'], pk['ni'] // 3, (', esconde %d do corpo' % pk.get('nocult', 0)) if pk.get('nocult') else ''))
+    # roupas do jogo: a parte da roupa pronta, recortada; o corpo some só onde a parte cobre (os vértices do corpo em que ela se apoia,
+    # mais um anel em volta, dentro dos que o próprio MakeHuman apaga). Os braços (para o colete) são os ossos do braço, sem o ombro
+    ENC = {}; ARM = [IX[o] for o in ('LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand')]
+    yJoelho = float((pA['LeftLeg'][1] + pA['RightLeg'][1]) / 2); yCint = float(pA['Hips'][1])
+    for item, nome, fontes, corp, extra in ROUPAS3D:
+        if cid not in fontes: continue
+        pasta, parte = fontes[cid]
+        if pasta not in ENC: ENC[pasta] = encaixar(ZS, 'clothes/' + pasta, P, miny)
+        E = ENC[pasta]
+        if E is None: log('  falta', pasta); continue
+        Q, Tq, comp = E['Q'], E['T'], E['comp']
+        _, ci = np.unique(comp, return_inverse=True); my = np.bincount(ci, Q[:, 1]) / np.bincount(ci)
+        if parte == 'cima': sv = my[ci] > yCint
+        elif parte == 'baixo': sv = my[ci] <= yCint
+        else: sv = np.ones(len(Q), bool)
+        tri = sv[Tq].all(1)
+        if extra.get('sem_manga'): tri &= ~np.isin(E['W'].argmax(1), ARM)[Tq].any(1)
+        if extra.get('corte'): tri &= Q[Tq, 1].min(1) > yJoelho + extra['corte']
+        T2, TU2 = Tq[tri], E['TU'][tri]
+        vp, vu, Tn = separar_costuras(T2, TU2, len(Q))
+        pk = pacote(Q[vp], E['N'][vp], np.c_[E['VT'][vu, 0], 1 - E['VT'][vu, 1]], E['W'][vp], Tn)
+        us = np.unique(T2); ref = E['ref']; cobre = np.zeros(NBV, bool)
+        for k in range(3):
+            w = ref[us, 3 + k] > 0; cobre[ref[us][w, k].astype(int)] = True
+        cobre[TB[cobre[TB].any(1)].ravel()] = True
+        dm = np.zeros(NBV, bool); dl = E['dele']; dm[dl[dl < NBV]] = True; esc_t = (cobre & dm)[TB].all(1)
+        pk['oculta'] = base64.b64encode(np.packbits(esc_t, bitorder='little').tobytes()).decode(); pk['nocult'] = int(esc_t.sum())
+        pk['tex'] = tingir(ZS, 'clothes/' + pasta, E['mat'], TU2, E['VT'], corp, 512)
+        e = SAIDA['pecas'].setdefault(item, {'nome': nome, 'cat': 'roupa', 'corpos': list(fontes.keys())}); e[cid] = pk
+        BYTES['roupa_' + item + '_' + cid] = len(pk['vb']) + len(pk['ib']) + len(pk['tex'])
+        log('  %-12s roupa (%s, %s) %5d vértices %5d triângulos, esconde %d do corpo' % (item, pasta, parte, pk['nv'], pk['ni'] // 3, pk['nocult']))
 for pid, nome, corpo, pasta in PELES:
     if SO_HOMEM and corpo != 'homem': continue
     mm = ler_mhmat(zler(ZS, [n for n in ZS.namelist() if n.startswith(pasta + '/') and n.endswith('.mhmat')][0]))

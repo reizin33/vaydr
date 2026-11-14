@@ -10,7 +10,8 @@
    · A aparência guarda ap.corpo = 'mh' e ap.mh = {g, pele, olhos, sobr, cabelo, barba}: vai no perfil e no jogo.
    · 14/11 (pedido do dono): o personagem começa sem roupa: o homem de cueca e a mulher de biquíni (pintados na pele pelo
      tools/mh_personagem.py); a roupa e o sapato saem da criação. As roupas do jogo (bermuda, calça, camisa, casaco, botas, gorro,
-     luvas, cinto) vestem por cima como cascas do próprio corpo, como no sobrevivente, e trocam de verdade. A barba é opcional
+     luvas, cinto) vestem por cima e trocam de verdade: as de pano, couro e as botas são roupas 3D (veja MH_CASCAS); gorro, luvas e
+     cinto são cascas do próprio corpo. A barba é opcional
      (o padrão é sem). O Sobrevivente virou um Personalizado pronto (MH_SOBREVIVENTE): o modelo antigo tinha calça e botas no
      próprio corpo, e a bermuda não trocava. */
 const MH_ALT={homem:1.76,mulher:1.64};   // altura com a escolha do meio da criação
@@ -45,6 +46,17 @@ const mhAp=()=>G.modo==='criacao'?CRIA.ap:(G.aparencia||(MESH.jogador&&MESH.joga
 const MHG={vb:{},vbb:{},peca:{},tex:{},tipos:new Map(),esq:{}};
 /* as roupas do jogo no corpo do MakeHuman: as mesmas cascas do sobrevivente e a bermuda do começo (do meio da coxa à cintura) */
 const MH_CASCAS=Object.assign({},typeof SURV_CASCAS!=='undefined'?SURV_CASCAS:{},{bermuda:[{sub:'pernasCurtas',inf:0.007,cor:0x5a6470,pelo:0}]});
+/* 14/11 (o dono achou feio: as cascas marcavam o corpo): camiseta, camisas, colete, casacos, calças, bermuda e botas são roupas 3D
+   de verdade (partes das roupas prontas do MakeHuman, tingidas na cor da peça: tools/mh_personagem.py, ROUPAS3D). Só gorro, boné,
+   luvas e cinto continuam cascas (são peças justas). O corpo some por baixo da roupa (os triângulos que ela cobre). */
+if(mhOk())for(const k in MHP.pecas)if(MHP.pecas[k].cat==='roupa')delete MH_CASCAS[k];
+/* as roupas 3D vestidas, na ordem das camadas; na criação o personagem fica só de roupa de baixo. A camiseta fica por baixo da camisa
+   e do casaco (some para não atravessar); com o colete ela aparece */
+const MH_COBRE_CAMISETA={camisaLeve:1,camisaCouro:1,casacoPele:1,casacoGrande:1};
+function mhRoupas(g){if(!mhOk()||G.modo==='criacao'||!P.roupa)return[];const R=P.roupa,o=[];
+  for(const sl of ['pes','pernas','camiseta','tronco']){const id=R[sl];if(!id||!MHP.pecas[id]||MHP.pecas[id].cat!=='roupa'||!MHP.pecas[id][g])continue;
+    if(sl==='camiseta'&&MH_COBRE_CAMISETA[R.tronco])continue;o.push(id);}
+  return o;}
 function mhVB(d){const vb=b64bytes(d.vb),b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,vb,gl.STATIC_DRAW);return b;}
 function mhVAO(vbuf,idx,i32){const vao=gl.createVertexArray();gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,vbuf);
   gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,3,gl.BYTE,true,28,12);
@@ -60,9 +72,9 @@ function mhEsq(g){if(MHG.esq[g])return MHG.esq[g];const c=MHP.corpos[g],nome='mh
   SKD[nome]={ossos:c.ossos,pai:c.pai,t:c.t,qb:c.qb,inv:c.inv,quadril:c.quadril,altura:c.altura,maoA:c.maoA};const t=skTipo(nome);
   const ib=b64bytes(c.ib);t.mhIdx=c.i32?new Uint32Array(ib.buffer):new Uint16Array(ib.buffer);t.mhI32=c.i32;t.mhVB=mhVB(c);return MHG.esq[g]=t;}
 /* o tipo de um personagem: o esqueleto do corpo + o corpo (com as regiões das roupas do jogo) + as peças escolhidas */
-function mhTipo(ap){const m=mhDe(ap),k=MH_CAMPOS.map(c=>m[c]).join('|');let t=MHG.tipos.get(k);if(t){MHG.tipos.delete(k);MHG.tipos.set(k,t);return t;}
-  const e=mhEsq(m.g),g=m.g,ids=['olhos',m.cabelo,m.barba,m.sobr,g==='mulher'?'cilios_m':'cilios_h'].filter(x=>x&&MHP.pecas[x]&&MHP.pecas[x][g]);
-  /* corpo: tira os triângulos escondidos por alguma peça que cubra o corpo (hoje nenhuma) */
+function mhTipo(ap){const m=mhDe(ap),rp=mhRoupas(m.g),k=MH_CAMPOS.map(c=>m[c]).join('|')+'|'+rp.join(',');let t=MHG.tipos.get(k);if(t){MHG.tipos.delete(k);MHG.tipos.set(k,t);return t;}
+  const e=mhEsq(m.g),g=m.g,ids=['olhos',m.cabelo,m.barba,m.sobr,g==='mulher'?'cilios_m':'cilios_h',...rp].filter(x=>x&&MHP.pecas[x]&&MHP.pecas[x][g]);
+  /* corpo: tira os triângulos escondidos pelas peças que cobrem o corpo (as roupas 3D) */
   const bits=ids.map(id=>MHP.pecas[id][g].oculta).filter(Boolean).map(b64bytes),I=e.mhIdx,n=I.length/3;let out=I;
   if(bits.length){const tmp=new (e.mhI32?Uint32Array:Uint16Array)(I.length);let o=0;
     for(let i=0;i<n;i++){let esc=false;for(const b of bits)if((b[i>>3]>>(i&7))&1){esc=true;break;}if(esc)continue;tmp[o++]=I[i*3];tmp[o++]=I[i*3+1];tmp[o++]=I[i*3+2];}out=tmp.subarray(0,o);}
@@ -72,12 +84,13 @@ function mhTipo(ap){const m=mhDe(ap),k=MH_CAMPOS.map(c=>m[c]).join('|');let t=MH
   let o=out.length;const sub={},bpe=e.mhI32?4:2;for(const k in S){todos.set(S[k],o);sub[k]={off:o*bpe,n:S[k].length};o+=S[k].length;}
   const corpo=mhVAO(e.mhVB,todos,e.mhI32);corpo.count=out.length;
   /* peças: as opacas primeiro (olhos), depois as recortadas */
-  const partes=ids.map(id=>{const p=mhPeca(id,g),d=MHP.pecas[id];return{vao:p.vao,count:p.count,tipo:p.tipo,alfa:p.alfa,tex:id==='olhos'?mhTex('olho_'+m.olhos,MHP.olhos[m.olhos].tex):mhTex('p_'+id,d.tex)};})
+  const partes=ids.map(id=>{const p=mhPeca(id,g),d=MHP.pecas[id];return{vao:p.vao,count:p.count,tipo:p.tipo,alfa:p.alfa,
+      tex:id==='olhos'?mhTex('olho_'+m.olhos,MHP.olhos[m.olhos].tex):d[g].tex?mhTex('p_'+id+'_'+g,d[g].tex):mhTex('p_'+id,d.tex)};})
     .sort((a,b)=>a.alfa-b.alfa);
   t=Object.assign(Object.create(e),{nome:'mh',mesh:corpo,tex:mhTex('pele_'+m.pele,MHP.peles[m.pele].tex),mask:null,nrm:null,rug:null,partes,sub,cascas:MH_CASCAS,pronto:true,mh:m});
   MHG.tipos.set(k,t);
   /* guarda poucos tipos (o corpo filtrado de cada um é pequeno; peças e texturas são de todos) */
-  while(MHG.tipos.size>6){const[k0,t0]=MHG.tipos.entries().next().value;if(P.ch&&P.ch.sk&&P.ch.sk.t===t0)break;MHG.tipos.delete(k0);try{gl.deleteVertexArray(t0.mesh.vao);gl.deleteBuffer(t0.mesh.ebo);}catch(_){}}
+  while(MHG.tipos.size>8){const[k0,t0]=MHG.tipos.entries().next().value;if(P.ch&&P.ch.sk&&P.ch.sk.t===t0)break;MHG.tipos.delete(k0);try{gl.deleteVertexArray(t0.mesh.vao);gl.deleteBuffer(t0.mesh.ebo);}catch(_){}}
   return t;}
 /* troca o corpo do jogador (sobrevivente, personalizado do MakeHuman ou o clássico) */
 survAplicar=function(){const ch=P.ch;if(!ch)return;const quer=survLigado(),ap=mhAp(),apJ=MESH.jogador&&MESH.jogador.ap,mh=quer&&mhUsa(ap);
@@ -87,6 +100,11 @@ survAplicar=function(){const ch=P.ch;if(!ch)return;const quer=survLigado(),ap=mh
     const alt=apJ?APAR.alturas[apJ.altura]:1;ch.s=ch.mh?alt*MH_ALT[tipo.mh.g]/(tipo.alt||1.8):alt*SURV_ALT/(SKT.surv.alt||1.82);}
   else if(ch.surv){const a=apJ;ch.sk=skNovo(SKT.akai);ch.proc=true;ch.surv=false;ch.mh=false;ch.procOmbro=a?APAR.portes[a.porte].ombro:0;ch.s=a?APAR.alturas[a.altura]:1;}};
 
+/* trocou de roupa no jogo (vestiu, tirou, achou outra): o corpo é refeito com as roupas 3D novas */
+{let rk=null;HUDS.push(()=>{if(G.modo!=='jogo'||!P.ch||!P.ch.mh)return;const R=P.roupa||{},k=(R.pes||'')+'|'+(R.pernas||'')+'|'+(R.camiseta||'')+'|'+(R.tronco||'');
+  if(k===rk)return;rk=k;try{survAplicar();}catch(e){console.error('personalizado: roupa',e);}});}
+/* a camisa de couro agora tem manga comprida no corpo: na 1ª pessoa também */
+if(typeof MANGAS_FP!=='undefined'&&!MANGAS_FP.camisaCouro)MANGAS_FP.camisaCouro={t:'longa',cor:0x8a5a36,punho:0x5a3820};
 /* na criação, o personalizado aparece só de roupa de baixo (a bermuda do começo veste quando o jogo começa) */
 {const _sc=skCascas;skCascas=function(){if(G.modo==='criacao'&&P.ch&&P.ch.mh)return;return _sc.apply(this,arguments);};}
 /* ---------- desenho: as peças vão depois do corpo, com a mesma pele de ossos ---------- */
