@@ -331,13 +331,15 @@ def encaixar(z, pasta, P, miny):
             if x != y: pai[x] = y
     comp = np.array([raiz(i) for i in range(len(Q))])
     return dict(Q=Q, W=Wq, T=Tq, TU=TUq, VT=VTq, ref=ref, dele=dele, mat=mat, comp=comp, N=normais(Q, Tq))
-def cobertos(P, N, cand, Q, T, alcance=0.08):
-    """quais vértices do corpo (dos candidatos) ficam por baixo da roupa: o raio que sai do vértice pela normal bate na roupa até
-    'alcance' metros (Möller-Trumbore em blocos). Só esses somem: a borda da roupa não abre buraco na pele em volta"""
+def cobertos(P, N, cand, Q, T, alcance=0.08, atras=0.03):
+    """quais vértices do corpo (dos candidatos) ficam por baixo da roupa: a reta que passa pelo vértice na direção da normal bate na
+    roupa entre 'atras' metros para dentro (o corpo que fura a roupa justa) e 'alcance' para fora, numa face virada para o mesmo
+    lado (a perna de dentro da bermuda não conta para a outra perna). Möller-Trumbore em blocos"""
     V0 = Q[T[:, 0]]; E1 = Q[T[:, 1]] - V0; E2 = Q[T[:, 2]] - V0; out = np.zeros(len(cand), bool)
+    Nf = np.cross(E1, E2); Nf /= np.linalg.norm(Nf, axis=1, keepdims=True) + 1e-12
     lo, hi = Q.min(0) - alcance, Q.max(0) + alcance
-    for i in range(0, len(cand), 160):
-        ix = cand[i:i + 160]; O = P[ix]; D = N[ix]
+    for i in range(0, len(cand), 128):
+        ix = cand[i:i + 128]; O = P[ix]; D = N[ix]
         dentro = ((O > lo) & (O < hi)).all(1)
         if not dentro.any(): continue
         O = O[dentro]; D = D[dentro]
@@ -345,15 +347,28 @@ def cobertos(P, N, cand, Q, T, alcance=0.08):
         ok = np.abs(det) > 1e-10; inv = np.where(ok, 1.0 / np.where(ok, det, 1), 0)
         Tv = O[:, None, :] - V0[None]; u = (Tv * Pv).sum(2) * inv
         Qv = np.cross(Tv, E1[None]); v = (D[:, None, :] * Qv).sum(2) * inv; t = (E2[None] * Qv).sum(2) * inv
-        hit = ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > -0.004) & (t < alcance)
-        r = np.zeros(len(ix), bool); r[np.nonzero(dentro)[0]] = hit.any(1); out[i:i + 160] = r
+        hit = ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > -atras) & (t < alcance) & ((D @ Nf.T) > 0.2)
+        r = np.zeros(len(ix), bool); r[np.nonzero(dentro)[0]] = hit.any(1); out[i:i + 128] = r
     return out
-def cinza(z, pasta, mat, TU, VT, lado):
+def sem_estampa(L):
+    """tira a estampa da camiseta (o logotipo do MakeHuman e as faixas): onde a luz foge muito da média em volta, entra a média
+    do tecido em volta (as dobras mudam devagar e ficam)"""
+    from PIL import ImageFilter as IF
+    im = Image.fromarray(np.clip(L, 0, 255).astype(np.uint8)); Lb = np.asarray(im.filter(IF.GaussianBlur(10)), float)
+    m = (np.abs(L - Lb) > 0.16 * np.maximum(Lb, 1)).astype(np.uint8) * 255
+    m = np.asarray(Image.fromarray(m).filter(IF.MaxFilter(7)), float) / 255
+    w = 1 - m; num = np.asarray(Image.fromarray(np.clip(L * w, 0, 255).astype(np.uint8)).filter(IF.GaussianBlur(24)), float)
+    den = np.asarray(Image.fromarray((w * 255).astype(np.uint8)).filter(IF.GaussianBlur(24)), float) / 255
+    fill = num / np.maximum(den, 0.05)
+    return L * w + fill * m
+def cinza(z, pasta, mat, TU, VT, lado, estampa=False):
     """a luz do tecido da roupa (dobras, costuras, oclusão) em tons de cinza, sem a cor: o jogo tinge com a cor de cada peça do jogo
     (as peças que saem da mesma roupa pronta dividem a mesma imagem). 255 = 1,45 vezes a luz do meio do tecido"""
     mm = ler_mhmat(zler(z, pasta + '/' + mat)) if mat else {}
     im = Image.open(io.BytesIO(z.read(pasta + '/' + mm['diffuseTexture']))).convert('RGB')
+    if max(im.size) > 1024: im = im.resize((1024, 1024), Image.LANCZOS)
     L = np.asarray(im, float) @ [0.3, 0.59, 0.11]
+    if estampa: L = sem_estampa(L)
     ao = mm.get('aomapTexture')
     if ao and (pasta + '/' + ao) in z.namelist():
         o = np.asarray(Image.open(io.BytesIO(z.read(pasta + '/' + ao))).convert('L').resize(im.size, Image.LANCZOS), float) / 255
@@ -471,8 +486,8 @@ for cid, c in CORPOS.items():
                 if pid in TINGE: im = TINGE[pid](im)
                 e['tex'] = img_b64(im, lado, alfa); e['alfa'] = bool(alfa); BYTES[pid] = len(e['tex'])
         log('  %-12s %-11s %5d vértices %5d triângulos%s' % (pid, cat, pk['nv'], pk['ni'] // 3, (', esconde %d do corpo' % pk.get('nocult', 0)) if pk.get('nocult') else ''))
-    # roupas do jogo: a parte da roupa pronta, recortada; o corpo some só onde a parte cobre (dos vértices que o próprio MakeHuman
-    # apaga, os que ficam por baixo desta parte: cobertos()). Os braços (para o colete) são os ossos do braço, sem o ombro
+    # roupas do jogo: a parte da roupa pronta, recortada; o corpo some só onde a parte cobre (cobertos(); nas botas também o que o
+    # MakeHuman apaga). Os braços (para o colete) são os ossos do braço, sem o ombro
     ENC = {}; GEO = {}; ARM = [IX[o] for o in ('LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand')]
     yJoelho = float((pA['LeftLeg'][1] + pA['RightLeg'][1]) / 2); yCint = float(pA['Hips'][1])
     for item, nome, fontes, corp, extra in ROUPAS3D:
@@ -497,11 +512,12 @@ for cid, c in CORPOS.items():
         T2, TU2 = Tq[tri], E['TU'][tri]
         vp, vu, Tn = separar_costuras(T2, TU2, len(Q))
         pk = pacote(Q[vp], E['N'][vp], np.c_[E['VT'][vu, 0], 1 - E['VT'][vu, 1]], E['W'][vp], Tn)
-        dm = np.zeros(NBV, bool); dl = E['dele']; dm[dl[dl < NBV]] = True; cand = np.nonzero(dm)[0]
-        cobre = np.zeros(NBV, bool); cobre[cand[cobertos(P, Nb, cand, Q, T2)]] = True; esc_t = cobre[TB].all(1)
+        cand = np.unique(TB); cobre = np.zeros(NBV, bool); cobre[cand[cobertos(P, Nb, cand, Q, T2)]] = True
+        if parte == 'tudo': dl = E['dele']; cobre[dl[dl < NBV]] = True
+        esc_t = cobre[TB].all(1)
         pk['oculta'] = base64.b64encode(np.packbits(esc_t, bitorder='little').tobytes()).decode(); pk['nocult'] = int(esc_t.sum())
         kf = pasta + ':' + parte; RT = SAIDA.setdefault('roupasTex', {})
-        if kf not in RT: RT[kf] = cinza(ZS, 'clothes/' + pasta, E['mat'], E['TU'][sv[Tq].all(1)], E['VT'], 512); BYTES['roupa_' + kf] = len(RT[kf])
+        if kf not in RT: RT[kf] = cinza(ZS, 'clothes/' + pasta, E['mat'], E['TU'][sv[Tq].all(1)], E['VT'], 512, estampa=item == 'camiseta'); BYTES['roupa_' + kf] = len(RT[kf])
         pk['texf'] = kf
         e = SAIDA['pecas'].setdefault(item, {'nome': nome, 'cat': 'roupa', 'corpos': list(fontes.keys()), 'cor': corp}); e[cid] = pk
         BYTES['roupa_' + item + '_' + cid] = len(pk['vb']) + len(pk['ib'])
