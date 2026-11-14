@@ -15,7 +15,7 @@
    Desenho: todas as peças do quarteirão numa malha só, com a textura do kit (uma chamada), mais os cabos e a sujeira; some de
    longe como os detalhes dos prédios. Colisão só no que fica no chão do beco e no telhado. KIT.on=false desliga o desenho. */
 const KIT={on:true,amostra:['Edifício Aurora','Escritórios Central','Mercado Bom Preço','Edifício Bela Vista'],
-  itens:[],cabos:[],manchas:[],cols:[],g:null,pecas:{},info:null,dist:150};
+  itens:[],cabos:[],manchas:[],cols:[],g:null,pecas:{},info:null,dist:150,distPerto:70};
 function kitOk(){return typeof KITX!=='undefined'&&!!KITX&&!!KITX.pecas;}
 function kitT(id){const X=KITX.pecas[id];return X?X.tam:[0,0,0];}
 /* os quatro lados do prédio: comprimento, ponto (ao longo, para fora da face) -> (u, v) e o giro de quem olha para fora */
@@ -132,7 +132,7 @@ function kitBarraco(ctx,acha,yT,giro){const{p,R}=ctx,w=2.2,d=2.6,hF=2.25,hB=1.95
   const em=(lx,lz)=>[cw[0]+lx*c+lz*s,cw[1]-lx*s+lz*c];   // do espaço do barraco (x para o lado, z para a frente) para o mundo
   const peca=(m,lx,y,lz,dy,e,rx,rz)=>{const X=KITX.pecas[m];if(!X)return;const ccx=(X.lo[0]+X.hi[0])/2*e[0],ccz=(X.lo[2]+X.hi[2])/2*e[2],
       g=dy||0,cg=Math.cos(yaw+g),sg=Math.sin(yaw+g),w2=em(lx,lz);
-    ctx.itens.push({m,M:kitM(w2[0]-(ccx*cg+ccz*sg),y,w2[1]-(-ccx*sg+ccz*cg),yaw+g,e,rx,rz),p:p.nome,e});};
+    ctx.itens.push({m,M:kitM(w2[0]-(ccx*cg+ccz*sg),y,w2[1]-(-ccx*sg+ccz*cg),yaw+g,e,rx,rz),p:p.nome,e,grande:true});};
   const Rt=KITX.pecas.canoReto;
   for(const[lx,lz,h]of[[-w/2+0.08,d/2-0.08,hF],[w/2-0.08,d/2-0.08,hF],[-w/2+0.08,-d/2+0.08,hB],[w/2-0.08,-d/2+0.08,hB]])peca('canoReto',lx,yT,lz,0,[1,h/Rt.passo,1]);
   const ch=kitT('chapa'),ch2=kitT('chapa2');
@@ -215,7 +215,7 @@ function kitGerar(){for(const c of KIT.cols)colRemove(c);KIT.cols.length=0;KIT.i
   for(const ctx of todos.values())kitSujeiraMontar(ctx);
   let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const p of ps){x0=Math.min(x0,p.x0);x1=Math.max(x1,p.x1);z0=Math.min(z0,p.z0);z1=Math.max(z1,p.z1);}
   for(const c of KIT.cabos)for(const q of [c.a,c.b]){x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);z0=Math.min(z0,q[2]);z1=Math.max(z1,q[2]);}
-  KIT.g={x0:x0-3,x1:x1+3,z0:z0-3,z1:z1+3,m:null,mc:null,mm:null};
+  KIT.g={x0:x0-3,x1:x1+3,z0:z0-3,z1:z1+3,m:null,mp:null,mc:null,mm:null};
   const cont={};for(const it of KIT.itens)cont[it.m]=(cont[it.m]||0)+1;
   KIT.info={pecas:KIT.itens.length,porTipo:cont,cabos:KIT.cabos.length,manchas:KIT.manchas.length,colisoes:KIT.cols.length,
     telhados:Object.fromEntries([...todos.values()].map(c=>[c.p.nome,(c.telhado||[]).join(',')]))};}
@@ -242,17 +242,23 @@ function kitCabosGeo(){const out=[],cor=[0.055,0.052,0.05];
         const P=(Q,n)=>[Q[0]+n[0]*c.r,Q[1]+n[1]*c.r,Q[2]+n[2]*c.r];
         for(const[Q,n]of[[A,n0],[B,n0],[B,n1],[A,n0],[B,n1],[A,n1]]){const q=P(Q,n);out.push(q[0],q[1],q[2],cor[0],cor[1],cor[2],0,0,n[0],n[1],n[2]);}}}}
   return new Float32Array(out);}
+/* as peças pequenas (ar-condicionado, quadros, calhas, respiros, o que está no chão do beco) somem antes, a 70 m, onde já são
+   poucos pixels; as grandes (caixa d'água, barraco, antenas, placas, chapas nas janelas) e os cabos vão até onde vão os
+   detalhes dos prédios */
+const KIT_PEQ=new Set(['arCond','arCaixa','quadroLuz','caixaLuz','extintor','respiro','cano','canoReto','canoLuva','cacamba','tambores','lona','caixas','barreira','tabuas']);
 function kitMalhas(g){if(g.m!==null)return;g.m=false;
-  try{const J=kitJuntar(KIT.itens);if(J.n){g.m=texMesh(J.f,J.uv,texModelo('kit_atlas',KITX.tex,false));g.tri=J.n/3;}
+  try{const tex=texModelo('kit_atlas',KITX.tex,false),gr=KIT.itens.filter(it=>it.grande||!KIT_PEQ.has(it.m)),pq=KIT.itens.filter(it=>!it.grande&&KIT_PEQ.has(it.m));
+    const A=kitJuntar(gr),B=kitJuntar(pq);if(A.n)g.m=texMesh(A.f,A.uv,tex);if(B.n)g.mp=texMesh(B.f,B.uv,tex);if(!g.m&&g.mp){g.m=g.mp;g.mp=null;}
+    g.tri=(A.n+B.n)/3;g.triPerto=B.n/3;
     const c=kitCabosGeo();if(c.length)g.mc=litMesh(c);
     const s=kitSujeiraGeo();if(s.length)g.mm=unMesh(s);}
   catch(e){console.error('kit (malhas)',e);}}
 function kitPerto(ox,oz){const g=KIT.g;return Math.hypot(Math.max(g.x0-ox,0,ox-g.x1),Math.max(g.z0-oz,0,oz-g.z1));}
 function kitDesenhar(Pg,sombra,perto){const g=KIT.g;if(!KIT.on||!g)return;const ox=sombra?P.x:cam.pos[0],oz=sombra?P.z:cam.pos[2],oy=sombra?P.y:cam.pos[1];
   if(oy<SUB_FUNDO)return;const d=kitPerto(ox,oz);if(d>(sombra?(perto?60:110):KIT.dist))return;
-  if(g.m===null)kitMalhas(g);if(!g.m||(g.m.tex&&!g.m.tex.pronta))return;
-  if(sombra){gl.uniformMatrix4fv(Pg.u.uModel,false,ID);for(const m of [g.m,g.mc])if(m){gl.bindVertexArray(m.vao);gl.drawArrays(gl.TRIANGLES,0,m.count);}return;}
-  drawStat(Pg,g.m,ID);if(g.mc)drawStat(Pg,g.mc,ID);}
+  if(g.m===null)kitMalhas(g);if(!g.m||(g.m.tex&&!g.m.tex.pronta))return;const pq=g.mp&&d<(sombra?60:KIT.distPerto)?g.mp:null;
+  if(sombra){gl.uniformMatrix4fv(Pg.u.uModel,false,ID);for(const m of [g.m,pq,g.mc])if(m){gl.bindVertexArray(m.vao);gl.drawArrays(gl.TRIANGLES,0,m.count);}return;}
+  drawStat(Pg,g.m,ID);if(pq)drawStat(Pg,pq,ID);if(g.mc)drawStat(Pg,g.mc,ID);}
 DESENHO.opaco.push(Pg=>kitDesenhar(Pg,false));
 DESENHO.sombra.push((Pg,perto)=>kitDesenhar(Pg,true,perto));
 /* a sujeira vai junto com as manchas de sangue (mesmo programa, mesma mistura, sem escrever profundidade) */

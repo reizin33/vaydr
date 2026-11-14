@@ -32,7 +32,6 @@ PECAS = {
     'chapa':      dict(n=230, frente='+z', parede=True, alvo=320),             # chapa rebitada (tapa janela)
     'chapa2':     dict(n=232, frente='+x', parede=True, alvo=320),
     'tabuas':     dict(n=89,  frente='+x', parede=True, alvo=400),             # tábuas pregadas em duas ripas
-    'escada':     dict(n=219, frente='+z', parede=True, alvo=900),            # escada de marinheiro (3,2 m)
     # telhado
     'caixaDagua': dict(n=273, frente='+z', alvo=2600),                         # caixa d'água no suporte
     'tanque':     dict(n=1,   frente='+z', alvo=2600),                         # tanque redondo grande
@@ -41,13 +40,11 @@ PECAS = {
     'antena':     dict(n=195, frente='+z', alvo=2500),                         # armação de antenas
     'respiro':    dict(n=271, frente='+z', alvo=450),                         # cano de respiro com curva
     'telha':      dict(n=88,  frente='+z', alvo=400),                          # telha ondulada (barraco)
-    # beco e calçada
+    # beco (a escada de marinheiro #219, as caixas de papelão #18, a barreira #242 e o feixe de fios #201 ficam para as próximas
+    # etapas: os fios entre os prédios são cabos feitos no jogo, mais leves e com a barriga certa para cada vão)
     'cacamba':    dict(n=0,   frente='+z', alvo=1500),
     'tambores':   dict(n=21,  frente='+z', alvo=1800),
-    'caixas':     dict(n=18,  frente='+z', alvo=1500),
     'lona':       dict(n=36,  frente='+z', alvo=1800),                         # tambores cobertos com lona
-    'barreira':   dict(n=242, frente='+z', alvo=900),
-    'fios':       dict(n=201, frente='+z', alvo=1000, sem_chao=True),          # feixe de fios caído (3,6 m), pendurado entre prédios
 }
 # a calha do kit é a curva de saída embaixo, um cilindro reto de 0,78 a 2,06 m e a luva de 2,06 a 2,41 m: o trecho reto e a luva
 # saem dela (antes de simplificar) e o jogo empilha quantos precisar até o telhado
