@@ -22,8 +22,8 @@ HOMEM = dict(malha='male_generic', pele='skins/middleage_caucasian_male/middleag
              pb=(0.035, -0.03, 0.004), mao0=-0.035)
 # a mão do female_generic é a do male_generic em 77% (mesma forma): as medidas da mão vão nessa escala; o pulso foi achado no perfil
 # do braço (a seção mais fina antes de a mão alargar) e o antebraço é mais curto (o cotovelo fica a uns 26 cm do pulso)
-MULHER = dict(HOMEM, malha='female_generic', pele='skins/young_caucasian_female/young_lightskinned_female_diffuse.png', corte=-0.35,
-              Uk=0.083, ombro=-0.22, tw=-0.04, dedos=(0.091, 0.105, -0.36), braco=(0.115, -0.21), lim=(-0.023, 0.046), pol=(0.0, 0.023, 0.116, 0.135),
+MULHER = dict(HOMEM, malha='female_generic', pele='skins/young_caucasian_female/young_lightskinned_female_diffuse.png', corte=-0.43,
+              Uk=0.083, ombro=-0.22, tw=-0.04, dedos=(0.091, 0.105, -0.36), braco=(0.115, -0.19), lim=(-0.023, 0.046), pol=(0.0, 0.023, 0.116, 0.135),
               pb=(0.027, -0.023, 0.004), mao0=-0.027)
 z = zipfile.ZipFile(ZIPMH)
 sm = lambda a, b, x: np.clip((x - a) / (b - a), 0, 1) ** 2 * (3 - 2 * np.clip((x - a) / (b - a), 0, 1))
