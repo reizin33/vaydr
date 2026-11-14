@@ -28,7 +28,7 @@ for(const[t,e]of[['arsenal',['espingarda',.22,1,1]],['arsenal',['cartucho',.5,4,
   ['cobertura',['rifle',.08,1,1]],['cobertura',['balaRifle',.2,2,6]],['cofre_pol',['rifle',.12,1,1]],['vestiario',['cartucho',.12,2,4]],['deposito',['bombaCaseira',.03,1,1]],
   ['deposito',['isca',.04,1,1]],['ap_gaveta',['isca',.03,1,1]],['armazem',['besta',.03,1,1]],['armazem',['virote',.08,3,8]],['hotel_mala',['cartucho',.04,2,4]]])if(CID_LOOT[t])CID_LOOT[t].push(e);
 /* ---------- malhas na mão (osso 11: cano em -y, topo em +z) ---------- */
-let ARMA_COR_FP=0.12;   // comprimento da coronha das armas longas na 1ª pessoa (m; 0 = sem coronha)
+let ARMA_COR_FP=0;   // comprimento da coronha das armas longas na 1ª pessoa (m; 0 = sem coronha: no teste de 14/11 a curta ainda tampava a mão)
 function armas3Meshes(){const R=rng(91),mk=f=>{const g=new GB(512,8);f(g);return litMesh(g.data());},aco=lin(0x2c2f33),aco2=lin(0x4a4f55),mad=lin(0x6a4a2c),mad2=lin(0x553a22);
   /* armas longas: na 1ª pessoa a coronha é mais curta (MESH.armaFP): a inteira vinha até a câmera e cobria a mão direita no cabo
      e o antebraço (14/11). cor(L,y0,z0,rx): coronha de comprimento L começando atrás do cabo, inclinada rx */

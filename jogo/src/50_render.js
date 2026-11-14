@@ -203,7 +203,7 @@ function drawStatI(Pg,mesh,M,k){if(k>0&&Pg.u.uIntO)gl.uniform1f(Pg.u.uIntO,k);dr
    direita, fechada no cabo (antes a mão ficava abaixo da tela e só a ferramenta aparecia). O preparo e a batida do golpe de cima
    continuam no mesmo lugar da tela de antes: os números de GOLPE_FP levam da pose nova até eles (o sexto é o giro de lado).
    Sem modelo na mão (punho vazio, chave, curativo…) fica a pose de antes, com o soco subindo da borda de baixo */
-const VM_LONGA=[0,0,0];   // deslocamento das armas longas na 1ª pessoa (câmera: direita, cima, frente)
+const VM_LONGA=[-0.025,0.045,-0.03];   // deslocamento das armas longas na 1ª pessoa (câmera: direita, cima, frente): mais alta, um pouco para o meio e para a frente (14/11: a mão direita ficava na borda de baixo da tela)
 const VM_MAO=[0.29,-0.24,-0.52,-2.499,0.062,3.833],VM_VAZIA=[0.33,-0.46,-0.62,-2.45,0.25,Math.PI];   // na mão: cabo para cima e para a frente, lâmina para a frente e um pouco para a esquerda
 const GOLPE_FP={k:-0.85,kd:0,sobe:[0.12,0.08,0.05,-0.293,0.049,0.188],desce:[-0.18,-0.14,-0.18,0.207,0.149,0.188]};
 const GOLPE_FP_VAZIA={k:-0.85,kd:0,sobe:[0.08,0.3,0.15,0.4,0,0],desce:[-0.22,0.08,-0.08,0.9,0.1,0]};
