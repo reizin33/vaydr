@@ -199,24 +199,31 @@ function drawStatI(Pg,mesh,M,k){if(k>0&&Pg.u.uIntO)gl.uniform1f(Pg.u.uIntO,k);dr
    no alto do preparo (sobe) e no fim da descida (desce). Ajuste de 12/11: a cabeça do machado acaba no meio da tela, um pouco
    abaixo da mira (antes descia até a borda de baixo e quase sumia: só aparecia a ponta do cabo), e gira no cabo para a lâmina
    aparecer de lado na batida (de costas ela fica fina como um prego) */
-const GOLPE_FP={k:-0.85,kd:0,sobe:[0.08,0.3,0.15,0.4,0],desce:[-0.22,0.08,-0.08,0.9,0.1]};
+/* v10.2.2 (13/11): com o braço de verdade (62yh_braco.js), o que tem modelo na mão sobe para a mão aparecer no canto de baixo à
+   direita, fechada no cabo (antes a mão ficava abaixo da tela e só a ferramenta aparecia). O preparo e a batida do golpe de cima
+   continuam no mesmo lugar da tela de antes: os números de GOLPE_FP levam da pose nova até eles (o sexto é o giro de lado).
+   Sem modelo na mão (punho vazio, chave, curativo…) fica a pose de antes, com o soco subindo da borda de baixo */
+const VM_MAO=[0.29,-0.24,-0.52,-2.499,0.062,3.833],VM_VAZIA=[0.33,-0.46,-0.62,-2.45,0.25,Math.PI];   // na mão: cabo para cima e para a frente, lâmina para a frente e um pouco para a esquerda
+const GOLPE_FP={k:-0.85,kd:0,sobe:[0.12,0.08,0.05,-0.293,0.049,0.188],desce:[-0.18,-0.14,-0.18,0.207,0.149,0.188]};
+const GOLPE_FP_VAZIA={k:-0.85,kd:0,sobe:[0.08,0.3,0.15,0.4,0,0],desce:[-0.22,0.08,-0.08,0.9,0.1,0]};
 function viewModel(o){const d=selDef(),id=selItem()?selItem().id:null;const a=P.acao;let sx=0,sy=0,kick=0,bob=Math.sin(P.ph*2)*0.012*P.amp,bobx=Math.cos(P.ph)*0.012*P.amp,gx=0,gy=0,gz=0,gr=0;
-  if(a&&a.tipo==='golpe'){const s=clamp(a.t/a.dur,0,1);const w=s<0.4?-easeIO(s/0.4)*0.9:lerp(-0.9,1.2,easeOut(Math.min(1,(s-0.4)/0.25)))*(1-smooth(0.7,1,s));if(a.vertical)sx=w*(a.soco?1:w<0?GOLPE_FP.k:GOLPE_FP.kd);else sy=-w*1.2;
+  const comItem=!!(id&&MESH.arma&&MESH.arma[id]&&ITEMS[id]&&(ITEMS[id].tipo==='arma'||ITEMS[id].mao)&&typeof brfMalha==='function'&&brfMalha()),G0=comItem?GOLPE_FP:GOLPE_FP_VAZIA,B0=comItem?VM_MAO:VM_VAZIA;
+  if(a&&a.tipo==='golpe'){const s=clamp(a.t/a.dur,0,1);const w=s<0.4?-easeIO(s/0.4)*0.9:lerp(-0.9,1.2,easeOut(Math.min(1,(s-0.4)/0.25)))*(1-smooth(0.7,1,s));if(a.vertical)sx=w*(a.soco?1:w<0?G0.k:G0.kd);else sy=-w*1.2;
     /* v10.1, golpe de cima (machado, picareta): o giro estava ao contrário (a lâmina descia para fora da tela no preparo e subia no
        golpe); agora sobe no preparo e desce no golpe (k negativo). E o braço inteiro trabalha: no preparo a mão sobe e vai para trás
        do ombro; na descida cruza para o meio da tela, para baixo e para a frente, e volta. Antes só o punho girava */
-    if(a.vertical&&!a.soco){const sobe=s<0.4?easeIO(s/0.4):1-easeOut(Math.min(1,(s-0.4)/0.2)),desce=s<0.4?0:easeOut(Math.min(1,(s-0.4)/0.2))*(1-smooth(0.68,1,s)),A=GOLPE_FP.sobe,B=GOLPE_FP.desce;
-      gx=A[0]*sobe+B[0]*desce;gy=A[1]*sobe+B[1]*desce;gz=A[2]*sobe+B[2]*desce;gr=A[3]*sobe+B[3]*desce;sx+=A[4]*sobe+B[4]*desce;}}
+    if(a.vertical&&!a.soco){const sobe=s<0.4?easeIO(s/0.4):1-easeOut(Math.min(1,(s-0.4)/0.2)),desce=s<0.4?0:easeOut(Math.min(1,(s-0.4)/0.2))*(1-smooth(0.68,1,s)),A=G0.sobe,B=G0.desce;
+      gx=A[0]*sobe+B[0]*desce;gy=A[1]*sobe+B[1]*desce;gz=A[2]*sobe+B[2]*desce;gr=A[3]*sobe+B[3]*desce;sx+=A[4]*sobe+B[4]*desce;sy+=A[5]*sobe+B[5]*desce;}}
   if(a&&a.tipo==='usar')kick=-0.5*Math.min(1,a.t/0.2,(a.dur-a.t)/0.2);
   if(a&&a.tipo==='recarga')kick=-0.6*Math.sin(Math.min(1,a.t/a.dur)*Math.PI);
   if(a&&a.tipo==='empurrar')kick=0.4*Math.min(1,a.t/0.12,(a.dur-a.t)/0.2);
   if(a&&a.tipo==='arremesso'){const s=clamp(a.t/a.dur,0,1);kick=s<0.4?-1.1*easeIO(s/0.4):lerp(-1.1,0.9,easeOut(Math.min(1,(s-0.4)/0.2)))*(1-smooth(0.7,1,s));}
   const fogo=d&&(d.fogo||id==='lanterna');   // a lanterna de mão fica na frente como a pistola
-  let px=(fogo?0.17:0.33)+bobx,py=(fogo?-0.17:-0.46)+bob-P.recuo*0.02,pz=(fogo?-0.42:-0.62)+P.recuo*0.05;
+  let px=(fogo?0.17:B0[0])+bobx,py=(fogo?-0.17:B0[1])+bob-P.recuo*0.02,pz=(fogo?-0.42:B0[2])+P.recuo*0.05;
   // soco de mãos vazias: o punho sobe e avança para dentro da tela (dá para ver a pele e a manga escolhidas)
   if(!fogo&&a&&a.tipo==='golpe'&&a.soco&&!a.pedra){const k=Math.sin(clamp(a.t/a.dur,0,1)*Math.PI);px-=0.13*k;py+=0.27*k;pz-=0.16*k;}
   if(fogo)trs(o,px,py,pz,-Math.PI/2+P.recuo*0.12+kick,Math.PI,0,1,1,1);
-  else trs(o,px+gx,py+gy,pz+gz,-2.45+sx+kick,0.25+sy,Math.PI+gr,0.85,0.85,0.85);
+  else trs(o,px+gx,py+gy,pz+gz,B0[3]+sx+kick,B0[4]+sy,B0[5]+gr,0.85,0.85,0.85);
   return id;}
 /* pássaros de dia: dois bandos circulando alto */
 const BIRD_N=10,birdArr=new Float32Array(16*6*7);
@@ -381,8 +388,8 @@ function render(){
     const f=cam.fwd,r=cam.right,u=cam.up,p=cam.pos;CW.set([r[0],r[1],r[2],0,u[0],u[1],u[2],0,-f[0],-f[1],-f[2],0,p[0],p[1],p[2],1]);
     mul(VPV,PRV,V);setLit(PL);gl.uniformMatrix4fv(PL.u.uViewProj,false,VPV);gl.uniform1f(PL.u.uShadowOn,0);mul(TMP2,CW,TMP);
     if(id==='arco')desenharArco1P(PL,CW);
-    else if(id&&MESH.arma[id]&&(ITEMS[id].tipo==='arma'||ITEMS[id].mao)){drawStat(PL,MESH.arma[id],TMP2);if(id==='lanterna'&&P.lanterna&&MESH.lanternaLente)drawStat(PL,MESH.lanternaLente,TMP2);}
-    const ad=norm([0.32,-0.55,0.77]);mul(TMP2,CW,alignY(TMP[12],TMP[13],TMP[14],ad[0],ad[1],ad[2]));drawStat(PL,bracoFPMesh(),TMP2);}
+    else if(id&&MESH.arma[id]&&(ITEMS[id].tipo==='arma'||ITEMS[id].mao)&&!brfSemItem(id)){drawStat(PL,MESH.arma[id],TMP2);if(id==='lanterna'&&P.lanterna&&MESH.lanternaLente)drawStat(PL,MESH.lanternaLente,TMP2);}
+    bracoFPDesenhar(PL,CW,TMP,id);}   // v10.2.2: braço e mão de verdade, fechada no cabo (62yh_braco.js)
   gl.bindVertexArray(null);
   if(post)posProcessar();}
 /* desenha o que projeta sombra numa cascata (perto: tudo; longe: só o que é grande) */

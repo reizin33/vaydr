@@ -985,12 +985,14 @@ body.criativo .ad-selo{display:block}
    e os esfumados foram tirados dela (1920×1080) e andam com --k, que acompanha o tamanho da janela; os textos têm um
    tamanho mínimo para dar para ler */
 #t-titulo{--k:min(calc(100vw / 1920),calc(100vh / 1080));display:block;padding:0;overflow:hidden;background:#0b0d0e}
-.cg-foto{position:absolute;top:0;right:0;width:62.25%;height:100%;object-fit:cover;object-position:50% 23%;opacity:.64}
+.cg-foto{position:absolute;top:0;right:0;width:62.25%;height:100%;object-fit:cover;object-position:50% 23%;opacity:.92}
+/* 14/11 (pedido do Himalaia): o sobrevivente aparece claro. Antes a foto ia a 64% e o esfumado da esquerda ia até 70% da tela,
+   bem em cima dele (o lado esquerdo do corpo sumia no escuro); agora o escuro fica só onde estão os textos */
 .cg-veu{position:absolute;inset:0;pointer-events:none;background:
   radial-gradient(33% 28% at 27% 103%,rgba(255,138,61,.15),rgba(255,138,61,0)),
-  linear-gradient(180deg,rgba(11,13,14,.75),rgba(11,13,14,0) 19%),
-  linear-gradient(0deg,rgba(11,13,14,.85),rgba(11,13,14,0) 40%),
-  linear-gradient(90deg,#0b0d0e 38.3%,rgba(11,13,14,0) 70.3%)}
+  linear-gradient(180deg,rgba(11,13,14,.5),rgba(11,13,14,0) 14%),
+  linear-gradient(0deg,rgba(11,13,14,.78),rgba(11,13,14,0) 26%),
+  linear-gradient(90deg,#0b0d0e 37.5%,rgba(11,13,14,.55) 46%,rgba(11,13,14,0) 57%)}
 /* a coluna começa sempre no mesmo lugar (o do conceito): dica de três linhas cresce para baixo e não empurra o VAYDR */
 .cg-col{position:absolute;left:calc(120 * var(--k));top:calc(50% - 225 * var(--k));width:max(300px,calc(640 * var(--k)));display:grid;justify-items:start}
 .cg-logo{margin:0;font:700 max(64px,calc(170 * var(--k)))/.8 var(--f-display);letter-spacing:.07em;text-transform:uppercase;color:var(--bone)}

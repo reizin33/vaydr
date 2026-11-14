@@ -205,6 +205,9 @@ body[data-tela="celular"] .vl-teclas{display:none}
 #t-login .lg-perfil::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--ember);opacity:.55}
 #t-login .lg-perfil:hover,#t-login .lg-perfil:focus-visible{transform:translateY(-4px);border-color:rgba(255,138,61,.6);box-shadow:0 16px 40px rgba(0,0,0,.45);background:linear-gradient(180deg,rgba(255,138,61,.12),rgba(255,255,255,.02)),#12181b}
 #t-login .lg-perfil .lg-av{width:104px;height:104px;border-radius:50%;border:2px solid rgba(236,228,210,.28)}
+#t-login .lg-del{top:12px;right:12px}#t-login .lg-cart:hover .lg-del,#t-login .lg-cart:hover .lg-perfil{transform:translateY(-4px)}   /* a lixeira sobe junto com o cartão */
+#t-login .lg-cart.apaga .lg-perfil{transform:none}
+#t-login .lg-conf{border-radius:18px}
 #t-login .lg-i{justify-items:center;width:100%}#t-login .lg-i b{font:700 20px/1.1 var(--f-display);letter-spacing:.05em;text-transform:uppercase;max-width:100%}
 #t-login .lg-i small{white-space:normal;text-align:center}
 #t-login .lg-ent{opacity:.85}

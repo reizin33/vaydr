@@ -79,6 +79,21 @@ function pfEspacoTexto(){let n=0;try{for(let i=0;i<localStorage.length;i++){cons
 .lg-i{display:grid;gap:3px;min-width:0;flex:1}.lg-i b{font:800 17px/1.1 var(--f-ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lg-i small{font:600 13px/1.2 var(--f-ui);color:var(--ash);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lg-ent{flex:none;font:800 12px/1 var(--f-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ember)}
+.lg-cart{position:relative;display:flex;min-width:0}
+.lg-del{appearance:none;position:absolute;top:8px;right:8px;z-index:2;display:grid;place-items:center;width:34px;height:34px;padding:0;border-radius:50%;
+  border:1px solid rgba(236,228,210,.16);background:rgba(10,14,12,.6);color:#a3a59a;cursor:pointer;opacity:.75;transition:opacity .2s,color .2s,border-color .2s,background .2s,transform .25s}
+.lg-del svg{width:17px;height:17px;display:block}
+.lg-cart:hover .lg-del,.lg-del:focus-visible{opacity:1}
+.lg-del:hover,.lg-del:focus-visible{color:#ffb4a8;border-color:rgba(227,73,62,.75);background:rgba(227,73,62,.2);outline:none}
+.lg-conf{position:absolute;inset:0;z-index:3;display:grid;align-content:center;justify-items:center;gap:10px;padding:14px;border-radius:inherit;
+  border:1px solid rgba(227,73,62,.7);background:#170f0f;text-align:center}
+.lg-conf b{font:700 18px/1.15 var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:var(--bone);overflow-wrap:anywhere}
+.lg-conf small{font:600 13px/1.35 var(--f-ui);color:#d9cfc0}
+.lg-conf-bts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.lg-conf .btn{width:100%;min-height:38px;padding:0 8px;font-size:13.5px}
+.lg-conf .lg-sim{background:rgba(227,73,62,.25);border-color:var(--blood);color:var(--blood-ink)}
+.lg-conf .lg-sim:hover,.lg-conf .lg-sim:focus-visible{background:rgba(227,73,62,.42)}
+.lg-cart.apaga .lg-del{visibility:hidden}
 .lg-novo{display:grid;gap:8px}.lg-novo label{font:800 12px/1 var(--f-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ash)}
 .lg-novo input,.sz-ren,.aj-pf-nome{width:100%;min-width:0;padding:11px 12px;border-radius:9px;border:1px solid var(--edge-hi);background:rgba(0,0,0,.3);color:var(--bone);font:700 16px/1 var(--f-ui)}
 .lg-novo input:focus,.sz-ren:focus,.aj-pf-nome:focus{outline:2px solid var(--ember);outline-offset:1px}
@@ -123,17 +138,33 @@ $('t-menu').insertAdjacentHTML('afterend',`<div class="tela clara" id="t-login" 
   <ul class="sz-lista" id="sz-lista"></ul><div id="sz-acoes"></div><p class="sz-msg" id="sz-msg" role="status"></p><p class="sz-espaco" id="sz-espaco"></p>
   <button class="btn" id="sz-voltar" type="button">Voltar</button></div></div>`);
 TELAS.push('t-login','t-sozinho');
-function pfLoginRender(){const lista=PERFIS.lista.slice().sort((a,b)=>(b.usado||0)-(a.usado||0));
-  $('lg-lista').innerHTML=lista.map(p=>{const m=p.mundos.find(x=>x.id===p.ultimoMundo)||p.mundos[0];
-    return'<button type="button" class="lg-perfil" role="listitem" data-id="'+p.id+'"><span class="lg-av">'+pfAvatar(p)+'</span><span class="lg-i"><b>'+pfEsc(p.nome)+'</b><small>'+
-      (m?pfEsc(m.nome)+' · dia '+m.dia+(p.mundos.length>1?' · '+p.mundos.length+' mundos':''):'Nenhum mundo ainda')+'</small></span><span class="lg-ent">Entrar</span></button>';}).join('');
+/* 14/11 (pedido do Himalaia): cada cartão tem a lixeira no canto para excluir o perfil ali mesmo. Antes de apagar, o cartão
+   vira a pergunta, com quantos mundos vão junto (não tem volta: apaga o perfil e os saves de todos os mundos dele) */
+let lgApaga=null;   // o perfil que está pedindo a confirmação
+const LG_LIXO='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12.2A2 2 0 0 0 8.5 21h7a2 2 0 0 0 2-1.8L18.5 7M9 7V4.5h6V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function pfLoginRender(){const lista=PERFIS.lista.slice().sort((a,b)=>(b.usado||0)-(a.usado||0));if(lgApaga&&!pfAchar(lgApaga))lgApaga=null;
+  $('lg-lista').innerHTML=lista.map(p=>{const m=p.mundos.find(x=>x.id===p.ultimoMundo)||p.mundos[0],nm=pfEsc(p.nome),n=p.mundos.length;
+    return'<div class="lg-cart'+(lgApaga===p.id?' apaga':'')+'" role="listitem"><button type="button" class="lg-perfil" data-id="'+p.id+'"><span class="lg-av">'+pfAvatar(p)+'</span><span class="lg-i"><b>'+nm+'</b><small>'+
+      (m?pfEsc(m.nome)+' · dia '+m.dia+(n>1?' · '+n+' mundos':''):'Nenhum mundo ainda')+'</small></span><span class="lg-ent">Entrar</span></button>'+
+      '<button type="button" class="lg-del" data-del="'+p.id+'" aria-label="Excluir o perfil '+nm+'" title="Excluir perfil">'+LG_LIXO+'</button>'+
+      (lgApaga===p.id?'<div class="lg-conf" role="group" aria-label="Excluir o perfil '+nm+'"><b>Excluir '+nm+'?</b><small>'+
+        (n?(n>1?'O perfil e os '+n+' mundos dele somem':'O perfil e o mundo dele somem'):'O perfil some')+' deste computador. Não tem volta.</small>'+
+        '<span class="lg-conf-bts"><button type="button" class="btn" data-nao="'+p.id+'">Cancelar</button><button type="button" class="btn lg-sim" data-sim="'+p.id+'">Excluir</button></span></div>':'')+'</div>';}).join('');
   $('lg-sub').textContent=lista.length?'Escolha o seu perfil. Cada perfil tem o seu personagem e os seus mundos.':'Crie o seu perfil para começar. Ele guarda o seu personagem e os seus mundos neste computador.';
   if(!lista.length)pfLoginNovo(true);else $('lg-mais').hidden=!$('lg-novo').hidden||lista.length>=PF_MAX;}
 function pfLoginNovo(on){$('lg-novo').hidden=!on;$('lg-mais').hidden=on||PERFIS.lista.length>=PF_MAX;$('lg-cancelar').hidden=!PERFIS.lista.length;$('lg-msg').textContent='';
   if(on){$('lg-nome').value='';setTimeout(()=>$('lg-nome').focus(),30);}}
-function pfMostrarLogin(){G.modo='menu';tela('t-login');hudEl.classList.add('oculto');$('lg-novo').hidden=true;$('lg-msg').textContent='';pfLoginRender();
+function pfMostrarLogin(){lgApaga=null;G.modo='menu';tela('t-login');hudEl.classList.add('oculto');$('lg-novo').hidden=true;$('lg-msg').textContent='';pfLoginRender();
   const v=document.querySelector('#t-menu .versao');$('lg-versao').textContent=v&&v.firstChild?String(v.firstChild.textContent).trim():'';}
-$('lg-lista').addEventListener('click',e=>{const b=e.target.closest('[data-id]'),p=b&&pfAchar(b.dataset.id);if(!p)return;sfx('clique');try{audioInit();}catch(_){}pfEntrar(p);mostrarMenu();});
+const lgFoco=q=>{const el=document.querySelector('#lg-lista '+q);if(el)el.focus();};
+$('lg-lista').addEventListener('click',e=>{const t=e.target,del=t.closest('[data-del]'),nao=t.closest('[data-nao]'),sim=t.closest('[data-sim]');
+  if(del){sfx('clique');lgApaga=del.dataset.del;$('lg-msg').textContent='';pfLoginRender();lgFoco('[data-nao]');return;}
+  if(nao){sfx('clique');const id=lgApaga;lgApaga=null;pfLoginRender();lgFoco('[data-del="'+id+'"]');return;}
+  if(sim){const p=pfAchar(sim.dataset.sim);lgApaga=null;if(p){sfx('clique');pfApagarPerfil(p);}pfLoginRender();if(p)$('lg-msg').textContent='O perfil "'+p.nome+'" foi excluído.';return;}
+  const b=t.closest('.lg-perfil[data-id]'),p=b&&pfAchar(b.dataset.id);if(!p)return;
+  if(lgApaga){sfx('clique');lgApaga=null;pfLoginRender();return;}   // com uma pergunta aberta, tocar em outro cartão só fecha a pergunta
+  sfx('clique');try{audioInit();}catch(_){}pfEntrar(p);mostrarMenu();});
+$('lg-lista').addEventListener('keydown',e=>{if(e.key!=='Escape'||!lgApaga)return;e.preventDefault();e.stopPropagation();const id=lgApaga;lgApaga=null;pfLoginRender();lgFoco('[data-del="'+id+'"]');});
 $('lg-mais').addEventListener('click',()=>{sfx('clique');pfLoginNovo(true);});
 $('lg-cancelar').addEventListener('click',()=>{sfx('clique');pfLoginNovo(false);});
 $('lg-novo').addEventListener('submit',e=>{e.preventDefault();const nome=pfNome($('lg-nome').value),msg=t=>{$('lg-msg').textContent=t;};
