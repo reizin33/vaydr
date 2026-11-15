@@ -153,6 +153,9 @@ function luzSol(LVo,LPo,LVPo,cx,cz,meio,S){const L=E.dd,f=norm([-L[0],-L[1],-L[2
   const tx=2*meio/S,a=cx*r[0]+cz*r[2],b=cx*u[0]+cz*u[2],da=Math.round(a/tx)*tx-a,db=Math.round(b/tx)*tx-b,C=[cx+r[0]*da+u[0]*db,u[1]*db,cz+r[2]*da+u[2]*db];
   lookAt(LVo,[C[0]+L[0]*150,C[1]+L[1]*150,C[2]+L[2]*150],C,[0,1,0]);ortho(LPo,-meio,meio,-meio,meio,1,330);mul(LVPo,LPo,LVo);}
 let spotP=[0,-100,0],spotD=[0,-1,0];const PLv=new Float32Array(16),PCv=new Float32Array(12);let NPL=0;
+/* furo pontilhado em volta do jogador (o que fica entre a câmera e ele some aos poucos). v10.2.3: a ferramenta na mão dele fica de
+   fora (vista de frente, a cabeça da picareta e o resto da peça ficavam entre a câmera e o corpo e sumiam) */
+function furoJog(u,on){if(!u.uVer)return;if(on&&cfg.cam!=='1'&&!CARRO.ativo&&P.alive&&camDist>1.2)gl.uniform4f(u.uVer,P.x,P.y+(P.agachado?0.75:1.1),P.z,0.95);else gl.uniform4f(u.uVer,0,0,0,0);}
 function setLit(Pg){const u=Pg.u,sh=GRAF[cfg.graf].sombra>0,post=!!GDEF;gl.useProgram(Pg.p);if(u.uAlbT){gl.uniform1i(u.uAlbT,5);gl.uniform1f(u.uUseTex,0);}if(u.uJog)gl.uniform4f(u.uJog,P.x,P.y,P.z,P.alive&&!CARRO.ativo?1:0);
   gl.uniformMatrix4fv(u.uViewProj,false,VP);gl.uniform3fv(u.uCam,cam.pos);gl.uniform3f(u.uTint,1,1,1);gl.uniform1f(u.uAlpha,1);
   gl.uniform3fv(u.uHemiS,E.hs);gl.uniform3fv(u.uHemiG,E.hg);gl.uniform3fv(u.uDirD,E.dd);gl.uniform3fv(u.uDirC,E.dc);
@@ -161,7 +164,7 @@ function setLit(Pg){const u=Pg.u,sh=GRAF[cfg.graf].sombra>0,post=!!GDEF;gl.usePr
   gl.uniform3fv(u.uFog,post?E.fogL:E.hor);gl.uniform3fv(u.uFogSun,post?E.fogSunL:E.fogSun);gl.uniform3fv(u.uSunD,E.sunFogD);gl.uniform1f(u.uMist,E.mist);
   gl.uniform1f(u.uFogD,E.fogD);gl.uniform1f(u.uExp,E.exp);gl.uniform1f(u.uDetail,GRAF[cfg.graf].detalhe);if(u.uWet)gl.uniform1f(u.uWet,E.wet||0);gl.uniform1f(u.uEmis,post?2.2:1);
   gl.uniform3fv(u.uRim,E.rim);gl.uniform1f(u.uTime,G.t);gl.uniform2fv(u.uWind,E.wind);
-  if(u.uVer){if(cfg.cam!=='1'&&!CARRO.ativo&&P.alive&&camDist>1.2)gl.uniform4f(u.uVer,P.x,P.y+(P.agachado?0.75:1.1),P.z,0.95);else gl.uniform4f(u.uVer,0,0,0,0);}
+  furoJog(u,true);
   gl.uniform1f(u.uShadowOn,sh?1:0);gl.uniformMatrix4fv(u.uShadowM,false,SM);gl.uniformMatrix4fv(u.uShadowM2,false,SM2);gl.uniform1f(u.uCasc,SHADOW&&SHADOW.casc?1:0);gl.uniform1f(u.uTexel,1/(SHADOW?SHADOW.size:1024));
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,SHADOW.tex);gl.uniform1i(u.uShadow,0);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,NOISE_TEX);gl.uniform1i(u.uNoise,1);
   if(u.uSplat){gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,SPLAT_TEX);gl.uniform1i(u.uSplat,2);}gl.activeTexture(gl.TEXTURE0);}
@@ -328,7 +331,7 @@ function render(){
   desenharChao(PL);   // itens no chão: cada um com o seu modelo (48yc)
   if(P.mochila){trs(TMP,P.mochila.x,P.mochila.y,P.mochila.z,0,0.6,0,1,1,1);drawStat(PL,MESH.mochila,TMP);}
   if(G.ev&&G.ev.ativo){trs(TMP,G.ev.x,G.ev.y,G.ev.z,0,0.4,0,1,1,1);drawStat(PL,MESH.caixa,TMP);}
-  if(armaMesh&&cfg.cam!=='1'&&!CARRO.ativo){drawStat(PL,armaMesh,hand);if(selId==='lanterna'&&P.lanterna&&MESH.lanternaLente)drawStat(PL,MESH.lanternaLente,hand);}
+  if(armaMesh&&cfg.cam!=='1'&&!CARRO.ativo){furoJog(PL.u,false);drawStat(PL,armaMesh,hand);if(selId==='lanterna'&&P.lanterna&&MESH.lanternaLente)drawStat(PL,MESH.lanternaLente,hand);furoJog(PL.u,true);}
   desenharArmas2(PL);desenharSobrevArmas(PL);desenharBase(PL);desenharArmasZ(PL);desenharArmas3(PL);desenhoFase('opaco',PL);
   desenharCarro(PL);
   setLit(PLI);drawInst(PLI,MESH.galho);drawInst(PLI,MESH.grass);drawInst(PLI,MESH.flor);drawInst(PLI,MESH.samambaia);drawInst(PLI,MESH.folhas);

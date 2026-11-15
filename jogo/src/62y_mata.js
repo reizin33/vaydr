@@ -25,7 +25,17 @@ function mataEsp(x,z){const n=MATAV.esp.length;return Math.min(n-1,Math.floor(pi
 /* altura da árvore redonda detalhada de antes (s = 1) */
 function mataAlturaRedonda(){const L=ARVL.lim&&ARVL.lim.roundHi;return L?L.hi[1]-L.lo[1]:7;}
 /* escala da espécie e cor das folhas: miolo da copa mais escuro, pontas mais claras, um pouco de variação de verde */
-function mataGeo(f,k,fol){const n=f.length/11;for(let i=0;i<n;i++){const a=i*11;f[a]*=k;f[a+1]*=k;f[a+2]*=k;}
+/* 14/11 (Himalaia: "as árvores consigo atravessar todas"): nas espécies da Poly Haven o tronco não fica no meio do modelo (o da
+   ilha2 sai 0,9 m para o lado, o da pequena 0,7 m, o do jacarandá 0,4 m) e é bem mais grosso que o círculo de colisão de antes
+   (0,23 m × tamanho): o jogador colidia com um poste invisível ao lado e atravessava o tronco que se vê. Agora o modelo inteiro
+   anda para o tronco (a parte de 0,3 a 1,6 m de altura) ficar em cima do ponto da árvore, e o raio da colisão de cada árvore
+   passa a ser o do tronco da espécie dela (arvRaio). Também deixa a árvore cair girando pelo pé do tronco (corte). */
+function mataTronco(A,k){const pts=[];for(const nome in A.lod[0]){if(nome==='folhas'||/branch/i.test(nome))continue;const f=mod3dDecodificar(A.lod[0][nome]).f;
+    for(let i=0;i<f.length;i+=11){const y=f[i+1]*k;if(y>0.3&&y<1.6)pts.push(f[i]*k,f[i+2]*k);}}
+  if(!pts.length)return{cx:0,cz:0,r:TREE_R};const m=pts.length/2;let cx=0,cz=0;for(let i=0;i<pts.length;i+=2){cx+=pts[i];cz+=pts[i+1];}cx/=m;cz/=m;
+  const d=[];for(let i=0;i<pts.length;i+=2)d.push(Math.hypot(pts[i]-cx,pts[i+1]-cz));d.sort((a,b)=>a-b);
+  return{cx,cz,r:Math.max(0.1,d[Math.floor(d.length*0.72)])};}
+function mataGeo(f,k,fol,T){const n=f.length/11,dx=T?-T.cx:0,dz=T?-T.cz:0;for(let i=0;i<n;i++){const a=i*11;f[a]=f[a]*k+dx;f[a+1]*=k;f[a+2]=f[a+2]*k+dz;}
   /* madeira: o pé do tronco mais escuro até ~1,3 m (terra, musgo e a sombra do chão). Sem isso a raiz das árvores de casca
      clara, deitada no chão e de frente para o céu, ficava quase branca e parecia uma mancha (13/11) */
   if(!fol){for(let i=0;i<n;i++){const a=i*11,t=Math.min(1,Math.max(0,f[a+1]/1.3)),ao=0.48+0.52*t*t*(3-2*t);f[a+3]*=ao;f[a+4]*=ao;f[a+5]*=ao;}return;}let cx=0,cy=0,cz=0;for(let i=0;i<n;i++){cx+=f[i*11];cy+=f[i*11+1];cz+=f[i*11+2];}cx/=n;cy/=n;cz/=n;
@@ -37,14 +47,19 @@ function mataMontar(){MATAV.ok=false;MATAV.esp=[];if(typeof MATA==='undefined'||
   const max=MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length+(typeof FRUTEIRAS!=='undefined'?FRUTEIRAS.length+40:0);
   for(const id of MATA_ESP){const A=MATA[id];if(!A||A.tipo!=='arvore')continue;const k=hR*(MATA_ALT[id]||1)/A.h;
     const tex={};for(const nome in A.tex)tex[nome]=texModelo('mata_'+id+'_'+nome,A.tex[nome],nome!=='folhas');
+    const T=mataTronco(A,k);
     const lods=A.lod.map(L=>{const partes=[];for(const nome in L){const fol=nome==='folhas';
-        const m=instTex(L[nome],max,tex[nome],fol?1:0,f=>mataGeo(f,k,fol));m.sway=MESH.roundN.sway;partes.push({m,fol,tex:tex[nome]});}return partes;});
-    MATAV.esp.push({id,tex,lods,k,lim:{lo:A.lo.map(v=>v*k),hi:A.hi.map(v=>v*k)}});}
+        const m=instTex(L[nome],max,tex[nome],fol?1:0,f=>mataGeo(f,k,fol,T));m.sway=MESH.roundN.sway;partes.push({m,fol,tex:tex[nome]});}return partes;});
+    MATAV.esp.push({id,tex,lods,k,tronco:T,lim:{lo:A.lo.map(v=>v*k),hi:A.hi.map(v=>v*k)}});}
   MATAV.restoR=instClone(MESH.roundN,MESH.roundN.max);MATAV.restoB=instClone(MESH.birchN,MESH.birchN.max);MATAV.restoP=MESH.pineN?instClone(MESH.pineN,MESH.pineN.max):null;
   MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='ilha1');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
   MATAV.ok=MATAV.esp.length>0;MATAV.info={especies:MATAV.esp.map(e=>({id:e.id,escala:+e.k.toFixed(3),altura:+(e.lim.hi[1]).toFixed(2),
     tri:e.lods.map(L=>L.reduce((s,p)=>s+p.m.tri,0))})),alturaRedonda:+hR.toFixed(2)};}
-etapaMalha('mata','mata',7,()=>{try{mataMontar();}catch(e){console.error('mata nova',e);MATAV.erro=String(e);MATAV.ok=false;}});
+/* raio da colisão de uma árvore: o do tronco da espécie dela (pinheiros, que usam a espécie esticada, um pouco mais) */
+function arvRaio(t){if(!MATAV.ok||!MATAV.esp.length)return TREE_R*t.s;const e=MATAV.esp[mataEsp(t.x,t.z)];return(e&&e.tronco?e.tronco.r:TREE_R)*(t.kind===0?(MATAV.kPinho||1):1)*t.s;}
+function mataColisoes(){if(!MATAV.ok)return;let n=0;for(const c of COLL.filter(c=>c.tree&&c.tree!==true)){const t=c.tree,r=arvRaio(t);if(Math.abs(r-c.r)<0.01)continue;
+    colRemove(c);colCircle(t.x,t.z,r,{tree:t});n++;}MATAV.info.colisoes=n;MATAV.info.troncos=MATAV.esp.map(e=>({id:e.id,raio:+e.tronco.r.toFixed(2),desvio:[+e.tronco.cx.toFixed(2),+e.tronco.cz.toFixed(2)]}));}
+etapaMalha('mata','mata',7,()=>{try{mataMontar();mataColisoes();}catch(e){console.error('mata nova',e);MATAV.erro=String(e);MATAV.ok=false;}});
 /* as árvores de perto (redondas e bétulas) vão para a espécie de cada uma: de perto o LOD0, até o fim do "perto" o LOD1 */
 function mataDistribuir(){if(!MATAV.ok)return;const R0=(MATA_R0[cfg.graf]??22)**2,R1=(MATA_R1[cfg.graf]??60)**2,liga=mataLigada()&&mataProntas(),tmp=MATAV.tmp||(MATAV.tmp=new Float32Array(8));
   for(const e of MATAV.esp)for(const L of e.lods)for(const p of L)p.m.n=0;MATAV.restoR.n=0;MATAV.restoB.n=0;if(MATAV.restoP)MATAV.restoP.n=0;MATAV.nExtra=0;

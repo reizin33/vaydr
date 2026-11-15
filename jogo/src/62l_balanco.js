@@ -19,14 +19,17 @@
    Animais (caça) levam o mesmo dano de antes de cada arma, para a caça não mudar. Explosão e fogo continuam como eram. */
 const BALANCO={
   regioes:{cabeca:2.5,tronco:1,bracos:0.6,pernas:0.7},
-  regioesCat:{espingarda:{cabeca:1.6,bracos:0.7,pernas:0.75},precisao:{cabeca:3}},
+  /* 14/11 (Himalaia: "um tiro da pistola tá matando direto"): com "Mão firme" no máximo o tiro de pistola na cabeça tirava ~109 e
+     derrubava qualquer zumbi comum com um tiro. Agora a pistola tira 26 no corpo e 2 vezes isso na cabeça: o zumbi comum (100)
+     pede 2 tiros na cabeça mesmo com "Mão firme" no máximo e a melhoria da mira; o corredor (65) cai com 1 só nesse caso */
+  regioesCat:{pistola:{cabeca:2},espingarda:{cabeca:1.6,bracos:0.7,pernas:0.75},precisao:{cabeca:3}},
   variacao:0.08,          // ± no dano de cada acerto (de cada bago, na espingarda)
   correndo:1.6,           // a abertura do tiro cresce assim correndo
   miraPorNivel:0.15,      // habilidade "Mão firme": armas de fogo, arco e besta
   forcaPorNivel:0.12,     // habilidade "Braço forte": corpo a corpo
   categorias:{pistola:'Pistola',espingarda:'Espingarda',precisao:'Rifle de precisão',projetil:'Arco e besta',branca:'Arma branca'},
   armas:{
-    pistola:{cat:'pistola',dano:30,tempo:0.3,pente:8,recarga:1.3,municao:'municao9',alcance:20,alcanceMax:50,minK:0.55,abre:0.012,abreMira:0.004,bicho:55},
+    pistola:{cat:'pistola',dano:26,tempo:0.3,pente:8,recarga:1.3,municao:'municao9',alcance:20,alcanceMax:50,minK:0.55,abre:0.012,abreMira:0.004,bicho:55},
     espingarda:{cat:'espingarda',dano:14,chumbo:8,tempo:0.9,pente:5,municao:'cartucho',alcance:5,alcanceMax:25,minK:0.15,abre:0.075,abreMira:0.06,bicho:19},
     rifle:{cat:'precisao',dano:125,tempo:1.15,pente:5,recarga:2,municao:'balaRifle',alcance:80,alcanceMax:140,minK:0.8,abre:0.03,abreMira:0,atravessa:2,atravessaK:0.65,bicho:150},
     besta:{cat:'projetil',dano:80,tempo:0.25,pente:1,recarga:1.5,municao:'virote',bicho:120},

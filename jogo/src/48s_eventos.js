@@ -105,7 +105,7 @@ function mundoAmanhece(){const M=mundoD();
   for(const e of M.ev){if(!e.fim&&e.tipo==='infestacao'&&G.dia>e.ate){e.fim='sumiu';e.fimDia=G.dia;}if(!e.fim&&e.tipo==='comboio'&&G.dia-e.dia>8){e.fim='sumiu';e.fimDia=G.dia;}}
   for(let i=M.ev.length-1;i>=0;i--){const e=M.ev[i];if(e.fim&&G.dia-(e.fimDia||G.dia)>=1&&e.tipo!=='estrada'){if(e.cols)for(const c of e.cols)colRemove(c);M.ev.splice(i,1);}else if(e.tipo==='estrada'&&e.fim)M.ev.splice(i,1);}
   // tocos de árvore queimada: a mata volta depois de 6 dias
-  for(let i=M.tocos.length-1;i>=0;i--){const q=M.tocos[i];if(G.dia-q.dia>=6){const t=TREES[q.id];if(t)colRemove(COLL.find(c=>c.queimada===t)||{});if(t&&!t.alive&&!t.agua){t.alive=true;t.hp=5;if(!COLL.find(c=>c.tree===t))colCircle(t.x,t.z,TREE_R*t.s,{tree:t});vegDirty=true;}M.tocos.splice(i,1);}}
+  for(let i=M.tocos.length-1;i>=0;i--){const q=M.tocos[i];if(G.dia-q.dia>=6){const t=TREES[q.id];if(t)colRemove(COLL.find(c=>c.queimada===t)||{});if(t&&!t.alive&&!t.agua){t.alive=true;t.hp=5;if(!COLL.find(c=>c.tree===t))colCircle(t.x,t.z,typeof arvRaio==='function'?arvRaio(t):TREE_R*t.s,{tree:t});vegDirty=true;}M.tocos.splice(i,1);}}
   if(G.dia<2||Math.random()>EVM.chanceDia)return;const ativos=M.ev.filter(e=>!e.fim&&e.tipo!=='esconderijo').length;if(ativos>=EVM.maxAtivos)return;
   const pesos=Object.assign({},EVM.peso);if(G.dia<3)pesos.infestacao=0;if(G.dia<4)pesos.comboio=0;if((G.clima&&G.clima.atual==='tempestade')||G.chuva>0.5)pesos.estrada*=2.2;
   let tot=0;for(const k in pesos)tot+=pesos[k];let r=Math.random()*tot,esc=null;for(const k in pesos){r-=pesos[k];if(r<=0){esc=k;break;}}

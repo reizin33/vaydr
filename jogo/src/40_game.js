@@ -671,7 +671,7 @@ function serializar(){const q=posSalvar();return{v:1,mv:MUNDO_V,dia:G.dia,hora:G
   cao:{a:CAO.ativo,st:CAO.st,m:CAO.modo,x:+CAO.x.toFixed(2),z:+CAO.z.toFixed(2),hp:Math.round(CAO.hp),fx:+CAO.ficaX.toFixed(2),fz:+CAO.ficaZ.toFixed(2)},
   prog:{xp:G.xp,nivel:G.nivel,pontos:G.pontos,perks:G.perks,tarefas:G.tarefas,tarefaN:G.tarefaN,luaSangue:G.luaSangue,caiuNoite:G.caiuNoite},fab:G.fab,cid:cidSalvar(),sob:sobrevSalvar(),x8:v8Salvar()};}
 function salvarJogo(){if(G.modo!=='jogo'&&G.modo!=='pausa'&&G.modo!=='morto')return;G.salvarT=45;let s;try{s=serializar();}catch(e){console.error(e);saveFalhou('erro ao montar o save');return false;}return gravarSave(s);}
-function resetMundo(){for(const t of TREES){if(t.agua)continue;if(!t.alive){t.alive=true;t.hp=5;if(!COLL.find(c=>c.tree===t))colCircle(t.x,t.z,TREE_R*t.s,{tree:t});}t.hp=5;}
+function resetMundo(){for(const t of TREES){if(t.agua)continue;if(!t.alive){t.alive=true;t.hp=5;if(!COLL.find(c=>c.tree===t))colCircle(t.x,t.z,typeof arvRaio==='function'?arvRaio(t):TREE_R*t.s,{tree:t});}t.hp=5;}
   for(const r of ROCKS){if(r.agua)continue;if(!r.alive){r.alive=true;colCircle(r.x,r.z,0.85*r.s,{rock:r});}r.hp=4;}
   for(const b of BUSHES){if(b.agua)continue;b.frutas=true;b.cresce=0;}for(const p of PICKS)if(!p.agua)p.alive=true;for(const i of INTER)delete i.dia;
   while(OB.length)destruirObraSilenciosa(OB[0]);Z.length=0;BICHOS.length=0;DROPS.length=0;PART.length=0;RINGS.length=0;MANCHAS.length=0;resetArmas2();resetAmbiente();resetZumbis2();resetArmas3();resetEfeitos();vegDirty=true;}
