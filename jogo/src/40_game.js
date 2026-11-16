@@ -186,6 +186,9 @@ function sobreviver(dt,running){const df=DIF[cfg.dif],mt=1-0.15*perk('metab');P.
 function animarJogador(dt){const o=P.ch.r,a=P.acao,d=selDef(),k=P.agK||0;
   poseLoco(o,P.ph,P.amp*(1-0.4*k),G.t,Math.max(P.runK||0,P.amp>0.85?clamp((P.amp-0.85)/0.15,0,1)*0.6:0)*(1-k));   // corrida misturada aos poucos (sem trocar de pose de uma vez)
   if(k>0.01){o[3]+=0.34*k;o[6]-=0.2*k;o[9]-=0.2*k;o[12]-=0.35*k;o[15]-=0.2*k;o[18]-=0.35*k;o[21]-=1.0*k;o[24]+=1.55*k;o[27]-=1.0*k;o[30]+=1.55*k;}
+  /* ferramenta de duas mãos (machado, picareta, pá, lança, taco): a mão direita leva o cabo na frente do corpo, na diagonal, e a
+     esquerda segura mais acima (62zd_maos.js); o golpe parte daqui */
+  {const it=selItem();if(it&&typeof MAO2!=='undefined'&&MAO2[it.id]&&!(a&&a.tipo!=='golpe')){S3(o,5,-0.3,0,-0.18);S3(o,6,-0.75,0,0);}}
   if(a&&a.tipo==='golpe'){const s=clamp(a.t/a.dur,0,1);const B=new Float32Array(36);B.set(o);poseMelee(B,s,a.vertical);const w=Math.min(1,s/0.1,(1-s)/0.2+0.3);for(let i=3;i<36;i++)if(i<21||i>=33)o[i]=lerp(o[i],B[i],clamp(w,0,1));}
   else if(d&&d.fogo&&(P.aim>0.05||(a&&a.tipo==='tiro')))poseAim(o,Math.max(P.aim,a&&a.tipo==='tiro'?1:0),P.recuo);
   else if(d&&d.fogo){S3(o,5,-0.35,0,-0.1);S3(o,6,-0.45,0,0);}
