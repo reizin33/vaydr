@@ -256,8 +256,9 @@ function golpeAcerta(a){const s=a.arma,d=s?ITEMS[s.id]:a.pedra?BALANCO.brancas.p
       else dica('gigante2','corpo','Essa árvore é grande demais para derrubar. Procure os cipós no tronco: por eles dá para subir até os galhos.');return;}}
   if(s&&d.corta){const t=perto(TREES,P.x+fx*1.0,P.z+fz*1.0,1.6,t=>t.alive&&Math.hypot(t.x-P.x,t.z-P.z)<2.6);
     if(t){t.hp--;const n=1+(Math.random()<(d.rende??0.5)?1:0)+(t.hp<=0?perk('lenhador'):0);ganhar('madeira',n);lascas(t.x,t.y+1.0,t.z,[0.55,0.38,0.22,1]);sfx('madeira',t.x,t.z);barulho(P.x,P.z,14,true);gastar(s,1);
-      if(t.hp<=0)derrubarArvore(t);
-      return;}}
+      if(t.hp<=0){derrubarArvore(t);if(typeof quedaComecar==='function')quedaComecar(t);}   // a árvore tomba e vira tora (62ze_queda.js)
+      return;}
+    if(typeof toraGolpe==='function'&&toraGolpe(P.x+fx*1.0,P.z+fz*1.0,s,d))return;}
   if(!s||a.soco){const t=perto(TREES,P.x+fx*0.8,P.z+fz*0.8,1.4,t=>t.alive&&Math.hypot(t.x-P.x,t.z-P.z)<1.75+0.3*t.s);
     if(t){lascas(t.x,t.y+1.1,t.z,[0.55,0.38,0.22,1],4);sfx('madeira',t.x,t.z,0.6);barulho(P.x,P.z,6,true);P.shake=0.12;P.socoMad=(P.socoMad||0)+1;
       if(a.pedra){P.socoMad+=0.5;const sp=selItem();if(sp&&sp.id==='pedra'&&Math.random()<0.1){sp.n--;if(sp.n<=0)P.inv[P.sel]=null;feed('A pedra rachou',true);hudBarra();}}

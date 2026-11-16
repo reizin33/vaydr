@@ -49,7 +49,7 @@ function mataMontar(){MATAV.ok=false;MATAV.esp=[];if(typeof MATA==='undefined'||
     const tex={};for(const nome in A.tex)tex[nome]=texModelo('mata_'+id+'_'+nome,A.tex[nome],nome!=='folhas');
     const T=mataTronco(A,k);
     const lods=A.lod.map(L=>{const partes=[];for(const nome in L){const fol=nome==='folhas';
-        const m=instTex(L[nome],max,tex[nome],fol?1:0,f=>mataGeo(f,k,fol,T));m.sway=MESH.roundN.sway;partes.push({m,fol,tex:tex[nome]});}return partes;});
+        const m=instTex(L[nome],max,tex[nome],fol?1:0,f=>mataGeo(f,k,fol,T));m.sway=MESH.roundN.sway;partes.push({m,fol,tex:tex[nome],nome});}return partes;});
     MATAV.esp.push({id,tex,lods,k,tronco:T,lim:{lo:A.lo.map(v=>v*k),hi:A.hi.map(v=>v*k)}});}
   MATAV.restoR=instClone(MESH.roundN,MESH.roundN.max);MATAV.restoB=instClone(MESH.birchN,MESH.birchN.max);MATAV.restoP=MESH.pineN?instClone(MESH.pineN,MESH.pineN.max):null;
   MATAV.jac=MATAV.esp.findIndex(e=>e.id==='jacaranda');MATAV.peq=MATAV.esp.findIndex(e=>e.id==='ilha1');MATAV.extra=new Float32Array((MESH.roundN.max+MESH.birchN.max+(MESH.pineN?MESH.pineN.max:0)+GIGANTES.length)*8);MATAV.nExtra=0;
