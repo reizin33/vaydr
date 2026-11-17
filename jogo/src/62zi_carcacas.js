@@ -14,8 +14,8 @@ function carcGB(seed){const g=new GB(1<<13,8),R=rng(seed);return{g,R,A:(t,m,c,o)
 /* roda deitada no eixo x (cylTris sobe em y; girada vai de x0-h a x0): centro em (x, y, z) */
 function carcRoda(A,x,y,z,r,h,c,seg){A(cylTris(r,r,h,seg||12),mat(x+h/2,y,z,0,0,Math.PI/2),c);}
 CARC.geo.onibus=function(){const{g,R,A}=carcGB(4401);
-  const fuligem=lin(0x15120f),queimado=lin(0x4a3b30),ferrugem=lin(0x7a4628),ferrugem2=lin(0x93603a),cinza=lin(0x8c877e),tinta=lin(0xa98a3a),aro=lin(0x5b5650),banco=lin(0x2b2621);
-  const casca=()=>{const r=R();return r<0.35?queimado:r<0.65?ferrugem:r<0.85?ferrugem2:cinza;};
+  const fuligem=lin(0x15120f),queimado=lin(0x3d3631),ferrugem=lin(0x5e3f2c),ferrugem2=lin(0x6e5440),cinza=lin(0x75706a),tinta=lin(0x8a7440),aro=lin(0x4a4642),banco=lin(0x2b2621);
+  const casca=()=>{const r=R();return r<0.4?queimado:r<0.65?ferrugem:r<0.85?cinza:ferrugem2;};   // depois da 1ª captura: menos laranja (parecia tábua), mais cinza e fuligem
   /* aros sem pneu: o ônibus assentou */
   for(const wz of[3.6,-3.8])for(const s of[-1,1]){carcRoda(A,s*1.05,0.42,wz,0.42,0.22,aro);carcRoda(A,s*1.08,0.42,wz,0.16,0.26,fuligem,8);}
   for(const s of[-1,1])A(boxTris(0.16,0.22,10.6),mat(s*0.55,0.6,0),fuligem);   // longarinas
@@ -24,20 +24,20 @@ CARC.geo.onibus=function(){const{g,R,A}=carcGB(4401);
   for(const s of[-1,1]){const x=s*1.235;
     if(s>0){A(boxTris(0.05,0.62,10.0),mat(x,1.29,-0.75),casca());A(boxTris(0.05,0.62,0.5),mat(x,1.29,5.5),casca());}
     else A(boxTris(0.05,0.62,11.5),mat(x,1.29,0),casca());
-    for(const[z0,z1]of[[-5.75,-4.45],[-3.15,2.95],[4.25,5.75]]){if(s>0&&z0>4){A(boxTris(0.05,0.5,0.5),mat(x,0.73,5.5),tinta);continue;}
-      A(boxTris(0.05,0.5,z1-z0),mat(x,0.73,(z0+z1)/2),z0<-5?mixc(tinta,queimado,0.3):casca());}
+    for(const[z0,z1]of[[-5.75,-4.45],[-3.15,2.95],[4.25,5.75]]){if(s>0&&z0>4){A(boxTris(0.05,0.5,0.5),mat(x,0.73,5.5),casca());continue;}
+      A(boxTris(0.05,0.5,z1-z0),mat(x,0.73,(z0+z1)/2),casca());}
     /* colunas das janelas (uma ou outra caída, algumas tortas pelo calor) */
     for(let z=-5.3;z<=5.0;z+=1.17){if(s>0&&z>4.1)continue;const t=R();if(t<0.08)continue;
       A(boxTris(0.07,0.98,0.1),mat(x,2.09,z,(R()-0.5)*0.12,0,s*(R()<0.25?0.12+R()*0.15:0)),t<0.5?fuligem:queimado);}
     A(boxTris(0.08,0.07,11.5),mat(x,1.62,0),queimado);   // friso da janela
     A(boxTris(0.09,0.14,11.5),mat(x,2.6,0),fuligem);     // calha de cima, preta da fumaça
-    for(let i=0;i<5;i++){const z=-5+R()*10;A(boxTris(0.02,0.3+R()*0.35,0.4+R()*0.8),mat(x+s*0.03,1.2+R()*0.3,z),R()<0.5?ferrugem2:cinza);}}   // descascados
+    for(let i=0;i<3;i++){const z=-5+R()*10;A(boxTris(0.02,0.3+R()*0.35,0.4+R()*0.8),mat(x+s*0.03,1.2+R()*0.3,z),R()<0.5?ferrugem2:fuligem);}}   // descascados e fuligem
   A(boxTris(0.04,1.7,0.5),mat(1.46,0.92,4.8,0,0.55,0.22),queimado);   // a porta, caída para fora
   /* teto cedendo no meio, com um pedaço queimado de fora a fora (aparecem os arcos) */
   const N=6,L=11.5/N;
   for(let k=0;k<N;k++){const zc=-5.75+(k+0.5)*L,y=2.69-0.2*Math.sin(Math.PI*(k+0.5)/N),dy=-0.2*Math.PI/11.5*Math.cos(Math.PI*(k+0.5)/N);
     if(k===3){A(boxTris(2.3,0.04,0.8),mat(0.1,y-0.22,zc-0.45,0.55,0.1,0.06),queimado);continue;}   // pedaço pendurado para dentro
-    A(boxTris(2.5,0.06,L+0.02),mat(0,y,zc,-Math.atan(dy),0,(R()-0.5)*0.03),k%2?queimado:ferrugem);}
+    A(boxTris(2.5,0.06,L+0.02),mat(0,y,zc,-Math.atan(dy),0,(R()-0.5)*0.03),k%2?queimado:cinza);}
   for(let z=-5.2;z<=5.2;z+=1.17)A(boxTris(2.4,0.05,0.06),mat(0,2.6-0.2*Math.sin(Math.PI*(z+5.75)/11.5),z),fuligem);   // arcos do teto
   /* frente e traseira */
   A(boxTris(2.5,0.95,0.08),mat(0,1.18,5.76),mixc(tinta,queimado,0.35));
@@ -100,8 +100,8 @@ CARC.geo.ambulancia=function(){const{g,R,A}=carcGB(6601);
   for(const z of[-0.7,0.7])A(boxTris(0.5,0.35,0.04),mm(mat(0.1,0.52,-3.55,-0.44,0.12,0),mat(0,-0.2,z)),chassi);
   return g.data();};
 /* malha de cada tipo ('onibus', 'ambulancia', 'caminhao0'..'caminhao2'): partes por material, como os veículos (62zf) */
-function carcMalha(nome){const m=/^([a-z]+)(\d*)$/.exec(nome),fn=m&&CARC.geo[m[1]];if(!fn)return null;const f=fn(+(m[2]||0));
-  const c=typeof itxMalha==='function'&&typeof ITX_DADOS!=='undefined'?itxMalha('carc_'+m[1],f,0.5,true):null;
+function carcMalha(nome){const m=/^([a-z]+)(\d*)$/.exec(nome),fn=m&&CARC.geo[m[1]];if(!fn)return null;const f=fn(+(m[2]||0)),qm=m[1]==='onibus';
+  const c=typeof itxMalha==='function'&&typeof ITX_DADOS!=='undefined'?itxMalha('carc_'+m[1],f,qm?1:0.5,true,qm?'metal':null):null;   // o ônibus queimado: ferrugem miúda (sem pintura)
   return c?c.partes:[litMesh(f)];}
 {const _pt=prpTem;prpTem=function(id){if(id&&id.startsWith('G:'))return!!CARC.geo[id.slice(2).replace(/\d+$/,'')];return _pt(id);};}
 {const _pm=prpMalha;prpMalha=function(id){if(!id||!id.startsWith('G:'))return _pm(id);let X=PRP.m[id];if(X!==undefined)return X;

@@ -12,6 +12,8 @@
    pedaços, um por material; drawStat desenha os pedaços (mão, chão, sobreviventes, sombra e 1ª pessoa). */
 const ITX={feito:false,tex:{},pedra:new Set(['pedra','machadoPedra','facaPedra']),pula:new Set(['braco']),erro:null,info:null};
 function itxTex(k){if(ITX.tex[k])return ITX.tex[k];
+  if(k==='vidro'){const t=gl.createTexture();skNaUnidade(()=>{gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.SRGB8_ALPHA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([188,188,188,255]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);});t.pronta=true;return ITX.tex[k]=t;}   // vidro: liso de verdade (sem o relevo de detalhe), brilho médio 0,5
   const t=skTextura(ITX_DADOS[k],true,()=>{skNaUnidade(()=>{gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);});t.pronta=true;});
   return ITX.tex[k]=t;}
 function itxMaterial(id,r,g,b){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx-mn,lum=0.2126*r+0.7152*g+0.0722*b;
@@ -23,9 +25,11 @@ function itxMaterial(id,r,g,b){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=m
 /* v10.2.6 (Himalaia: "o helicóptero também tá sem textura"): os veículos feitos no código (caminhonete, carro, moto, triciclo,
    barco, jangada, helicóptero e as rodas) ganham as mesmas texturas de material; a lataria fica com o metal gasto, a madeira da
    jangada com o veio, banco e lona com a trama. Escala da textura maior (de 50 em 50 cm), porque o veículo é grande. */
-function itxMalha(id,f,esc,veic){const nt=Math.floor(f.length/33),grupos={};
+function itxMalha(id,f,esc,veic,chave){const nt=Math.floor(f.length/33),grupos={};
   for(let t=0;t<nt;t++){const o=t*33,r=(f[o+3]+f[o+14]+f[o+25])/3,g=(f[o+4]+f[o+15]+f[o+26])/3,b=(f[o+5]+f[o+16]+f[o+27])/3,lum=0.2126*r+0.7152*g+0.0722*b;
-    const k=(veic&&id!=='v_jangada'?(lum<0.024||(g>r*1.05&&g>b)||(b>r*1.15&&b>=g*0.95&&lum<0.08)?null:ITX_DADOS.lataria?'lataria':'metal'):itxMaterial(id,r,g,b))||'liso';(grupos[k]||(grupos[k]=[])).push(t);}   // veículo: lataria pintada (não madeira); vidro, pneu e borracha lisos
+    /* veículo: lataria pintada (não madeira; a pintura verde-oliva também: o "verde é folha" só vale para os itens); o vidro
+       azulado vai liso de verdade; pneu e borracha (bem escuros) ficam com o relevo de detalhe */
+    const k=(veic&&id!=='v_jangada'?(b>r*1.15&&b>=g*0.95&&lum<0.08?'vidro':lum<0.024?null:chave||(ITX_DADOS.lataria?'lataria':'metal')):itxMaterial(id,r,g,b))||'liso';(grupos[k]||(grupos[k]=[])).push(t);}
   if(Object.keys(grupos).length===1&&grupos.liso)return null;const partes=[];
   for(const k in grupos){const tris=grupos[k],ff=new Float32Array(tris.length*33),uv=new Float32Array(tris.length*6);
     tris.forEach((t,j)=>{const a=t*33;ff.set(f.subarray(a,a+33),j*33);
