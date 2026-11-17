@@ -14,11 +14,11 @@
      muda).
    Tudo sai de regras sobre a planta de cada prédio (janelas, portas, vitrines, letreiros, sacadas, faixas de vidro da torre,
    escadas de fora, passarelas, caminhos do telhado, caixas de saque e o que já está na calçada), com sorteio fixo por prédio: o
-   mundo é sempre o mesmo e os jogos salvos não mudam. Bairros com as peças: KIT.bairros (passo 2: o Centro e a Entrada).
+   mundo é sempre o mesmo e os jogos salvos não mudam. Bairros com as peças: KIT.bairros (passo 2: o Centro e a Entrada; passo 3: Distrito Industrial e os dois bairros residenciais) e os prédios de KIT.extras fora deles (passo 4: o Galpão da Pousada, na serra).
    Desenho: as peças de cada quarteirão numa malha só, com a textura do kit (uma chamada para as grandes e outra para as pequenas,
    que somem antes), mais os cabos e a sujeira; cada quarteirão some de longe como os detalhes dos prédios. Colisão só no que fica
    no chão e no telhado. KIT.on=false desliga o desenho (para comparar antes e depois). */
-const KIT={on:true,bairros:['Centro','Entrada da cidade'],
+const KIT={on:true,bairros:['Centro','Entrada da cidade','Distrito Industrial','Bairro Residencial Sul','Bairro Residencial Norte'],extras:['Galpão da Pousada'],
   itens:[],cabos:[],manchas:[],cols:[],grupos:[],pecas:{},info:null,dist:150,distPerto:70};
 function kitOk(){return typeof KITX!=='undefined'&&!!KITX&&!!KITX.pecas;}
 function kitT(id){const X=KITX.pecas[id];return X?X.tam:[0,0,0];}
@@ -28,7 +28,7 @@ function kitLados(p){const W=p.W,D=p.D;return{
   L:{L:D,uv:(a,o)=>[-o,a],yaw:p.yaw-Math.PI/2},R:{L:D,uv:(a,o)=>[W+o,a],yaw:p.yaw+Math.PI/2}};}
 function kitLadoPos(p,u,v){const c=[['F',Math.abs(v)],['B',Math.abs(v-p.D)],['L',Math.abs(u)],['R',Math.abs(u-p.W)]];c.sort((a,b)=>a[1]-b[1]);return c[0][0];}
 const kitAo=(s,u,v)=>s==='F'||s==='B'?u:v;
-function kitTopo(p){return p.yTopo+(p.andares>1?1.1:0.9);}   // alto da platibanda
+function kitTopo(p){return p.casa?p.yTopo:p.yTopo+(p.andares>1?1.1:0.9);}   // alto da platibanda (na casa: a beira do telhado)
 /* o que não pode ser coberto em cada lado: janelas, portas, sacadas (com a porta de vidro), escadas de fora, chegada das
    passarelas e o letreiro das lojas; as peças postas entram aqui também (uma não cobre a outra) */
 function kitVaos(p){const V={F:[],B:[],L:[],R:[]};
@@ -66,9 +66,9 @@ function kitChao(ctx,m,u,v,y,gl0,e,col,x){const X=KITX.pecas[m];if(!X)return nul
 
 /* ---------- 1) calhas: num canto de cada lado, do telhado até a calçada (base com a curva, trechos retos com luva) ---------- */
 function kitCalhas(ctx){const{p,R,V,ld}=ctx,topo=kitTopo(p),C=KITX.pecas.cano,Rt=KITX.pecas.canoReto,Lv=KITX.pecas.canoLuva;if(!C||!Rt||!Lv)return;
-  for(const s of ['F','B','L','R']){const L=ld[s].L;if(L<7||(s!=='F'&&R()>0.8))continue;
+  for(const s of ['F','B','L','R']){const L=ld[s].L;if(L<7||(s!=='F'&&R()>0.8)||(p.casa&&(s==='L'||s==='R')))continue;   // casa: só onde tem beiral
     const cs=[0.42,L-0.42];if(R()<0.5)cs.reverse();
-    const o=p.andares===1&&s==='F'?0.075:0.012;   // na frente das lojas a faixa da base sai 6 cm da parede
+    const o=p.andares===1&&s==='F'&&!p.casa?0.075:0.012;   // na frente das lojas a faixa da base sai 6 cm da parede
     for(const a of cs){if(!kitLivre(V[s],a-0.42,a+0.42,QUADRA_Y-1,topo,0.05)||kitPropPerto(p,s,a))continue;
       kitParede(ctx,'cano',s,a,QUADRA_Y,o);let y=QUADRA_Y+C.hi[1],k=0;
       while(y<topo-0.08){if(k%3===2&&y+Lv.passo<topo-0.3){kitParede(ctx,'canoLuva',s,a,y,o);y+=Lv.passo;k++;continue;}   // luva a cada dois trechos
@@ -76,7 +76,7 @@ function kitCalhas(ctx){const{p,R,V,ld}=ctx,topo=kitTopo(p),C=KITX.pecas.cano,Rt
       V[s].push({s,a,a0:a-0.35,a1:a+0.35,y0:-1,y1:topo,k:'peca'});ctx.calhas.push([s,a]);break;}}}
 
 /* ---------- 2) ar-condicionado embaixo (ou do lado) de algumas janelas dos andares de cima ---------- */
-function kitArCond(ctx){const{p,R,V,ld}=ctx,ch=p.tipo==='escritorio'?0.32:0.2,max=p.tipo==='escritorio'?4:2;
+function kitArCond(ctx){const{p,R,V,ld}=ctx,ch=p.tipo==='escritorio'?0.32:0.2,max=p.tipo==='escritorio'?4:p.casa?1:2;
   for(const s of ['F','B','L','R']){let n=0;
     for(const v of V[s].slice()){if(v.k!=='jan'||v.f<1||v.j.vitrine||n>=max||R()>ch)continue;
       const m=R()<0.55?'arCond':'arCaixa',t=kitT(m),k=m==='arCond'?0.7:0.78,w=t[0]*k,h=t[1]*k;let a=v.a,y=v.y0-0.12-h;
@@ -260,7 +260,22 @@ function kitSujeiraGeo(manchas){const out=[];
   return new Float32Array(out);}
 
 /* ---------- montagem (depois que a cidade nasce) ---------- */
-function kitPredios(){return CID.predios.filter(p=>!p.casa&&!p.rural&&p.W&&(()=>{const b=bairroEm((p.x0+p.x1)/2,(p.z0+p.z1)/2);return!!b&&KIT.bairros.includes(b.nome);})());}
+/* ---------- passo 3: casas (telhado de duas águas) e armazéns do Distrito Industrial (v10.2.5) ----------
+   Casa: calha só nos lados com beiral (frente e fundo), no máximo um ar-condicionado e, em metade delas, a armação de antena
+   em pé na cumeeira, perto de um oitão (sem caixa d'água nem barraco: o telhado é inclinado). Armazém: além do telhado plano,
+   tambores, caçamba, lona e tanque encostados nas paredes do pátio (fora das portas e dos caminhos), com colisão. */
+function kitTelhadoCasa(ctx){const{p,R}=ctx;if(R()<0.5)return;const t=kitT('antena'),k=0.62,u=R()<0.5?1.2+t[0]*k/2:p.W-1.2-t[0]*k/2;
+  const it=kitChao(ctx,'antena',u,p.D/2,p.yTopo+1.5+0.08,R()<0.5?0:Math.PI,[k,k,k],false);if(it)(ctx.telhado||(ctx.telhado=[])).push('antena');}
+function kitPatio(ctx){const{p,R,V,ld}=ctx;const nos=CID.nos.filter(q=>q.y<1.5&&Math.abs(q.x-(p.x0+p.x1)/2)<p.W+8&&Math.abs(q.z-(p.z0+p.z1)/2)<p.D+8);
+  const lista=['tambores','cacamba','tambores','lona','tanque','tambores'];let n=0;
+  for(let tent=0;tent<40&&n<5;tent++){const s=['B','L','R','F'][tent%4],m=lista[n%lista.length],t=kitT(m),L=ld[s].L;if(L<t[0]+3)continue;
+    const a=1.4+t[0]/2+R()*(L-2.8-t[0]);
+    if(!kitLivre(V[s],a-t[0]/2-0.7,a+t[0]/2+0.7,-0.5,Math.max(1.6,t[1]),0)||kitPropPerto(p,s,a,0,t[0]/2+1.0)||ctx.chao.some(q=>q[0]===s&&Math.abs(q[1]-a)<t[0]+1.2))continue;
+    const uv=ld[s].uv(a,0.15+t[2]/2),gi={F:Math.PI,B:0,L:-Math.PI/2,R:Math.PI/2}[s],wc=pw(p,uv[0],uv[1]);
+    if(nos.some(q=>Math.hypot(q.x-wc[0],q.z-wc[1])<t[0]/2+1.0))continue;
+    const it=kitChao(ctx,m,uv[0],uv[1],QUADRA_Y,gi,[1,1,1],true);if(!it)continue;it.chao=true;it.wx=wc[0];it.wz=wc[1];
+    V[s].push({s,a,a0:a-t[0]/2,a1:a+t[0]/2,y0:-0.5,y1:t[1],k:'peca'});ctx.chao.push([s,a]);n++;}}
+function kitPredios(){return CID.predios.filter(p=>p.W&&(KIT.extras.includes(p.nome)||!p.rural)&&(KIT.extras.includes(p.nome)||(()=>{const b=bairroEm((p.x0+p.x1)/2,(p.z0+p.z1)/2);return!!b&&KIT.bairros.includes(b.nome);})()));}
 /* um grupo por quarteirão: as peças, os cabos e a sujeira dos prédios dele (os cabos ficam com o prédio de onde saem) */
 function kitAgrupar(){const G=new Map(),grupo=p=>{const q=quadraEm((p.x0+p.x1)/2,(p.z0+p.z1)/2)||p;let g=G.get(q);
     if(!g){g={q,ps:new Set(),itens:[],cabos:[],manchas:[],x0:1e9,x1:-1e9,z0:1e9,z1:-1e9,m:null,mp:null,mc:null,mm:null};G.set(q,g);}g.ps.add(p);return g;};
@@ -273,7 +288,8 @@ function kitGerar(){for(const c of KIT.cols)colRemove(c);KIT.cols.length=0;KIT.i
   if(!kitOk()||!CID.predios.length)return;const ps=kitPredios();if(!ps.length)return;
   const todos=new Map();
   for(const p of ps){const ctx={p,R:rng(91000+p.id*131),ld:kitLados(p),V:kitVaos(p),itens:KIT.itens,calhas:[],ares:[],chao:[]};ctx.vizinho=kitVizinhos(p,CID.predios);todos.set(p,ctx);}
-  for(const ctx of todos.values()){kitCalhas(ctx);kitLuz(ctx);kitLojas(ctx);kitArCond(ctx);kitTapumes(ctx);kitTelhado(ctx);kitBeco(ctx);}
+  for(const ctx of todos.values()){kitCalhas(ctx);kitLuz(ctx);kitLojas(ctx);kitArCond(ctx);kitTapumes(ctx);
+    if(ctx.p.casa)kitTelhadoCasa(ctx);else{kitTelhado(ctx);kitBeco(ctx);}if(ctx.p.tipo==='armazem')kitPatio(ctx);}
   for(const ctx of todos.values())kitFios(ctx,todos);
   for(const ctx of todos.values())kitSujeiraMontar(ctx);
   KIT.grupos=kitAgrupar();
