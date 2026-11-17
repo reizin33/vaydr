@@ -157,3 +157,8 @@ window.addEventListener('keydown',e=>{if(!ADM.ativo)return;if(e.target&&e.target
   if(e.code==='Backquote'){e.preventDefault();if(G.modo==='jogo')admAbrir();else if(G.modo==='criativo')admFechar();}
   else if(e.code==='Escape'&&G.modo==='criativo'){admFechar();}});
 admBotoes();
+
+/* v10.2.6 (pedido do Himalaia): tecla para ligar e desligar o voo no modo criativo, sem abrir o painel. X de fábrica; dá para
+   trocar em Ajustes > Teclas ("Voar (modo criativo)"). Fora do modo criativo a tecla não faz nada. */
+addEventListener('keydown',e=>{if(e.code!=='KeyX'||e.repeat||G.modo!=='jogo'||!ADM.ativo||CARRO.ativo)return;
+  ADM.voar=!ADM.voar;if(!ADM.voar)P.vy=0;P.voo=ADM.voar;if(typeof feed==='function')feed(ADM.voar?'Voo ligado':'Voo desligado');if(typeof sfx==='function')sfx('clique');});

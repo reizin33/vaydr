@@ -448,6 +448,68 @@ body[data-tela="pc"] .obra-acoes .btn{min-height:32px;padding:0 11px;font-size:1
   padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(20px + env(safe-area-inset-bottom,0px));background:var(--scrim)}
 .tela.clara{background:radial-gradient(90% 70% at 50% 50%,rgba(7,10,9,.15),rgba(7,10,9,.6))}
 .tc-cartao{width:min(330px,100%)}
+/* ===== menu de pausa (v10.2.6): a transmissão pausada. O jogo fica atrás, escurecido e borrado; o menu é uma coluna à
+   esquerda (grupos, ícones e teclas) e a ficha do sobrevivente fica embaixo à direita, com o relógio do dia e da noite ===== */
+.pz-tela{place-items:stretch;padding:0;background:linear-gradient(90deg,rgba(4,6,5,.94) 0%,rgba(4,6,5,.86) 30%,rgba(4,6,5,.42) 62%,rgba(4,6,5,.22) 100%);
+  -webkit-backdrop-filter:blur(3px) saturate(.65);backdrop-filter:blur(3px) saturate(.65)}
+.pz-tela::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='r'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23r)'/%3E%3C/svg%3E")}
+.pz-tela::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px)}
+.pz{position:relative;z-index:1;min-height:100%;display:grid;grid-template-columns:minmax(300px,440px) 1fr;gap:24px;
+  padding-block:calc(3.5vh + env(safe-area-inset-top,0px)) calc(3.5vh + env(safe-area-inset-bottom,0px));
+  padding-left:max(5vw,env(safe-area-inset-left,0px));padding-right:max(4vw,env(safe-area-inset-right,0px))}
+.pz-col{display:flex;flex-direction:column;gap:4px;min-width:0;margin-block:auto}
+.pz-kick{display:flex;align-items:center;gap:9px;margin:0;font:400 12px/1 var(--f-radio);letter-spacing:.18em;text-transform:uppercase;color:var(--ember)}
+.pz-ponto{width:8px;height:8px;border-radius:50%;background:var(--ember);box-shadow:0 0 10px var(--ember);animation:pzPisca 1.6s steps(2,jump-none) infinite}
+@keyframes pzPisca{50%{opacity:.25}}
+.pz-tit{margin:4px 0 0;font:400 clamp(40px,min(5.4vw,8.4vh),76px)/.92 var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--bone);
+  text-shadow:0 2px 0 rgba(0,0,0,.6);position:relative;padding-bottom:10px}
+.pz-tit::after{content:"";position:absolute;left:0;bottom:0;width:72px;height:3px;background:linear-gradient(90deg,var(--ember),transparent)}
+.pz-nome{margin:8px 0 0!important;font:400 14px/1.2 var(--f-radio)!important;color:var(--ash)!important}
+.pz-onde{margin:2px 0 10px;font:600 15px/1.35 var(--f-ui);color:var(--ash);letter-spacing:.02em}
+.pz-onde b{color:var(--bone);font-weight:800}
+.pz-menu{display:flex;flex-direction:column;gap:2px}
+.pz-grupo{display:flex;align-items:center;gap:10px;margin:min(12px,1.4vh) 0 3px;font:400 11px/1 var(--f-radio);letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+.pz-grupo::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--edge),transparent)}
+.pz-it{appearance:none;display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:14px;min-height:min(42px,5.3vh);padding:0 14px 0 13px;border:0;
+  border-left:3px solid transparent;border-radius:0 9px 9px 0;background:transparent;color:rgba(236,228,210,.86);font:700 clamp(15px,2.2vh,17px)/1 var(--f-ui);
+  letter-spacing:.02em;text-align:left;cursor:pointer;transition:background .14s,color .14s,transform .14s,border-color .14s}
+.pz-it[hidden]{display:none}
+.pz-it .ico{width:20px;height:20px;color:var(--dim);transition:color .14s}
+.pz-it kbd{min-width:22px;height:20px;padding:0 6px;border-radius:5px;border:1px solid var(--edge-hi);background:rgba(10,14,12,.6);color:var(--ash);
+  font:700 11px/18px var(--f-ui);text-align:center}
+.pz-it kbd:empty{display:none}
+.pz-it:hover,.pz-it:focus-visible{outline:none;color:#fff;border-left-color:var(--ember);transform:translateX(4px);
+  background:linear-gradient(90deg,rgba(255,138,61,.17),rgba(255,138,61,0) 85%)}
+.pz-it:hover .ico,.pz-it:focus-visible .ico{color:var(--ember)}
+.pz-prim{min-height:min(54px,6.8vh);font-size:clamp(18px,2.7vh,21px);color:#fff7ee;border-left-color:var(--ember);background:linear-gradient(90deg,rgba(194,85,29,.62),rgba(194,85,29,.08) 88%)}
+.pz-prim .ico{color:#ffd2b0}
+.pz-prim:hover,.pz-prim:focus-visible{background:linear-gradient(90deg,rgba(255,138,61,.7),rgba(194,85,29,.12) 92%)}
+.pz-sair{margin-top:min(10px,1.2vh);color:var(--ash)}
+.pz-sair:hover,.pz-sair:focus-visible{border-left-color:var(--blood);color:var(--blood-ink);background:linear-gradient(90deg,var(--blood-wash),transparent 85%)}
+.pz-sair:hover .ico,.pz-sair:focus-visible .ico{color:var(--blood)}
+.pz-ficha{align-self:end;justify-self:end;width:min(360px,100%);display:grid;gap:14px;padding:18px;border-radius:16px;
+  background:linear-gradient(160deg,rgba(14,19,17,.88),rgba(8,11,10,.82));border:1px solid var(--edge);box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.pz-ficha-topo{display:flex;align-items:center;gap:16px}
+.pz-relogio{width:112px;height:112px;flex:none}
+.pz-hora{display:grid;gap:6px}
+.pz-hora b{font:400 40px/1 var(--f-display);letter-spacing:.04em;color:var(--bone)}
+.pz-hora span{font:400 12.5px/1.3 var(--f-radio);color:var(--ash)}
+.pz-xp{display:grid;gap:6px;font:800 11px/1 var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--ash)}
+.pz-xp>i{display:block;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+.pz-xp>i>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ember-deep),var(--ember));border-radius:3px}
+.pz-stats{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important}
+.pz-stats div{min-width:0!important;padding:10px 12px!important;border-radius:10px;background:rgba(236,228,210,.06)!important;border:1px solid rgba(236,228,210,.08)}
+.pz-stats b{display:block;font:400 28px/1 var(--f-display);color:var(--bone)}
+.pz-stats span{font:800 10.5px/1.6 var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.pz-obj{margin:0;padding:10px 12px;border:1px dashed rgba(255,138,61,.4);border-radius:10px;font:400 13px/1.45 var(--f-radio);color:var(--bone)}
+.pz-obj:empty{display:none}
+.pz-obj small{display:block;margin-bottom:4px;font:800 10.5px/1 var(--f-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--ember)}
+#t-pausa:not([hidden]) .pz-col>*,#t-pausa:not([hidden]) .pz-it,#t-pausa:not([hidden]) .pz-ficha{animation:pzEntra .32s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0)*22ms)}
+@keyframes pzEntra{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@media (max-width:760px){.pz{grid-template-columns:1fr}.pz-ficha{justify-self:stretch;width:auto}.pz-tela{background:rgba(4,6,5,.9)}}
+@media (prefers-reduced-motion:reduce){#t-pausa .pz-col>*,#t-pausa .pz-it,#t-pausa .pz-ficha{animation:none!important}.pz-ponto{animation:none}}
+
 .tc-visor{margin:0;padding:14px 8px;border-radius:10px;background:#0b1712;border:1px solid rgba(125,255,176,.25);color:#86f7b6;font:700 34px/1 ui-monospace,"Cascadia Mono",Consolas,monospace;letter-spacing:.18em;text-align:center;text-shadow:0 0 10px rgba(134,247,182,.45);font-variant-numeric:tabular-nums}
 .tc-msg{margin:0;min-height:1.2em;text-align:center;color:var(--blood-ink);font:700 13px/1.2 var(--f-ui)}
 .tc-teclas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -1489,23 +1551,38 @@ body.criativo .ad-selo{display:block}
     <button class="btn" id="ad-fechar" type="button">Fechar</button>
   </div>
 </div>
-<div class="tela" id="t-pausa" hidden>
-  <div class="cartao">
-    <h2>Pausado</h2>
-    <p class="p-nome" id="p-nome" hidden></p>
-    <div class="stats" id="p-stats"></div>
-    <button class="btn prim" id="p-voltar" type="button">Voltar ao jogo</button>
-    <button class="btn" id="p-foto" type="button">Modo foto</button>
-    <button class="btn" id="p-mapa" type="button">Mapa</button>
-    <button class="btn" id="p-diario" type="button">Diário</button>
-    <button class="btn" id="p-manual" type="button">Manual de Sobrevivência</button>
-    <button class="btn" id="p-terr" type="button">Territórios e grupo</button>
-    <button class="btn" id="p-conq" type="button">Conquistas e recordes</button>
-    <button class="btn" id="p-criativo" type="button" hidden>Painel criativo</button>
-    <button class="btn" id="p-ajustes" type="button">Ajustes</button>
-    <button class="btn" id="p-salvo" type="button">Salvamento e cópias</button>
-    <button class="btn" id="p-ajuda" type="button">Como jogar</button>
-    <button class="btn" id="p-sair" type="button">Salvar e ir ao menu</button>
+<div class="tela pz-tela" id="t-pausa" hidden>
+  <div class="pz">
+    <div class="pz-col">
+      <p class="pz-kick"><i class="pz-ponto" aria-hidden="true"></i>Transmissão pausada · 104,3</p>
+      <h2 class="pz-tit">Pausado</h2>
+      <p class="p-nome pz-nome" id="p-nome" hidden></p>
+      <p class="pz-onde" id="pz-onde"></p>
+      <nav class="pz-menu" aria-label="Menu de pausa">
+      <button class="pz-it pz-prim" id="p-voltar" type="button"><svg class="ico" aria-hidden="true"><use href="#i-correr"/></svg><span>Voltar ao jogo</span><kbd class="so-pc">Esc</kbd></button>
+      <p class="pz-grupo">Sobrevivência</p>
+      <button class="pz-it" id="p-mapa" type="button"><svg class="ico" aria-hidden="true"><use href="#i-mapa"/></svg><span>Mapa</span><kbd class="so-pc" data-tecla="mapa"></kbd></button>
+      <button class="pz-it" id="p-diario" type="button"><svg class="ico" aria-hidden="true"><use href="#i-caderno"/></svg><span>Diário</span><kbd class="so-pc" data-tecla="diario"></kbd></button>
+      <button class="pz-it" id="p-terr" type="button"><svg class="ico" aria-hidden="true"><use href="#i-grupo"/></svg><span>Territórios e grupo</span><kbd class="so-pc" data-tecla="territorios"></kbd></button>
+      <button class="pz-it" id="p-conq" type="button"><svg class="ico" aria-hidden="true"><use href="#i-trofeu"/></svg><span>Conquistas e recordes</span></button>
+      <button class="pz-it" id="p-manual" type="button"><svg class="ico" aria-hidden="true"><use href="#i-livro"/></svg><span>Manual de Sobrevivência</span></button>
+      <p class="pz-grupo">Ferramentas</p>
+      <button class="pz-it" id="p-foto" type="button"><svg class="ico" aria-hidden="true"><use href="#i-camera"/></svg><span>Modo foto</span><kbd class="so-pc" data-tecla="foto"></kbd></button>
+      <button class="pz-it" id="p-criativo" type="button" hidden><svg class="ico" aria-hidden="true"><use href="#i-martelo"/></svg><span>Painel criativo</span></button>
+      <p class="pz-grupo">Sistema</p>
+      <button class="pz-it" id="p-ajustes" type="button"><svg class="ico" aria-hidden="true"><use href="#i-chave"/></svg><span>Ajustes</span></button>
+      <button class="pz-it" id="p-salvo" type="button"><svg class="ico" aria-hidden="true"><use href="#i-bau"/></svg><span>Salvamento e cópias</span></button>
+      <button class="pz-it" id="p-ajuda" type="button"><svg class="ico" aria-hidden="true"><use href="#i-radio"/></svg><span>Como jogar</span></button>
+      <button class="pz-it pz-sair" id="p-sair" type="button"><svg class="ico" aria-hidden="true"><use href="#i-mochila"/></svg><span>Salvar e ir ao menu</span></button>
+      </nav>
+    </div>
+    <aside class="pz-ficha" aria-label="Ficha do sobrevivente">
+      <div class="pz-ficha-topo"><svg class="pz-relogio" id="pz-relogio" viewBox="0 0 120 120" aria-hidden="true"></svg>
+        <div class="pz-hora"><b id="pz-hora">--:--</b><span id="pz-fase"></span></div></div>
+      <div class="pz-xp"><span id="pz-xp-t">Nível</span><i><i id="pz-xp-b"></i></i></div>
+      <div class="stats pz-stats" id="p-stats"></div>
+      <p class="pz-obj" id="pz-obj"></p>
+    </aside>
   </div>
 </div>
 

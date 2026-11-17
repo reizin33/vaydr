@@ -23,7 +23,7 @@ const ACOES_TECLA=[
   ['lanterna','Lanterna','KeyF'],['largar','Largar o item da mão','KeyG'],['camera','Primeira ou terceira pessoa','KeyV'],
   ['construir','Construir','KeyB'],['mochila','Mochila (além do Tab)','KeyI'],['mapa','Mapa','KeyM'],['diario','Diário','KeyJ'],
   ['territorios','Territórios, rádio e grupo','KeyK'],['foto','Modo foto','KeyP'],['buzina','Buzina do veículo','KeyH'],
-  ['consertarTudo','Consertar tudo (construindo)','KeyT'],['sensMenos','Sensibilidade do mouse −','Minus'],['sensMais','Sensibilidade do mouse +','Equal']
+  ['voo','Voar (modo criativo)','KeyX'],['consertarTudo','Consertar tudo (construindo)','KeyT'],['sensMenos','Sensibilidade do mouse −','Minus'],['sensMais','Sensibilidade do mouse +','Equal']
 ].map(([id,nome,pad])=>({id,nome,pad}));
 const TECLAS_FIXAS=/^(Escape|Tab|Digit\d|Numpad\d|Arrow\w+|F\d+|Meta\w*|OS\w*|ContextMenu)$/;
 function teclaDe(id){const a=ACOES_TECLA.find(q=>q.id===id);return(cfg.mapaTeclas&&cfg.mapaTeclas[id])||(a&&a.pad)||'';}

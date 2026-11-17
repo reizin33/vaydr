@@ -14,10 +14,10 @@
    · 12/11, 22h ("árvores redondas com cone, está feio"): os pinheiros de cone também viram espécies da mata (na altura deles) e as
      gigantes ganham copa de jacarandá do tamanho delas (a madeira, os galhos andáveis, os cipós e a colisão continuam os delas;
      a sombra da copa é a da copa antiga). Para o jogo não pesar: de perto o LOD0, até MATA_R1 o LOD1 e dali em diante a placa. */
-const MATA_R1={baixo:30,medio:45,alto:60,ultra:80};                            // até onde vai a versão de meia distância (m)
+const MATA_R1={baixo:42,medio:45,alto:60,ultra:80};   // v10.2.6: no Baixo era 30 (as copas de meia distância viravam placas escuras logo ali)                            // até onde vai a versão de meia distância (m)
 const MATA_ESP=['jacaranda','ilha1','ilha2','pequena'];   // 13/11: a ilha3 saiu (árvore baixa e esparramada: no tamanho das outras, o tronco claro deitava no chão e parecia lixo branco)
 const MATA_ALT={jacaranda:1.3,ilha1:1.05,ilha2:0.95,pequena:0.95};   // altura em relação à árvore redonda de antes
-const MATA_R0={baixo:10,medio:16,alto:22,ultra:30};                            // até onde vai a versão de perto (m)
+const MATA_R0={baixo:16,medio:16,alto:22,ultra:30};   // v10.2.6: no Baixo era 10 (pedido do Himalaia: "ainda tem árvores no modo antigo")                            // até onde vai a versão de perto (m)
 const MATAV={ok:false,esp:[],restoR:null,restoB:null,longe:null,info:null,erro:null};
 function mataLigada(){return MATAV.ok;}
 function mataProntas(){for(const e of MATAV.esp)for(const k in e.tex)if(!e.tex[k].pronta)return false;return MATAV.esp.length>0;}
