@@ -1,6 +1,8 @@
 """Texturas de detalhe dos itens feitos no código (machado de pedra, lança, porrete, faca de pedra, pedra, taco cravado...).
 Uso (de dentro de jogo/):
-  python3 -I tools/itens_textura.py <madeira.jpg> <metal.jpg> <pano.jpg> src/21f_texturas_dados.js src/21o_itens_tex_dados.js
+  python3 -I tools/itens_textura.py <madeira.jpg> <metal.jpg> <pano.jpg> src/21f_texturas_dados.js src/21o_itens_tex_dados.js [lataria.jpg]
+  lataria (v10.2.6) = rusty_painted_metal_diff_2k.jpg: a pintura vira cinza e os escorridos de ferrugem ficam escuros e um pouco
+  alaranjados (a lataria dos veículos: a cor do veículo continua a dele)
   madeira = weathered_planks_diff_2k.jpg, metal = rusty_metal_02_diff_2k.jpg, pano = rough_linen_diff_2k.jpg (Poly Haven, CC0);
   a pedra sai da camada 'rocha' (rock_boulder_dry) que o jogo já tem em 21f_texturas_dados.js.
 Cada textura vira um ladrilho de 256 px que repete sem emenda, com o brilho médio em 0,5: no jogo ela multiplica a cor da peça
@@ -31,6 +33,18 @@ def detalhe(im, guarda_cor, contraste=1.2):
     return Image.fromarray((c * 255 + 0.5).astype(np.uint8))
 
 
+def lataria(im):
+    a = np.asarray(im.convert('RGB'), np.float32) / 255.0
+    lin = a ** 2.2
+    lum = lin @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    med = float(np.median(lum)) or 1e-3
+    g = lum / med                                     # a pintura perto de 1, o escorrido abaixo
+    mancha = np.clip((0.85 - g) / 0.6, 0, 1)[..., None]
+    cor = np.repeat(g[..., None], 3, 2) * (1 - 0.55 * mancha + 0.55 * mancha * np.array([1.25, 0.78, 0.5], np.float32))
+    cor = cor / float(cor.mean()) * 0.5
+    cor = 0.5 + (cor - 0.5) * 0.9
+    cor = np.clip(cor, 0.03, 1.0) ** (1 / 2.2)
+    return Image.fromarray((cor * 255 + 0.5).astype(np.uint8))
 def tabua_sozinha(im):
     a = np.asarray(im.convert('L'), np.float32)
     col = a.mean(0); k = max(9, a.shape[1] // 100)
@@ -61,9 +75,11 @@ def main():
     out['metal'] = detalhe(Image.open(metal), 0.55, 1.0).resize((LADO, LADO), Image.LANCZOS)
     out['pano'] = detalhe(Image.open(pano), 0.0, 1.6).resize((LADO, LADO), Image.LANCZOS)
     out['pedra'] = detalhe(rocha, 0.3, 1.25).resize((LADO, LADO), Image.LANCZOS)
+    if len(sys.argv) > 6: out['lataria'] = lataria(Image.open(sys.argv[6])).resize((LADO, LADO), Image.LANCZOS)
     linhas = ['/* ================= texturas de detalhe dos itens feitos no código (v10.2.4) =================',
-              '   Gerado por tools/itens_textura.py. Poly Haven (CC0): weathered_planks (uma tábua só), rusty_metal_02, rough_linen e',
-              "   rock_boulder_dry (a camada 'rocha' de 21f). Ladrilhos de 256 px que repetem, com brilho médio 0,5 (62zf_itens_tex.js). */",
+              '   Gerado por tools/itens_textura.py. Poly Haven (CC0): weathered_planks (uma tábua só), rusty_metal_02, rough_linen,',
+              "   rock_boulder_dry (a camada 'rocha' de 21f) e rusty_painted_metal (lataria dos veículos, v10.2.6). Ladrilhos de 256 px",
+              '   que repetem, com brilho médio 0,5 (62zf_itens_tex.js). */',
               'const ITX_DADOS={']
     for k, im in out.items():
         linhas.append(f"  {k}:'{data_url(im)}',")

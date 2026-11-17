@@ -96,7 +96,8 @@ function carroGeometry(){const R=rng(808),paint=lin(0x4f6b4a),paint2=lin(0x445d4
     for(let i=0;i<5;i++){const a=i/5*6.283;add(g,boxTris(0.33,0.06,0.04),mat(0.17,Math.cos(a)*0.28,Math.sin(a)*0.28,a,0,0),lin(0x0e0e0e));}});
   return{body,roda};}
 const RODAS=VTIPOS.caminhonete.rodas;
-function veicGeometrias(){const R=rng(809),mk=f=>{const g=new GB(4096,8);f(g);return litMesh(g.data());},dark=lin(0x1c1f22),glass=lin(0x1a252d),trim=lin(0x5c6166),rust=lin(0x6e4a2c),A=(g,t,m,c,o)=>add(g,t,m,c,o||{j:0.04,rnd:R});
+function veicGeometrias(){const R=rng(809),mk=f=>{const g=new GB(4096,8);f(g);const d=g.data(),m=litMesh(d);m.f=d;return m;},   /* v10.2.6: m.f guarda os dados para a textura (62zf) */
+  dark=lin(0x1c1f22),glass=lin(0x1a252d),trim=lin(0x5c6166),rust=lin(0x6e4a2c),A=(g,t,m,c,o)=>add(g,t,m,c,o||{j:0.04,rnd:R});
   MESH.v_sedan=mk(g=>{const p=lin(0x7a2e2a),p2=lin(0x652522);A(g,bevelTris(1.78,0.5,4.25,0.12,{tx:0.97,tz:0.97}),mat(0,0.62,0),p);A(g,bevelTris(1.6,0.55,2.1,0.12,{tx:0.82,tz:0.7}),mat(0,1.13,-0.3),p2);
     A(g,boxTris(1.5,0.44,0.05),mat(0,1.13,0.72,-0.75,0,0),glass,{});A(g,boxTris(1.4,0.4,0.05),mat(0,1.12,-1.32,0.7,0,0),glass,{});for(const s of[1,-1])A(g,boxTris(0.05,0.36,1.5),mat(s*0.79,1.15,-0.3),glass,{});
     A(g,bevelTris(1.84,0.18,0.16,0.04),mat(0,0.45,2.12),trim);A(g,bevelTris(1.84,0.18,0.16,0.04),mat(0,0.45,-2.12),trim);
@@ -114,10 +115,19 @@ function veicGeometrias(){const R=rng(809),mk=f=>{const g=new GB(4096,8);f(g);re
   MESH.v_jangada=mk(g=>{const tr=lin(0x7a5a3a),tr2=lin(0x664a30),co=lin(0xb9a77a);for(let i=0;i<7;i++)A(g,cylTris(0.17,0.17,3.0,8),mat(-1.0+i*0.34,0.15,1.5,Math.PI/2,0,0),i%2?tr:tr2);
     for(const z of[-1.1,0,1.1])A(g,boxTris(2.4,0.08,0.12),mat(0,0.34,z),tr2);for(const z of[-1.1,0,1.1])for(const x of[-0.85,0.85])A(g,cylTris(0.2,0.2,0.08,8),mat(x,0.3,z,0,0,Math.PI/2),co);
     A(g,cylTris(0.025,0.025,1.9,5),mat(0.9,0.42,-0.7,1.2,0,0.4),tr);A(g,boxTris(0.18,0.03,0.42),mat(1.25,0.6,0.85,0.3,0,0.4),tr);});
-  MESH.v_heli=mk(g=>{const p=lin(0x4a5236),p2=lin(0x3a4129);A(g,ellipTris(1.25,1.15,1.9,14,10),mat(0,1.45,0.6),p);A(g,boxTris(0.32,0.35,3.6,{tx:0.6}),mat(0,1.65,-2.4),p2);
-    A(g,boxTris(0.06,0.9,0.6),mat(0,2.0,-4.1),p2);A(g,ellipTris(0.95,0.7,0.9,10,8),mat(0,1.7,1.65),glass,{});A(g,boxTris(0.5,0.25,0.5),mat(0,2.55,0.45),dark);
-    for(const s of[-1,1]){A(g,boxTris(0.07,0.07,3.2),mat(s*0.95,0.12,0.5),trim);for(const z of[-0.4,1.4])A(g,boxTris(0.05,0.6,0.05),mat(s*0.75,0.4,z,0,0,s*0.35),trim);}
-    A(g,cylTris(0.06,0.06,0.25,8),mat(0,2.65,0.45),trim);});
+  /* v10.2.6 (Himalaia: "o helicóptero tá sem textura"): redesenhado e com a lataria gasta (62zf) — fuselagem e cabine
+     chanfradas, nariz de vidro, janelas nas portas, capô do motor com escape, cauda afinando com a faixa clara, estabilizador,
+     deriva (o rotor de cauda foi junto para a ponta) e esquis de tubo com a ponta levantada e as travessas */
+  MESH.v_heli=mk(g=>{const p=lin(0x4a5236),p2=lin(0x3a4129),faixa=lin(0xb9b49a),preto=lin(0x16181a);
+    A(g,bevelTris(1.7,1.0,3.0,0.28),mat(0,1.0,0.35),p);A(g,bevelTris(1.6,0.85,2.3,0.3,{tz:0.82,tx:0.88}),mat(0,1.9,0.15),p);
+    A(g,ellipTris(0.84,0.52,0.85,14,8),mat(0,1.02,1.85),p2);A(g,ellipTris(0.8,0.72,0.9,14,8),mat(0,1.62,1.9),glass,{});
+    for(const s of[-1,1]){for(const z of[0.85,-0.05])A(g,boxTris(0.04,0.62,0.78),mat(s*0.805,1.9,z),glass,{});A(g,boxTris(0.03,0.05,2.2),mat(s*0.86,1.48,0.4),preto,{});}
+    A(g,bevelTris(0.95,0.45,1.5,0.16),mat(0,2.5,-0.55),p2);A(g,cylTris(0.09,0.12,0.45,8),mat(0,2.45,-1.3,-Math.PI/2,0,0),preto);
+    A(g,bevelTris(0.5,0.2,0.6,0.06),mat(0,2.42,0.45),dark);A(g,cylTris(0.08,0.08,0.32,8),mat(0,2.45,0.45),trim);
+    A(g,cylTris(0.11,0.26,3.9,10),mat(0,1.85,-0.95,-Math.PI/2,0,0),p);A(g,cylTris(0.199,0.214,0.4,10),mat(0,1.85,-2.3,-Math.PI/2,0,0),faixa,{});
+    A(g,boxTris(1.4,0.05,0.36),mat(0,1.86,-3.7),p2);A(g,boxTris(0.06,1.05,0.62,{tz:0.55}),mat(0,2.3,-4.72,-0.32,0,0),p2);A(g,boxTris(0.05,0.45,0.4,{tz:0.6}),mat(0,1.55,-4.7,0.35,0,0),p2);
+    for(const s of[-1,1]){A(g,cylTris(0.045,0.045,3.1,6),mat(s*0.95,0.08,-1.15,Math.PI/2,0,0),trim);A(g,cylTris(0.045,0.045,0.42,6),mat(s*0.95,0.08,1.95,Math.PI/2-0.75,0,0),trim);
+      for(const z of[1.25,-0.45])A(g,cylTris(0.04,0.04,0.75,6),mat(s*0.95,0.08,z,0,0,s*0.7),trim);}});
   MESH.v_rotor=mk(g=>{for(let i=0;i<2;i++)add(g,boxTris(9.2,0.04,0.32),mat(0,0,0,0,i*Math.PI/2,0),dark);add(g,cylTris(0.15,0.15,0.12,10),mat(0,-0.06,0),trim);});
   MESH.v_rotorCauda=mk(g=>{add(g,boxTris(0.03,1.4,0.18),mat(0,0,0),dark);});}
 INIT_MALHAS.push(veicGeometrias);
@@ -302,7 +312,7 @@ const _VR=M4();
 function desenharVeic(Pg,v){if(d2(v.x,v.z,cam.pos[0],cam.pos[2])>160*160)return;const T=VT(v),m=MESH[VMESH[v.tipo]];if(!m)return;trs(TMP,v.x,v.y,v.z,v.pitch,v.yaw,v.roll,1,1,1);
   if(Pg===PL)gl.uniform3f(PL.u.uTint,v.hp>0?1:0.45,v.hp>0?1:0.42,v.hp>0?1:0.4);drawStat(Pg,m,TMP);
   if(T.rodas)for(let i=0;i<T.rodas.length;i++){const w=T.rodas[i],dr=w[0]<0,sc=w[4]||1,fu=v.pecas.pneus[i]<=0;trs(TMP2,w[0],w[1]*(fu?0.82:1),w[2],dr?-v.giro:v.giro,(w[3]?-v.steer*0.5:0)+(dr?Math.PI:0),0,T.moto?0.5:sc,sc*(fu?0.85:1),sc);mul(CW2,TMP,TMP2);drawStat(Pg,MESH.roda,CW2);}
-  if(T.voa&&MESH.v_rotor){trs(TMP2,0,2.75,0.45,0,v.giro,0,1,1,1);mul(CW2,TMP,TMP2);drawStat(Pg,MESH.v_rotor,CW2);trs(TMP2,0.12,2.0,-4.15,v.giro*1.7,0,0,1,1,1);mul(CW2,TMP,TMP2);drawStat(Pg,MESH.v_rotorCauda,CW2);}
+  if(T.voa&&MESH.v_rotor){trs(TMP2,0,2.75,0.45,0,v.giro,0,1,1,1);mul(CW2,TMP,TMP2);drawStat(Pg,MESH.v_rotor,CW2);trs(TMP2,0.14,2.25,-4.75,v.giro*1.7,0,0,1,1,1);mul(CW2,TMP,TMP2);drawStat(Pg,MESH.v_rotorCauda,CW2);}
   if(v.blind&&MESH.v_blind)drawStat(Pg,MESH.v_blind,TMP);
   if(Pg===PL)gl.uniform3f(PL.u.uTint,1,1,1);}
 /* faróis acesos (dirigindo à noite) */

@@ -87,7 +87,7 @@ function kitArCond(ctx){const{p,R,V,ld}=ctx,ch=p.tipo==='escritorio'?0.32:0.2,ma
       kitParede(ctx,m,s,a,y,0.01,[k,k,k]);V[s].push({s,a,a0:a-w/2,a1:a+w/2,y0:y,y1:y+h,k:'peca'});ctx.ares.push([s,a,y,w]);n++;}}}
 
 /* ---------- 3) chapas e tábuas pregadas por fora em algumas janelas de cima (nenhuma janela de passagem é tapada) ---------- */
-function kitTapumes(ctx){const{p,R,V}=ctx,ch=(p.alagado||(p.entulho||0)>1)?0.26:p.tipo==='escritorio'?0.1:0.15;
+function kitTapumes(ctx){const{p,R,V}=ctx,ch=(p.alagado||(p.entulho||0)>1)?0.4:p.tipo==='escritorio'?0.2:0.3;   // v10.2.6: o dobro de janelas tapadas (cidade destruída)
   for(const s of ['F','B','L','R'])for(const v of V[s]){if(v.k!=='jan'||v.f<1||v.j.vitrine||R()>ch)continue;const lg=v.a1-v.a0;
     if(R()<0.62){const m=R()<0.5?'chapa':'chapa2',t=kitT(m);kitParede(ctx,m,s,v.a,v.y0-0.11,0.045,[(lg+0.26)/t[0],1.42/t[1],1],{rz:(R()-0.5)*0.07});}
     else{const t=kitT('tabuas');kitParede(ctx,'tabuas',s,v.a,v.y0+0.08,0.045,[(lg+0.42)/t[0],1.05/t[1],0.8],{rz:(R()-0.5)*0.12});}
@@ -241,7 +241,9 @@ function kitFios(ctx,todos){const{p,R}=ctx;
 function kitSujeiraMontar(ctx){const{p,R,V,ld}=ctx,M=KIT.manchas;
   const faixa=(s,a,w,y0,y1,al0,al1,cor,o)=>{const L=ld[s];M.push({p,s,L,a,w,y0,y1,al0,al1,cor,o});};
   for(const s of ['F','B','L','R']){
-    for(const v of V[s]){if(v.k==='jan'&&!v.j.vitrine){const n=2+Math.floor(R()*3),lg=v.a1-v.a0;
+    for(const v of V[s]){if(v.k==='jan'&&!v.j.vitrine&&v.y1&&R()<0.16){const lg=v.a1-v.a0;   // v10.2.6: fuligem subindo da janela (o fogo passou por ali)
+        faixa(s,v.a,lg+0.35+R()*0.3,v.y1+0.02,v.y1+0.9+R()*1.1,0.62+R()*0.2,0,3);}
+      if(v.k==='jan'&&!v.j.vitrine){const n=2+Math.floor(R()*3),lg=v.a1-v.a0;
         for(let i=0;i<n;i++){const a=v.a0+0.08+R()*(lg-0.16),w=0.05+R()*0.16,len=0.35+R()*(v.f>0?1.3:0.7);faixa(s,a,w,v.y0-0.04,v.y0-0.04-len,0.24+R()*0.2,0,0);}}}
     for(const q of ctx.ares)if(q[0]===s){const n=1+Math.floor(R()*2);for(let i=0;i<n;i++){const a=q[1]+(R()-0.5)*q[3]*0.6,len=0.6+R()*1.2;faixa(s,a,0.06+R()*0.1,q[2]+0.02,q[2]-len,0.32+R()*0.14,0,1);}}
     /* pé da parede: trechos sobrepostos de umidade, mais altos e mais escuros perto dos cantos */
@@ -250,7 +252,7 @@ function kitSujeiraMontar(ctx){const{p,R,V,ld}=ctx,M=KIT.manchas;
       a+=w*(0.55+R()*0.4);}}}
 /* faixa vertical: escorrido (alfa forte em cima, some embaixo) ou umidade (forte embaixo, some em cima) com a borda irregular */
 function kitSujeiraGeo(manchas){const out=[];
-  const C=[[0.13,0.115,0.095],[0.16,0.1,0.06],[0.11,0.105,0.09]];
+  const C=[[0.13,0.115,0.095],[0.16,0.1,0.06],[0.11,0.105,0.09],[0.028,0.026,0.024]];   // 3: fuligem de incêndio (v10.2.6)
   for(const f of manchas){const{p,L,a,w,y0,y1,al0,al1}=f,c=C[f.cor],o=(f.o||0.012)+((a*7.31)%1)*0.004;
     const pt=(aa,y)=>{const uv=L.uv(aa,o),q=pw(p,uv[0],uv[1]);return[q[0],y,q[1]];};
     const n=f.cor===2?6:3;   // umidade: borda de cima recortada em vários pedaços

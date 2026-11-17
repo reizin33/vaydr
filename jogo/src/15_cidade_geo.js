@@ -148,7 +148,7 @@ function geoCidadeChao(){const g=new GB(1<<15,8),R=rng(8080),asf=lin(0x3a3a38),a
 function geoCidadeProps(){const g=new GB(1<<15,8),R=rng(9191);PRP.rua.length=0;
   for(const o of CID.props){if(prpRua(o))continue;const y=quadraEm(o.x,o.z)?QUADRA_Y:0;   // v10.2.2: o que virou modelo de verdade é desenhado pelo 62yf_props.js
     if(o.k==='carro')carroGeo(g,o.x,o.z,o.yaw,o.cor,R,o.aberto,y);
-    else if(o.k==='onibus'){const b=mat(o.x,y,o.z,0,o.yaw,0);add(g,bvTris(2.6,2.6,11.6),mm(b,mat(0,1.55,0)),lin(0xc9a227),{j:0.04,rnd:R});add(g,bvTris(2.65,0.9,10.6),mm(b,mat(0,2.1,0.2)),lin(0x1c2830));
+    else if(o.k==='onibus'){const b=mat(o.x,y,o.z,0,o.yaw,0);add(g,bvTris(2.6,2.6,11.6),mm(b,mat(0,1.55,0)),lin(0x3a3029),{j:0.08,rnd:R});   /* v10.2.6: ônibus queimado (era amarelo inteiro) */add(g,bvTris(2.65,0.9,10.6),mm(b,mat(0,2.1,0.2)),lin(0x1c2830));
       add(g,bvTris(2.62,0.25,11.62),mm(b,mat(0,0.4,0)),lin(0x55595c));for(const wz of[3.6,-3.8])for(const wx of[1.2,-1.2])add(g,cylTris(0.5,0.5,0.3,10),mm(b,mat(wx+0.15*Math.sign(wx),0.5,wz,0,0,Math.PI/2)),lin(0x181818));}
     else if(o.k==='barreira'){const b=mat(o.x,y,o.z,0,o.yaw,0);for(let i=0;i<4;i++)add(g,bvTris(0.42,0.25,0.12),mm(b,mat(-0.63+i*0.42,0.85,0)),lin(i%2?0xd9d6cc:0xa8261d));for(const s of[-0.75,0.75])add(g,bvTris(0.08,0.9,0.5),mm(b,mat(s,0.45,0)),lin(0x55595c));}
     else if(o.k==='entulho'){const RR=rng(Math.floor(o.seed*1e6));for(let i=0;i<9;i++){const a=RR()*6.283,r=RR()*o.r;add(g,icoTris(0.3+RR()*0.5,0.4,RR),mat(o.x+Math.cos(a)*r,y+0.2+RR()*0.4,o.z+Math.sin(a)*r,RR(),RR()*6,RR(),1.2,0.7,1),mixc(lin(0x77746b),lin(0x8a877e),RR()),{j:0.1,rnd:RR});}

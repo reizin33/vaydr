@@ -14,17 +14,22 @@ const PRP={m:{},rua:[],mundo:[]};   // rua: objetos da cidade (refeitos com a ma
 const PRP_W=M4(),PRP_GIRO=[0,Math.PI,Math.PI/2,-Math.PI/2];
 /* um objeto solto no mundo (rua, acampamento): guarda a matriz e, quando é só giro e escala igual nos três eixos, vai para o
    desenho em lote (instâncias: uma chamada por modelo para todos os iguais) */
-function prpReg(L,id,x,y,z,yaw,s,rx,rz,r,Lmax){const uni=!rx&&!rz&&Math.abs(s[0]-s[1])<1e-3&&Math.abs(s[0]-s[2])<1e-3;
+function prpReg(L,id,x,y,z,yaw,s,rx,rz,r,Lmax){const uni=!/^[LG]:/.test(id)&&!rx&&!rz&&Math.abs(s[0]-s[1])<1e-3&&Math.abs(s[0]-s[2])<1e-3;   // 'L:'/'G:' não têm lote (v10.2.6: as carcaças em pé não apareciam)
   L.push({id,x,y,z,yaw:yaw||0,k:s[0],inst:uni,M:trs(M4(),x,y,z,rx||0,yaw||0,rz||0,s[0],s[1],s[2]),r,L:Lmax});}
 function prpOk(){return typeof PROPS3D!=='undefined'&&!!PROPS3D;}
-function prpTem(id){return prpOk()&&!!PROPS3D[id];}
+function prpTem(id){if(id&&id.startsWith('L:'))return typeof LUGX!=='undefined'&&!!LUGX[id.slice(2)];return prpOk()&&!!PROPS3D[id];}   // 'L:id': modelo dos lugares (21h)
 function prpHash(a,b){const s=Math.sin(a*127.1+b*311.7)*43758.5453;return s-Math.floor(s);}
 /* malhas do modelo (uma por material), feitas na primeira vez que ele aparece */
-function prpMalha(id){let X=PRP.m[id];if(X!==undefined)return X;const A=prpOk()?PROPS3D[id]:null;if(!A)return PRP.m[id]=null;
+function prpMalha(id){let X=PRP.m[id];if(X!==undefined)return X;
+  if(id.startsWith('L:')){const ms=typeof lugMontar==='function'?lugMontar(id.slice(2)):null;return PRP.m[id]=ms&&ms.length?{id,ps:ms}:null;}   // v10.2.6: carcaça de carro dos lugares
+ const A=prpOk()?PROPS3D[id]:null;if(!A)return PRP.m[id]=null;
   try{X={id,ps:[]};for(const d of A.partes){const g=mod3dDecodificar(d);X.ps.push(texMesh(g.f,g.uv,texModelo('prp_'+id+'_'+d.mat,A.tex[d.mat],false)));}}
   catch(e){console.error('objeto 3D',id,e);X=null;}
   return PRP.m[id]=X;}
-function prpDesenhar(Pg,id,M,k){const X=prpMalha(id);if(!X)return;for(const m of X.ps){if(k>0)drawStatI(Pg,m,M,k);else drawStat(Pg,m,M);}}
+function prpDesenhar(Pg,id,M,k){const X=prpMalha(id);if(!X)return;
+  if(id.charCodeAt(1)===58&&id[0]==='L'){const cf=gl.isEnabled(gl.CULL_FACE);if(cf)gl.disable(gl.CULL_FACE);   // escaneado dos lugares: os dois lados (como em lugDesenhar)
+    for(const m of X.ps)if(!m.tex||m.tex.pronta)drawStat(Pg,m,M);if(cf)gl.enable(gl.CULL_FACE);return;}
+  for(const m of X.ps){if(k>0)drawStatI(Pg,m,M,k);else drawStat(Pg,m,M);}}
 /* escala para caber na caixa (largura x, altura, fundo z, no espaço do modelo): 'u' por igual; 'l' livre (cada eixo no seu
    tamanho: mesas e prateleiras); 'q' (padrão) por igual pelo eixo mais justo e os outros esticados até lim (1,3 = 30%) */
 function prpEscala(id,W,H,D,modo,lim){const A=PROPS3D[id],m=[A.hi[0]-A.lo[0],A.hi[1]-A.lo[1],A.hi[2]-A.lo[2]],t=[W/m[0],H/m[1],D/m[2]];
@@ -108,7 +113,11 @@ function prpRua(o){if(!prpOk()||!o)return false;const y=quadraEm(o.x,o.z)?QUADRA
     case'banco':id='bancoPraca';s=[1.38,1,1];break;   // encosto em -z, como o de antes
     case'barreira':id='barreiraConcreto';s=[1.06,1.06,1.06];r=0.8;break;
     case'jersey':id='barreiraConcreto';s=[1.27,0.92,1.2];r=0.8;break;
-    case'carro':if(o.aberto||h>0.4)return false;id='carroCoberto';s=[1.02,1.02,1.02];r=1;if(h<0.2)yaw+=Math.PI;break;   // carro parado coberto com lona (4 em cada 10)
+    case'carro':if(!o.aberto&&h<=0.4&&prpTem('carroCoberto')){id='carroCoberto';s=[1.02,1.02,1.02];r=1;if(h<0.2)yaw+=Math.PI;break;}   // carro parado coberto com lona (4 em cada 10)
+      // fall through: o resto vira carcaça de verdade
+    case'viatura':{if(!prpTem('L:carroDestruido'))return false;   // v10.2.6 ("a cidade está muito quadrada"): carcaça escaneada no lugar da caixa pintada
+      const vira=!o.aberto&&o.k==='carro'&&h>0.88?Math.PI:!o.aberto&&o.k==='carro'&&h>0.8?(h>0.84?1:-1)*Math.PI/2:0;   // um ou outro capotado ou tombado de lado
+      prpReg(PRP.rua,'L:carroDestruido',o.x,y+(Math.abs(vira)>2?1.29:vira?1.11:0),o.z,yaw+Math.PI/2,[1,1,1],vira,0,1,150);return true;}
     case'entulho':if(!prpTem('barreiraConcreto'))return false;prpEntulho(o,y);return true;   // o monte de pedras vira barricada de tralha
     case'p3d':if(!prpTem(o.id))return true;s=o.s||s;prpReg(PRP.rua,o.id,o.x,y+(o.dy||0),o.z,yaw,s,o.rx,o.rz,0.35,o.L||40);return true;   // tralha da calçada (prpLixoCidade)
     default:return false;}

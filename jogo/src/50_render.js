@@ -83,7 +83,7 @@ function etapasMalhasEmOrdem(){const L=[];
   L.push(['cidade',72,()=>{const Wg=weaponGeometry();MESH.arma={};for(const k in Wg)MESH.arma[k]=litMesh(Wg[k]);
   const Og=obraGeometry();MESH.obra={};for(const k in Og)MESH.obra[k]=litMesh(Og[k]);
   const Xg=extraGeometry();for(const k in Xg)MESH[k]=litMesh(Xg[k]);
-  {const cg=carroGeometry();MESH.carro=litMesh(cg.body);MESH.roda=litMesh(cg.roda);}
+  {const cg=carroGeometry();MESH.carro=litMesh(cg.body);MESH.carro.f=cg.body;MESH.roda=litMesh(cg.roda);MESH.roda.f=cg.roda;}
   initCidadeMeshes();},'cidade-armas']);
   L.push(['cidade',10,()=>{FIREM=buildFire();MESH.ter=terMesh(terrainData());makeSplatTex(splatData(),SPLAT_S);},'cidade-terreno']);
   L.push(['lugares',15,()=>{skInit();
