@@ -42,8 +42,11 @@ function quedaTora(Q){const L=Q.q.L,fx=Math.sin(Q.d),fz=Math.cos(Q.d),sa=Math.si
     part(x,ground(x,z)+0.6+Math.random()*1.6,z,(Math.random()-0.5)*2.2,0.6+Math.random()*1.8,(Math.random()-0.5)*2.2,2.2,0.09,[0.2+Math.random()*0.1,0.34+Math.random()*0.12,0.1,0.95],false,2.2);}
   sfx('galho',Q.x+fx*L*sa*0.7,Q.z+fz*L*sa*0.7,0.8);
   const partes=Q.q.partes.filter(p=>p.tronco);if(!partes.length)return false;
-  const comp=Math.max(1.2,L*Q.q.tora*sa),raio=clamp(Q.q.r*0.65,0.16,0.6),cx=Q.x+fx*comp*0.5,cz=Q.z+fz*comp*0.5,gy=ground(cx,cz);
-  const T={x:Q.x,y:Q.y,z:Q.z,r:Q.r,s:Q.s,d:Q.d,a:Q.a,partes,comp,raio,hp:ARVQ.hpTora,vida:ARVQ.vidaTora,col:null};
+  /* sem a copa para segurar, o tronco termina de deitar até a ponta dele encostar no chão (morro abaixo ou acima) */
+  const raio=clamp(Q.q.r*0.65,0.16,0.6),Lt=L*Q.q.tora;let alvo=Q.a;
+  for(;alvo<1.75;alvo+=0.01){const s2=Math.sin(alvo),x=Q.x+fx*Lt*s2,z=Q.z+fz*Lt*s2;if(Q.y+Lt*Math.cos(alvo)<=ground(x,z)+raio*0.7)break;}
+  const comp=Math.max(1.2,Lt*Math.sin(alvo)),cx=Q.x+fx*comp*0.5,cz=Q.z+fz*comp*0.5,gy=ground(cx,cz);
+  const T={x:Q.x,y:Q.y,z:Q.z,r:Q.r,s:Q.s,d:Q.d,a:Q.a,alvo,w:0,Lt,partes,comp,raio,hp:ARVQ.hpTora,vida:ARVQ.vidaTora,col:null};
   T.col=colBox(cx,cz,raio,comp*0.5,Q.d,{tora:T,solid:true,y0:gy-0.3,y1:gy+raio*2+0.05});ARVQ.toras.push(T);return true;}
 function toraSemColisao(T){if(T.col){colRemove(T.col);T.col=null;}}
 function toraTirar(T){const i=ARVQ.toras.indexOf(T);if(i>=0)ARVQ.toras.splice(i,1);toraSemColisao(T);}
@@ -63,7 +66,9 @@ PASSOS.push(function quedaPasso(dt){if(!ARVQ.lista.length&&!ARVQ.toras.length)re
     else if(Q.fase===1){Q.w+=g*Math.sin(Q.a)*dt;Q.a+=Q.w*dt;if(Q.a>=Q.aMax){Q.a=Q.aMax;Q.w=0;}
       if(Q.tt-Q.tb>1.1){if(Q.q.tora>0&&quedaTora(Q))ARVQ.lista.splice(i,1);else Q.fase=2;}}
     else{Q.y-=dt*0.9;if(Q.tt-Q.tb>4)ARVQ.lista.splice(i,1);}}
-  for(let i=ARVQ.toras.length-1;i>=0;i--){const T=ARVQ.toras[i];T.vida-=dt;if(T.vida<0){toraSemColisao(T);T.y-=dt*0.35;if(T.vida<-4)ARVQ.toras.splice(i,1);}}});
+  for(let i=ARVQ.toras.length-1;i>=0;i--){const T=ARVQ.toras[i];T.vida-=dt;
+    if(T.a<T.alvo){T.w+=1.5*9.8/T.Lt*Math.sin(T.a)*dt;T.a+=T.w*dt;if(T.a>=T.alvo){T.a=T.alvo;T.w=0;const u=T.comp*0.8;sfx('madeira',T.x+Math.sin(T.d)*u,T.z+Math.cos(T.d)*u,0.9);}}
+    if(T.vida<0){toraSemColisao(T);T.y-=dt*0.35;if(T.vida<-4)ARVQ.toras.splice(i,1);}}});
 function quedaParte(Pg,m,M){gl.uniformMatrix4fv(Pg.u.uModel,false,M);gl.bindVertexArray(m.vao);const tx=m.tex&&Pg.u.uUseTex;
   if(tx){gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,m.tex);gl.activeTexture(gl.TEXTURE0);gl.uniform1f(Pg.u.uUseTex,m.alfa?1+m.alfa:1);}
   gl.drawArrays(gl.TRIANGLES,0,m.count);if(tx)gl.uniform1f(Pg.u.uUseTex,0);}
