@@ -92,7 +92,8 @@ function camBloqueio(x,y,z,teto){if(teto!==null&&y>teto-0.12)return true;
     if(c.t===0){if(Math.hypot(x-c.x,z-c.z)<0.18+c.r)return true;}else{const dx=x-c.x,dz=z-c.z,lx=dx*c.c-dz*c.s,lz=dx*c.s+dz*c.c,qx=clamp(lx,-c.hw,c.hw),qz=clamp(lz,-c.hd,c.hd);if(Math.hypot(lx-qx,lz-qz)<0.18)return true;}}
   return false;}
 function updateCamera(dt){const asp=W/H,first=cfg.cam==='1';
-  const aimK=P.aim;cam.fov=(asp>=1?0.98:1.2)*(cfg.fov||1)*(1-aimK*0.18)*(1+0.075*(P.runK||0));
+  /* v10.3.2: campo de visão mais aberto (0,98 rad de altura parecia zoom: agora 1,1, uns 95° na largura), com um empurrão leve na disparada */
+  const aimK=P.aim;cam.fov=(asp>=1?1.1:1.26)*(cfg.fov||1)*(1-aimK*0.2)*(1+0.06*(P.runK||0));
   const d=lookDir(P.yaw,P.pitch+P.recuo*0.04+(P.kickP||0));
   const shake=(P.shake>0?P.shake*0.07*(Math.sin(G.t*61.3)*0.6+Math.sin(G.t*37.1+1.3)*0.4):0)-(P.pouso||0);P.pouso=(P.pouso||0)*Math.exp(-dt*7);
   if(CARRO.ativo){const c=CARRO;cam.fov=(asp>=1?1.0:1.22)+Math.abs(c.v)*0.006;
@@ -100,13 +101,14 @@ function updateCamera(dt){const asp=W/H,first=cfg.cam==='1';
     else{const d2=lookDir(P.yaw,clamp(P.pitch,-0.6,0.35)-0.1),piv=[c.x,c.y+VT().camH,c.z],dist=VT().camD+Math.abs(c.v)*0.09;
       let cx=piv[0]-d2[0]*dist,cy=piv[1]-d2[1]*dist+0.7,cz=piv[2]-d2[2]*dist;const gy=ground(cx,cz)+0.6;if(cy<gy)cy=gy;
       cam.pos=[cx,cy+shake,cz];cam.tgt=[piv[0]+d2[0]*6,piv[1]+d2[1]*6,piv[2]+d2[2]*6];}}
-  else if(first){const bob=P.amp*Math.sin(P.ph*2)*0.018;const hy=P.alive?lerp(1.62,1.12,P.agK||0):0.4;
+  else if(first){const bob=P.amp*Math.sin(P.ph*2)*0.011;const hy=P.alive?lerp(1.62,1.12,P.agK||0):0.4;
     cam.pos=[P.x+d[0]*0.08,P.y+hy+bob+shake,P.z+d[2]*0.08];cam.tgt=[cam.pos[0]+d[0],cam.pos[1]+d[1],cam.pos[2]+d[2]];}
   else{const rx=-Math.cos(P.yaw),rz=Math.sin(P.yaw);
     // dentro de prédio (corredor, escada): a câmera chega mais perto e mais para trás do ombro, devagar, sem ficar batendo nas paredes
     {const dentro=P.y>-20&&!!salaEm(P.x,P.y+0.4,P.z);camIn+=((dentro?1:0)-camIn)*(1-Math.exp(-dt*3));}
-    const dist=lerp(lerp(3.6,2.65,aimK)*(cfg.camDist||1),lerp(2.25,1.9,aimK),camIn),side=lerp(lerp(0.55,0.7,aimK),0.42,camIn);
-    const alvo=[P.x+rx*side,P.y+lerp(1.55,1.12,P.agK||0)+Math.sin(P.ph*2)*0.022*P.amp*(1+0.4*(P.runK||0)),P.z+rz*side];
+    /* v10.3.2: mais perto do ombro (3,6 → 3,1 m) e sem o sobe e desce do passo (dava enjoo e parecia a câmera atrasada) */
+    const dist=lerp(lerp(3.1,2.5,aimK)*(cfg.camDist||1),lerp(2.2,1.9,aimK),camIn),side=lerp(lerp(0.5,0.68,aimK),0.42,camIn);
+    const alvo=[P.x+rx*side,P.y+lerp(1.62,1.15,P.agK||0)+Math.sin(P.ph*2)*0.006*P.amp,P.z+rz*side];
     if(!camPiv||Math.hypot(alvo[0]-camPiv[0],alvo[2]-camPiv[2])>3)camPiv=alvo.slice();else{const kp=1-Math.exp(-dt*24);for(let i=0;i<3;i++)camPiv[i]+=(alvo[i]-camPiv[i])*(i===1?kp*0.7:kp);}
     // teto suavizado: desce na hora (não atravessa a laje) e sobe devagar (na escada o teto muda a cada degrau e a câmera pulava)
     const piv=camPiv;let dd=dist;const teto0=tetoEm(P.x,P.y+0.3,P.z);
@@ -145,11 +147,13 @@ function updatePlayer(dt){const ch=P.ch;
   let mx=IN.mx,mz=IN.mz;const ml=Math.hypot(mx,mz);if(ml>1){mx/=ml;mz/=ml;}
   {const esf=P.acao&&P.acao.tipo==='revistar'&&P.acao.alvo&&P.acao.alvo.k==='carcaca';P.agK=approach(P.agK||0,P.agachado||esf?1:0,dt*5);}   // esfolando: agacha junto do bicho
   const moving=ml>0.15,running=IN.run&&moving&&P.energia>3&&mz>-0.2&&!P.agachado&&!pernaRuim()&&!P.voo;
-  let spd=running?6.2*(1+0.08*perk('corrida')):(P.agachado?1.9:3.7);if(P.acao&&(P.acao.tipo==='usar'||P.acao.tipo==='revistar'||P.acao.tipo==='recarga'))spd*=0.45;if(P.fome<=0||P.sede<=0)spd*=0.8;if(P.aim>0.5)spd*=0.6;if(P.acao&&P.acao.tipo==='arco')spd*=0.85;if(naAgua(P.x,P.y,P.z))spd*=0.55;spd*=lesaoVel()*sonoVel()*(P.lentoMata||1);
+  /* v10.3.2 (Himalaia: "movimentação muito ruim"): passo normal 4,2 m/s (era 3,7), disparada 6,8 (era 6,2), agachado 2,0;
+     de costas 72% e de lado 88% da velocidade de frente (antes tudo igual) */
+  let spd=running?6.8*(1+0.08*perk('corrida')):(P.agachado?2.0:4.2);if(!running&&moving&&!P.voo)spd*=mz<-0.25?0.72:Math.abs(mx)>Math.abs(mz)+0.1?0.88:1;if(P.acao&&(P.acao.tipo==='usar'||P.acao.tipo==='revistar'||P.acao.tipo==='recarga'))spd*=0.45;if(P.fome<=0||P.sede<=0)spd*=0.8;if(P.aim>0.5)spd*=0.6;if(P.acao&&P.acao.tipo==='arco')spd*=0.85;if(naAgua(P.x,P.y,P.z))spd*=0.55;spd*=lesaoVel()*sonoVel()*(P.lentoMata||1);
   if(P.voo)spd=IN.run?34:13;   // voando no modo criativo (v10.2.2): 13 m/s, com Shift 34 m/s (antes era o passo de andar, 3,7 m/s)
   if(P.travaAnda>0){P.travaAnda-=dt;mx=mz=0;}const px0=P.x,pz0=P.z;
   const sy=Math.sin(P.yaw),cy=Math.cos(P.yaw);const dx=sy*mz-cy*mx,dz=cy*mz+sy*mx;
-  const k=1-Math.exp(-dt*(P.voo?3.5:moving?(running?8:11):13));P.vx+=(dx*spd-P.vx)*k;P.vz+=(dz*spd-P.vz)*k;P.runK=approach(P.runK||0,running&&Math.hypot(P.vx,P.vz)>4?1:0,dt*2.5);P.correndo=running&&Math.hypot(P.vx,P.vz)>3;
+  const k=(1-Math.exp(-dt*(P.voo?3.5:moving?(running?7:10):17)))*(P.noChao||P.voo||P.coyote>0?1:0.22);P.vx+=(dx*spd-P.vx)*k;P.vz+=(dz*spd-P.vz)*k;P.runK=approach(P.runK||0,running&&Math.hypot(P.vx,P.vz)>4?1:0,dt*2.5);P.correndo=running&&Math.hypot(P.vx,P.vz)>3;
   {const ox=P.x,oz=P.z;P.x+=P.vx*dt;P.z+=P.vz*dt;
     /* beirada: andando no alto, não despenca sem querer (correndo ou pulando dá para saltar) */
     if(P.noChao&&!running&&P.y-ground(ox,oz)>2.2&&chaoEm(P.x,P.z,P.y)<P.y-1.2){P.x=ox;P.z=oz;P.vx*=0.2;P.vz*=0.2;dica('beirada','corpo','Beirada! Andando você não cai. Para saltar daqui, corra ou pule.');}}
@@ -157,11 +161,17 @@ function updatePlayer(dt){const ch=P.ch;
    const px=P.x-x0,pz=P.z-z0,pl=Math.hypot(px,pz);
     if(pl>1e-5){const nx=px/pl,nz=pz/pl,vn=P.vx*nx+P.vz*nz;if(vn<0){P.vx-=vn*nx;P.vz-=vn*nz;}}}
   if(!dentroMapa(P.x,P.z)&&!(P.y<-20&&salaSubEm(P.x,P.y+0.3,P.z))){voltarMapa(P,px0,pz0);P.vx*=0.3;P.vz*=0.3;if(G.t-G.limiteT>6){G.limiteT=G.t;toast('corpo',P.x>150?'Destroços e mato fechado bloqueiam a passagem por aqui.':'A mata é fechada demais por aqui. Volte para a clareira.');}}
-  fisicaVertical(dt);
+  fisicaVertical(dt);if(P.puloBuf>0){P.puloBuf-=dt;if(P.noChao&&P.puloBuf>0){P.puloBuf=0;pular();}}   // apertou o pulo um pouquinho antes de pousar: pula ao pousar
   if(running){P.energia=Math.max(0,P.energia-4.6*dt*(1-0.15*perk('folego'))*(1+Math.max(0,pesoRoupa()-5)*0.05));}else P.energia=Math.min(100,P.energia+(P.acao?10:18)*dt*(1+0.2*perk('folego'))*sonoRegen());
   const sp=Math.hypot(P.vx,P.vz);
-  let bodyT=P.body;if(cfg.cam==='1'||P.acao||P.aim>0.3)bodyT=P.acao&&P.acao.mira!==undefined?P.acao.mira:P.yaw;else if(sp>0.5)bodyT=Math.atan2(P.vx,P.vz);
-  P.body=angLerp(P.body,bodyT,1-Math.exp(-dt*(P.acao||P.aim>0.3?16:10)));
+  /* v10.3.2: o corpo olha para onde a câmera olha, como no DayZ e no PUBG (antes virava para onde andava: de costas ele dava meia-volta
+     e corria para a câmera). Andando, ele vai de lado e de costas com as animações próprias; na disparada vira para a frente; parado,
+     só vira quando a câmera passa do ombro (cfg.corpo='movimento' volta ao jeito antigo) */
+  let bodyT=P.body;if(cfg.cam==='1'||P.acao||P.aim>0.3)bodyT=P.acao&&P.acao.mira!==undefined?P.acao.mira:P.yaw;
+  else if(cfg.corpo==='movimento'){if(sp>0.5)bodyT=Math.atan2(P.vx,P.vz);}
+  else if(sp>0.5){bodyT=running?Math.atan2(P.vx,P.vz):P.yaw;P.giraCorpo=false;}
+  else{const df=Math.abs(angDiff(P.body,P.yaw));if(df>1.1)P.giraCorpo=true;if(P.giraCorpo){bodyT=P.yaw;if(df<0.08)P.giraCorpo=false;}}
+  P.body=angLerp(P.body,bodyT,1-Math.exp(-dt*(P.acao||P.aim>0.3?16:sp>0.5?12:7)));
   P.amp=approach(P.amp,sp>0.4?(running?1:0.75):0,dt*4);P.ph+=dt*(running?11:7.5)*(sp>0.3?1:0.25);
   {const st=Math.floor(P.ph/Math.PI);if(st!==P.passoN){P.passoN=st;if(sp>0.6&&P.noChao){const agua=naAgua(P.x,P.y,P.z),ri=agua?null:roadInfo(P.x,P.z),sup=agua?'agua':dentroCidade(P.x,P.z,-2)?'asf':ri.road&&ri.d<ri.road.w/2?(ri.road.cor==='asfalto'?'asf':'terra'):'grama';
       sfx('passo',undefined,undefined,agua?(running?0.7:0.45):running?0.5:P.agachado?0.1:0.26,sup);if(agua){barulho(P.x,P.z,running?13:P.agachado?4:8,true,P.y);dica('agua','corpo','Na água você anda devagar e cada passo faz barulho. Agachado faz menos. Mais fundo, você nada.');}}}}
@@ -220,7 +230,7 @@ function recarregar(){const s=selItem(),d=s?ITEMS[s.id]:null;if(!d||!d.fogo)retu
 function empurrar(){if(P.acao||P.cd>0||P.energia<8||!P.alive)return;P.acao={tipo:'empurrar',t:0,dur:0.4,mira:miraMelee(1.6)};P.energia-=8;sfx('golpe');}
 function agachar(on){if(!P.alive)return;P.agachado=on===undefined?!P.agachado:!!on;if(P.agachado){IN.run=false;IN.runFix=false;}sfx('clique');feed(P.agachado?'Agachado':'De pé');
   if(P.agachado)dica('agachar','corpo','Agachado você anda devagar e em silêncio, os zumbis demoram mais para te ver e um golpe pelas costas dá o dobro de dano.');}
-function pular(){if(P.escala){sairEscalada(null);return;}if(P.muro||P.rola)return;{const a=alvoMuro();if(a){comecarMuro(a);return;}}if(P.agachado){agachar(false);return;}if((!P.noChao&&!(P.coyote>0))||!P.alive||P.energia<4)return;if(pernaRuim()){feed(pernaSemTala()?'Com a perna quebrada não dá para pular':'Com a tala não dá para pular',true);return;}P.vy=4.8;P.noChao=false;P.coyote=0;P.energia-=4;}
+function pular(){if(P.escala){sairEscalada(null);return;}if(P.muro||P.rola)return;{const a=alvoMuro();if(a){comecarMuro(a);return;}}if(P.agachado){agachar(false);return;}if(!P.noChao&&!(P.coyote>0)&&P.alive){P.puloBuf=MOV.buf;return;}if((!P.noChao&&!(P.coyote>0))||!P.alive||P.energia<4)return;if(pernaRuim()){feed(pernaSemTala()?'Com a perna quebrada não dá para pular':'Com a tala não dá para pular',true);return;}P.vy=MOV.pulo;P.noChao=false;P.coyote=0;P.puloBuf=0;P.energia-=4;}
 function stepAcao(dt){const a=P.acao;a.t+=dt;
   if(a.tipo==='arco'){passoArco(a,dt);return;}
   if(a.tipo==='arremesso'&&!a.done&&a.t>=a.dur*0.4){a.done=true;lancarMolotov(a);}

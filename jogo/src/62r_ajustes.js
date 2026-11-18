@@ -7,7 +7,7 @@
 /* 12/11 (lobby novo): o Himalaia pediu abas de Som, Resolução e Sensibilidade. Resolução é nova (modo de tela e resolução do
    desenho); Sensibilidade saiu de Controles, que ficou com as teclas, o tipo de controle e os comandos na tela. */
 const AJ_SECOES=[['graficos','Gráficos',['aj-graf','aj-graf-nota','aj-tex','aj-fps','aj-fov']],['resolucao','Resolução',['aj-modo-tela','aj-res','aj-res-info']],['som','Som',['aj-som','aj-mus','aj-efx']],
-  ['sens','Sensibilidade',['aj-sens','aj-sensgp','aj-invy']],['mira','Mira',['aj-mira-prev','aj-mira-estilo','aj-mira-cor','aj-mira-tam','aj-mira-esp','aj-mira-abre','aj-mira-opac','aj-mira-cont','aj-mira-padrao']],['controles','Controles e teclas',['aj-teclas-btn','aj-tela','aj-teclas']],['jogo','Jogo',['aj-dif','aj-cam','aj-camdist','aj-animabre','aj-criativo']],
+  ['sens','Sensibilidade',['aj-sens','aj-sensgp','aj-invy']],['mira','Mira',['aj-mira-prev','aj-mira-estilo','aj-mira-cor','aj-mira-tam','aj-mira-esp','aj-mira-abre','aj-mira-opac','aj-mira-cont','aj-mira-padrao']],['controles','Controles e teclas',['aj-teclas-btn','aj-tela','aj-teclas']],['jogo','Jogo',['aj-dif','aj-cam','aj-corpo','aj-camdist','aj-animabre','aj-criativo']],
   ['acess','Acessibilidade',['aj-hud']],['conta','Conta e perfil',[]]];
 /* ---------- Resolução ----------
    Modo de tela: no PC (aplicativo) pede ao aplicativo (o mesmo do F11); no navegador, a tela cheia do navegador.

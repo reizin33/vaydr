@@ -1,15 +1,19 @@
 /* ================= subir e descer: gravidade com chão elevado, queda com dano e escalada em rotas marcadas ================= */
-const ESC_CFG={vel:1.5,energia:2.2,danoQueda:10,danoPorMs:7,degrau:0.55};
+/* v10.3.2 (Himalaia: "a movimentação muito ruim", "o pulo"): a gravidade do jogador era fraca (14 m/s²: o pulo subia 0,82 m e
+   ficava 0,7 s no ar, flutuando). Agora 23 m/s² subindo e 27 caindo: sobe uns 0,85 m e volta em pouco mais de meio segundo,
+   firme. A queda continua machucando da mesma altura de antes: os limites em velocidade crescem na mesma conta (MOV.kq). */
+const MOV={g:23,gCai:27,pulo:6.25,kq:Math.sqrt(27/14),buf:0.14};
+const ESC_CFG={vel:1.5,energia:2.2,danoQueda:10*MOV.kq,danoPorMs:7/MOV.kq,degrau:0.55};
 /* vertical do jogador: pisa no chão mais alto alcançável (terreno, raiz, galho, plataforma, ponte); se não houver, cai */
 function fisicaVertical(dt){const chao=chaoEm(P.x,P.z,P.y);
   if(P.vy>0||P.y>chao+0.002){
     if(P.vy<=0&&P.noChao&&P.y-chao<0.32){P.y=chao;P.vy=0;}             // descer degrau e ladeira sem pular
-    else{P.vy-=14*dt;P.y+=P.vy*dt;if(P.y<=chao)pousar(chao);}}
+    else{P.vy-=(P.vy>0?MOV.g:MOV.gCai)*dt;P.y+=P.vy*dt;if(P.y<=chao)pousar(chao);}}
   else if(!P.noChao&&P.vy<0)pousar(chao);                              // caindo em diagonal e o chão "subiu" sob os pés: também é pouso (com dano)
   else{P.y=chao;P.vy=0;}
   const antes=P.noChao;P.noChao=P.y<=chao+0.002;P.air=P.y-chao;if(antes&&!P.noChao&&P.vy<=0)P.coyote=0.18;else if(P.noChao)P.coyote=0;else P.coyote=Math.max(0,(P.coyote||0)-dt);}
-function pousar(chao){const imp=-P.vy;P.y=chao;P.vy=0;if(imp>3.5)P.pouso=Math.min(0.16,(imp-3)*0.025);if(imp>ESC_CFG.danoQueda)queda(imp);else if(imp>6)sfx('passo',undefined,undefined,0.5,'terra');}
-function queda(v){const d=(v-ESC_CFG.danoQueda)*ESC_CFG.danoPorMs;P.shake=0.8;sfx('dor');ferirJogador(d/Math.max(0.3,DIF[cfg.dif].dano*(1-protecao())));feed('Queda feia',true);if(v>ESC_CFG.danoQueda+6||(v>ESC_CFG.danoQueda+3.5&&Math.random()<0.55))lesao('perna');
+function pousar(chao){const imp=-P.vy,iq=imp/MOV.kq;P.y=chao;P.vy=0;if(iq>3.2)P.pouso=Math.min(0.16,(iq-2.8)*0.03);if(imp>ESC_CFG.danoQueda)queda(imp);else if(iq>4.5)sfx('passo',undefined,undefined,0.5,'terra');}
+function queda(v){const d=(v-ESC_CFG.danoQueda)*ESC_CFG.danoPorMs;P.shake=0.8;sfx('dor');ferirJogador(d/Math.max(0.3,DIF[cfg.dif].dano*(1-protecao())));feed('Queda feia',true);if(v>ESC_CFG.danoQueda+6*MOV.kq||(v>ESC_CFG.danoQueda+3.5*MOV.kq&&Math.random()<0.55))lesao('perna');
   dica('queda','corpo','Cair do alto machuca. Desça pelos cipós ou por uma escada de corda (segure E perto da saída).');}
 const altoDoChao=()=>P.y-ground(P.x,P.z);
 /* começar a escalar: perto da saída de baixo (sobe) ou de cima (desce) de uma rota */

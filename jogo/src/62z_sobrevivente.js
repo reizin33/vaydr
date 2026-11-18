@@ -108,7 +108,7 @@ function survLoco(ch,dt){const s=ch.sk;
 {const _sp=skPose;skPose=function(ch,dt){if(ch===P.ch){try{if(ch.surv!==survLigado())survAplicar();if(ch.surv)survLoco(ch,dt);}catch(e){console.error('sobrevivente',e);}}return _sp.apply(this,arguments);};}
 /* pulo: marca a saída do chão (o clipe começa no agachar); pouso forte: queda com as mãos no chão */
 {const _pl=pular;pular=function(){const ant=P.vy;const r=_pl.apply(this,arguments);if(P.vy>4&&ant<=4)SURV.pulo=0;return r;};}
-{const _po=pousar;pousar=function(chao){const imp=-P.vy;const r=_po.apply(this,arguments);if(P.ch&&P.ch.surv&&imp>ESC_CFG.danoQueda-1.5)SURV.queda=0;return r;};}
+{const _po=pousar;pousar=function(chao){const imp=-P.vy;const r=_po.apply(this,arguments);if(P.ch&&P.ch.surv&&imp>ESC_CFG.danoQueda-1.5*MOV.kq)SURV.queda=0;return r;};}
 /* depois de correr muito: respira ofegante parado por um tempo */
 PASSOS.push(function survCansaco(dt){if(!P.ch||!P.ch.surv)return;SURV.cansado=Math.max(0,(SURV.cansado||0)-dt);if(P.correndo&&P.energia<40)SURV.cansado=6;});
 /* ajuste "Personagem" (vai para a seção Jogo): o sobrevivente realista ou o boneco clássico da tela de criação */

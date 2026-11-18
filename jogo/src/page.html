@@ -1203,7 +1203,9 @@ body.criativo .ad-selo{display:block}
 :is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo) :is(.es-vaga,.en-k,.en-l,.qd2-f,.qd2-c,.qd2-graf,.vc-l,.es-barra,.chip-e,.chip-v){border-radius:3px}
 /* Tab (mochila, fabricar, tarefas, nível, baú): o jogo atrás, chapas retas e quadradinhos como no Rust */
 .inv{background:radial-gradient(125% 95% at 50% 45%,rgba(5,7,6,.55),rgba(3,4,4,.9));backdrop-filter:blur(2px)}
-.inv-c{width:min(1180px,100%);padding:6px 4px;gap:10px;border-radius:0;background:transparent;border:0;box-shadow:none}
+.inv{place-items:start center;padding-top:max(20px,4vh)}
+.inv-c{width:min(1180px,100%);height:min(820px,calc(100vh - max(40px,8vh)));padding:6px 4px;gap:10px;border-radius:0;background:transparent;border:0;box-shadow:none}
+.inv :is(#lista-tarefas,#lista-perks){background:var(--ui-chapa);border:1px solid var(--ui-linha);border-radius:3px;padding:0 12px;border-top:1px solid var(--ui-linha)}
 .inv-top{border-bottom:1px solid var(--ui-linha);gap:0}
 .abas{gap:0}
 .abas button{clip-path:none;border-radius:0;min-height:46px;padding:0 18px;background:transparent;color:var(--ash);border-bottom:2px solid transparent;margin-bottom:-1px;
@@ -1592,6 +1594,7 @@ body.criativo .ad-selo{display:block}
     <div class="opcao"><span class="rot">Gráficos</span><div class="segs" id="aj-graf"><button type="button" data-v="baixo">Baixo</button><button type="button" data-v="medio">Médio</button><button type="button" data-v="alto">Alto</button><button type="button" data-v="ultra">Ultra</button></div></div>
     <div class="opcao"><span class="rot">Dificuldade</span><div class="segs" id="aj-dif"><button type="button" data-v="facil">Fácil</button><button type="button" data-v="normal">Normal</button><button type="button" data-v="dificil">Difícil</button></div></div>
     <div class="opcao"><span class="rot">Câmera</span><div class="segs" id="aj-cam"><button type="button" data-v="3">3ª pessoa</button><button type="button" data-v="1">1ª pessoa</button></div></div>
+    <div class="opcao"><span class="rot">Corpo</span><div class="segs" id="aj-corpo"><button type="button" data-v="camera">Olha para a câmera</button><button type="button" data-v="movimento">Vira para onde anda</button></div></div>
     <div class="opcao"><span class="rot">Controles na tela</span><div class="segs" id="aj-tela"><button type="button" data-v="pc">Teclado e mouse</button><button type="button" data-v="celular">Toque</button></div></div>
     <div class="opcao so-pc"><span class="rot">Comandos na tela</span><div class="segs" id="aj-teclas"><button type="button" data-v="1">Mostrar</button><button type="button" data-v="0">Esconder</button></div></div>
     <div class="opcao"><label for="aj-sens">Sensibilidade do mouse e da câmera <b id="aj-sens-v">1.00</b> <span class="so-pc">(no jogo: teclas - e =)</span></label><input type="range" id="aj-sens" min="0.2" max="3" step="0.05" value="1"></div>
