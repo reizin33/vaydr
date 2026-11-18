@@ -24,7 +24,7 @@ const CREDITOS=[
   {tit:'Personagem',itens:[
     {obra:'Corpos, peles, olhos, sobrancelhas, cabelos, barbas, roupas e sapatos do Personalizado, e o braço da 1ª pessoa',autor:'MakeHuman',link:'makehumancommunity.org',lic:'CC0',mod:'ajustado ao esqueleto do jogo'}]},
   {tit:'Texturas e modelos',itens:[
-    {obra:'Grama, chão da mata, folhas, rocha, tábuas, capim, ferramentas, baú, galhos, pinheiro, móveis e objetos do mapa (barreira, tambor, caixa militar); madeira, metal enferrujado, linho e rocha nos itens feitos à mão',autor:'Poly Haven',link:'polyhaven.com',lic:'CC0'}]},
+    {obra:'Grama, chão da mata, folhas, rocha, tábuas, capim, ferramentas, baú, galhos, pinheiro, móveis e objetos do mapa (barreira, tambor, caixa militar); madeira, metal enferrujado, linho e rocha nos itens feitos à mão; pintura gasta com ferrugem na lataria dos veículos',autor:'Poly Haven',link:'polyhaven.com',lic:'CC0'}]},
   {tit:'Sons gravados',itens:[
     {obra:'Impact Sounds e RPG Audio',autor:'Kenney',link:'kenney.nl',lic:'CC0'},
     {obra:'Pacotes de efeitos CC0 (madeira, metal, quebra, criaturas, tiros)',autor:'rubberduck',link:'opengameart.org',lic:'CC0'},
