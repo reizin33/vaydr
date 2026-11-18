@@ -328,7 +328,7 @@ function ferirJogador(d,src){if(!P.alive)return;if(P.rola&&P.rola.t>P.rola.dur*0
 function zVisao(){const n=E.n||0;let r=lerp(24,11,n);if(P.lanterna&&n>0.3)r+=14;if(G.chuva>0.5)r*=0.8;r*=climaVisao();
   if(!P.lanterna&&(emPredios(P.x,P.z,2)||P.y<-20)){const s=salaEm(P.x,P.y+0.3,P.z);if(s&&s.escura>0.5)r*=0.6;}if(camuflado())r*=0.55;if(P.fumaca>0.3)r*=1-0.75*P.fumaca;return r;}   // no escuro de dentro, sem lanterna, é mais difícil te ver
 function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let horda=0;ouvirBarulhos();
-  for(let i=Z.length-1;i>=0;i--){const z=Z[i],ch=z.ch,S=ZS[z.tipo],P2=ZP[z.tipo];
+  for(let i=Z.length-1;i>=0;i--){const z=Z[i];if(LAN.on)lanZAntes(z,dt);const ch=z.ch,S=ZS[z.tipo],P2=ZP[z.tipo];   // v10.4.0 (LAN, 63_lan.js): o zumbi caça o jogador mais perto; no convidado, os bonecos repetem o anfitrião
     const dxp=P.x-z.x,dzp=P.z-z.z,dp=Math.hypot(dxp,dzp);
     z.flash=Math.max(0,z.flash-dt);ch.tint=z.flash>0?[2.2,1.3,1.3]:(z.tint||[1,1,1]);
     if(z.st==='morrendo'){z.t+=dt;if(!zSkMorto(z)){if(S.cao){const k=easeOut(Math.min(1,z.t/0.45));ch.roll=1.5*k;ch.hipY=-0.22*k;}else ch.pitch=-1.5*easeOut(Math.min(1,z.t/0.6));}if(z.t>0.7){z.st='morto';z.t=0;}ch.y=z.y;continue;}
@@ -341,15 +341,15 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
     ch.vis=dp<100;
     if(z.st==='dorme'){   // emboscada: parada no escuro até alguém chegar perto, fazer barulho ou bater nela
       if(z.ouvir){z.ouvir.t-=dt;if(z.ouvir.t<=0){z.st='alerta';z.ax=z.ouvir.x;z.az=z.ouvir.z;z.ay=z.ouvir.y;z.ouvir=null;ch.pitch=0;}}
-      if(z.st==='dorme'&&P.alive&&((dp<(ag?2.0:3.6)&&Math.abs(P.y-z.y)<2)||z.flash>0)){z.st='caca';z.viu=0;z.lx=P.x;z.lz=P.z;z.ly=P.y;ch.pitch=0;sfx('ataqueZ',z.x,z.z,1,z.tipo);}
+      if(z.st==='dorme'&&!z.lan&&P.alive&&((dp<(ag?2.0:3.6)&&Math.abs(P.y-z.y)<2)||z.flash>0)){z.st='caca';z.viu=0;z.lx=P.x;z.lz=P.z;z.ly=P.y;ch.pitch=0;sfx('ataqueZ',z.x,z.z,1,z.tipo);}
       if(z.st==='dorme'){z.stAnt='dorme';ch.x=z.x;ch.z=z.z;ch.y=z.y;if(ch.vis&&!zSkDeitado(z)){poseZIdle(ch.r,G.t*0.3+z.id,P2);ch.pitch=0.3;}continue;}}
     // acordou: levanta do chão antes de agir (com o esqueleto novo)
     if(z.stAnt==='dorme'&&ch.sk&&!S.baixo){z.levanta=z.tipo==='emboscada'?1.0:1.5;z.levantaD=z.levanta;}z.stAnt=z.st;
     if(z.levanta>0){z.levanta-=dt;zSkLevantar(z,1-z.levanta/z.levantaD);ch.x=z.x;ch.z=z.z;ch.y=z.y;ch.yaw=angLerp(ch.yaw,Math.atan2(dxp,dzp),1-Math.exp(-dt*2.5));if(z.levanta<=0)skParar(ch,5);continue;}if(z.noturno||z.st==='caca'||z.st==='marcha')horda++;
-    if(z.chefe&&chefeAtualiza(z,dt,dp,dxp,dzp))continue;
-    if(zEspecial(z,dt,dp,dxp,dzp))continue;
+    if(z.chefe&&!z.lan&&chefeAtualiza(z,dt,dp,dxp,dzp))continue;
+    if(!z.lan&&zEspecial(z,dt,dp,dxp,dzp))continue;
     // percepção
-    if(P.alive){const fx=Math.sin(ch.yaw),fz=Math.cos(ch.yaw);const ang=dp>0.01?(dxp*fx+dzp*fz)/dp:1;
+    if(z.lan){}else if(P.alive){const fx=Math.sin(ch.yaw),fz=Math.cos(ch.yaw);const ang=dp>0.01?(dxp*fx+dzp*fz)/dp:1;
       if(z.ignora>0)z.ignora-=dt;
       const alto=P.y-z.y>3.2&&!(z.zona&&P.y-z.y<4.5),sent=z.tipo==='sentinela',vz=vis*(sent?1.35:1);let sees=alto?(dp<2.5&&!(z.ignora>0)):(dp<(ag?(sent?2.2:1.3):3.5)||(dp<vz&&ang>(sent?-0.6:-0.35))||(!ag&&dp<vz*0.5));
       if(sees&&(z.zona||emPredios(P.x,P.z,2)))sees=enxerga(z);if(sees&&Math.abs(P.y-z.y)>8&&(P.y<-20||z.y<-20))sees=false;   // na cidade, parede e andar escondem
@@ -362,6 +362,7 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
     let tx=null,tz=null,spd=0;const noite=(E.n||0)>0.5?1.18:1;
     let ac=false,dcao=1e9,AL=null;if(z.st==='caca'||z.st==='golpe'){AL=aliadoPerto(z,dp);if(AL){ac=true;dcao=AL.d;}}   // Caramelo ou sobrevivente mais perto que você vira o alvo
     switch(z.st){
+      case'lan':tx=z.lanSpd>0?z.lanTx:null;tz=z.lanTz;spd=z.lanSpd||0;break;   // boneco do zumbi do anfitrião (LAN)
       case'guarda':ch.yaw=angLerp(ch.yaw,(z.yaw0||0)+Math.sin(G.t*0.45+z.id)*0.9,1-Math.exp(-dt*2));break;   // sentinela: parada no posto, olhando em volta
       case'volta':{const q=z.posto;tx=q?q.x:z.hx;tz=q?q.z:z.hz;spd=S.vaga;if(d2(z.x,z.z,tx,tz)<0.6&&Math.abs((q?q.y:z.y)-z.y)<1.2){z.st='guarda';z.gritou=false;}break;}
       case'vaga':if(z.posto){z.st='volta';break;}z.idleT-=dt;if(z.idleT<=0){z.idleT=4+Math.random()*7;const s=z.zona;
@@ -382,7 +383,7 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
         if((ac?dcao:dp)<S.alcance*(ch.s||1)&&(ac||(P.alive&&zAlcanca(z)))){z.st='golpe';z.t=0;z.bateu=false;z.mira=ac?AL:'p';if(Math.random()<0.7)sfx('ataqueZ',z.x,z.z,0.9,z.tipo);}
         if(z.viu>6&&!ac){z.st='alerta';z.ax=z.lx;z.az=z.lz;z.ay=z.ly;}break;
       case'golpe':{z.t+=dt*(S.cao?1.7:1);const mc=z.mira!=='p'&&aliadoValido(z.mira),mp=mc?aliadoPos(z.mira):null,gx=mc?mp[0]-z.x:dxp,gz=mc?mp[1]-z.z:dzp,gd=Math.hypot(gx,gz);ch.yaw=angLerp(ch.yaw,Math.atan2(gx,gz),1-Math.exp(-dt*8));
-        if(z.t>=0.62&&!z.bateu){z.bateu=true;const fx=Math.sin(ch.yaw),fz=Math.cos(ch.yaw);if(gd<S.alcance*(ch.s||1)+0.35&&(gx*fx+gz*fz)/(gd||1)>0.3&&(mc||zAlcanca(z))){if(mc)ferirAliado(z.mira,S.dano);else ferirJogador(S.dano,z);zBateu(z,!mc);}}
+        if(z.t>=0.62&&!z.bateu){z.bateu=true;const fx=Math.sin(ch.yaw),fz=Math.cos(ch.yaw);if(gd<S.alcance*(ch.s||1)+0.35&&(gx*fx+gz*fz)/(gd||1)>0.3&&(mc||zAlcanca(z))){if(mc)ferirAliado(z.mira,S.dano);else if(!z.lan)ferirJogador(S.dano,z);zBateu(z,!mc&&!z.lan);}}
         if(z.t>=1.05)z.st='caca';break;}
       case'derruba':{const o=z.obra;if(!o||o.hp<=0||!OB.includes(o)||!(P.y-z.y>1.75)||!P.alive){z.st='caca';z.obra=null;z.derrubando=false;break;}
         const d=Math.hypot(o.x-z.x,o.z-z.z);if(d>S.r*(ch.s||1)+0.5){tx=o.x;tz=o.z;spd=S.caca*noite;break;}
@@ -399,7 +400,7 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
     if(z.pula&&z.pula.j&&janelaTapada(z.pula.j)){z.pula=null;z.rota=null;z.rotaT=0;}
     if(z.pula){z.pula.t-=dt;if(z.pula.t<=0){let q=z.pula;if(q.j&&bloqueadoAlto(q.x,q.z,0.3,q.y)){const nx=Math.sin(q.j.yaw),nz=Math.cos(q.j.yaw),a=janelaPouso(q.j,(q.x-q.j.x)*nx+(q.z-q.j.z)*nz<0);if(a)q={x:a.x,y:a.y,z:a.z};}z.x=q.x;z.z=q.z;z.y=q.y;z.pula=null;z.rotaI++;poeira(z.x,z.y+0.5,z.z,4);sfx('madeira',z.x,z.z,0.5);}else{tx=null;}}
     // na cidade: rota por portas, corredores e escadas quando o alvo está em outra zona
-    if(tx!==null&&spd>0&&(z.zona||z.cidade||emPredios(tx,tz,2))){const ty=z.st==='caca'?(z.viu<0.5?P.y:(z.ly??z.y)):z.st==='alerta'?(z.ay??z.y):z.st==='volta'&&z.posto?z.posto.y:z.y;const wp=navProximo(z,tx,ty,tz);if(wp){tx=wp.x;tz=wp.z;}}
+    if(tx!==null&&spd>0&&!z.lan&&(z.zona||z.cidade||emPredios(tx,tz,2))){const ty=z.st==='caca'?(z.viu<0.5?P.y:(z.ly??z.y)):z.st==='alerta'?(z.ay??z.y):z.st==='volta'&&z.posto?z.posto.y:z.y;const wp=navProximo(z,tx,ty,tz);if(wp){tx=wp.x;tz=wp.z;}}
     // movimento
     if(tx!==null&&spd>0){let dx=tx-z.x,dz=tz-z.z;const dd=Math.hypot(dx,dz);if(dd>0.05){dx/=dd;dz/=dd;
         if(z.desvio>0){z.desvio-=dt;const s=z.desvioS;const px=-dz*s,pz=dx*s;dx=dx*0.35+px;dz=dz*0.35+pz;}
@@ -411,7 +412,7 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
         ch.yaw=angLerp(ch.yaw,Math.atan2(dx,dz),1-Math.exp(-dt*7));z.ph+=dt*v*3.2;
         const hit=collide(z,S.r*(ch.s||1),c=>c.solid);
         if(hit&&(hit.obra||hit.porta)&&(z.st==='caca'||z.st==='marcha'||z.st==='alerta'||(z.st==='derruba'&&!(hit.obra&&hit.obra.tipo==='pilar'&&hit.obra!==z.obra)))){if(z.st==='derruba')z.derrubando=true;z.st='quebra';z.obra=hit.obra||hit.porta;z.t=0;}
-        z.stuck+=dt;if(z.stuck>1.2){const mv=Math.hypot(z.x-z.lastX,z.z-z.lastZ);if(mv<0.25&&z.desvio<=0){z.desvio=0.9;z.desvioS=Math.random()<0.5?-1:1;}z.stuck=0;z.lastX=z.x;z.lastZ=z.z;}}}
+        z.stuck+=dt;if(z.stuck>1.2){const mv=Math.hypot(z.x-z.lastX,z.z-z.lastZ);if(mv<0.25&&z.desvio<=0&&!z.lan){z.desvio=0.9;z.desvioS=Math.random()<0.5?-1:1;}z.stuck=0;z.lastX=z.x;z.lastZ=z.z;}}}
     else if(z.st==='atordoado')collide(z,S.r*(ch.s||1),c=>c.solid);
     if(!dentroMapa(z.x,z.z,-10)&&z.y>-20){const k=Math.hypot(z.x,z.z),rm=raioMapaEm(z.x,z.z);if(k>rm+10&&!dentroCidade(z.x,z.z,10)){z.x*=(rm+10)/k;z.z*=(rm+10)/k;}}
     {const cz=zChaoAgua(z,chaoEm(z.x,z.z,z.y));if(z.y>cz+0.3||z.vy>0){z.vy=(z.vy||0)-14*dt;z.y+=z.vy*dt;if(z.y<=cz){if(z.vy<-12)ferirZ(z,(-z.vy-12)*9,0,0,true);z.y=cz;z.vy=0;}}else{if(z.vy<-12)ferirZ(z,(-z.vy-12)*9,0,0,true);z.y=cz;z.vy=0;}}
@@ -421,7 +422,7 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
     const moving=tx!==null&&spd>0;
     if(zPoseEsp(z,ch,moving,spd,dt));
     else if(z.st==='golpe')poseZAttack(ch.r,clamp(z.t/0.9,0,1),P2);
-    else if(z.st==='quebra')poseZPound(ch.r,z.ph,P2);
+    else if(z.st==='quebra'||z.lanPose==='quebra')poseZPound(ch.r,z.ph,P2);
     else if(z.st==='grito'){poseZScream(ch.r,G.t,clamp(Math.min(z.t/0.3,(1.8-z.t)/0.4),0,1));}
     else if(z.st==='atordoado'){poseZWalk(ch.r,z.ph,P2,0.2);ch.r[3]+=-0.35;ch.r[6]-=0.4;}
     else if(moving)poseZWalk(ch.r,z.ph,P2,clamp(spd/1.4,0.6,1.2));

@@ -187,6 +187,21 @@ ipcMain.on('vaydr:sair', (e) => { if (daPagina(e) && win) win.close(); });
 // Configurações > Resolução > Modo de tela (o mesmo que F11 e Alt+Enter; a escolha fica lembrada como sempre)
 ipcMain.on('vaydr:tela-cheia', (e, ligar) => { if (daPagina(e) && win) win.setFullScreen(!!ligar); });
 ipcMain.on('vaydr:tela-cheia?', (e) => { e.returnValue = !!(win && !win.isDestroyed() && win.isFullScreen()); });
+/* partida em rede local (LAN, v10.4.0): o servidor fica aqui no aplicativo de quem abre a partida (lan.js) */
+const { criarServidorLan } = require('./lan.js');
+let lanSrv = null;
+ipcMain.handle('vaydr:lan-hospedar', async (e, porta) => {
+  if (!daPagina(e)) return { ok: false, erro: 'origem' };
+  const p = Math.max(1024, Math.min(65535, +porta || 47811));
+  try {
+    if (!lanSrv) lanSrv = await criarServidorLan({ porta: p, log });
+    return { ok: true, porta: lanSrv.porta, ips: lanSrv.ips() };
+  } catch (err) {
+    lanSrv = null; log('lan: não abriu', err && err.message);
+    return { ok: false, erro: err && err.code === 'EADDRINUSE' ? 'a porta ' + p + ' já está em uso (tem outro VAYDR aberto com partida?)' : String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('vaydr:lan-parar', async (e) => { if (!daPagina(e)) return false; if (lanSrv) { const s = lanSrv; lanSrv = null; await s.parar(); log('lan: partida fechada'); } return true; });
 ipcMain.on('vaydr:reiniciar-atualizar', async (e) => {
   if (!daPagina(e) || !atualizador || !versaoBaixada) return;
   log('reiniciar para atualizar:', await salvarAntes());

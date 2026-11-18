@@ -11,4 +11,7 @@ contextBridge.exposeInMainWorld('vaydrPC', {
   sair: () => ipcRenderer.send('vaydr:sair'),
   telaCheia: (ligar) => ipcRenderer.send('vaydr:tela-cheia', !!ligar),
   estaTelaCheia: () => ipcRenderer.sendSync('vaydr:tela-cheia?'),
+  // partida em rede local (LAN): abre o servidor neste PC e devolve a porta e os IPs para os amigos
+  lanHospedar: (porta) => ipcRenderer.invoke('vaydr:lan-hospedar', porta),
+  lanParar: () => ipcRenderer.invoke('vaydr:lan-parar'),
 });

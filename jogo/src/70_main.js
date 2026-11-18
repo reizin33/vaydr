@@ -28,7 +28,7 @@ function frame(now){const dt=Math.min(0.05,Math.max(0,(now-last)/1000)||0.016);l
     cam.fwd=norm([cam.tgt[0]-cam.pos[0],cam.tgt[1]-cam.pos[1],cam.tgt[2]-cam.pos[2]]);cam.right=norm([-cam.fwd[2],0,cam.fwd[0]]);
     cam.up=[cam.right[1]*cam.fwd[2]-cam.right[2]*cam.fwd[1],cam.right[2]*cam.fwd[0]-cam.right[0]*cam.fwd[2],cam.right[0]*cam.fwd[1]-cam.right[1]*cam.fwd[0]];if(!(TESTE&&window.__semRender))render();}
   else if(G.modo==='criacao')criacaoQuadro(dt);
-  else{if(G.modo==='foto')fotoCam(dt);G.t+=dt*0.5;computeEnv();if(!(TESTE&&window.__semRender))render();if(AU.ctx)musica(dt);}
+  else{if(typeof lanMundoSegue==='function')lanMundoSegue(dt);if(G.modo==='foto')fotoCam(dt);G.t+=dt*0.5;computeEnv();if(!(TESTE&&window.__semRender))render();if(AU.ctx)musica(dt);}
   }catch(err){console.error(err);}
   if(TESTE&&window.__perf){window.__perf.total=(window.__perf.total||0)+performance.now()-TF0;}
   requestAnimationFrame(frame);}

@@ -34,6 +34,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "lan.js",
       "app/**/*",
       "package.json"
     ],
