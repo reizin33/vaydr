@@ -28,7 +28,8 @@ function eletNome(o){return OBRAS[o.tipo]?OBRAS[o.tipo].nome:o.tipo;}
 /* uma linha curta com o estado da peça */
 function eletEstado(o){const d=ELET[o.tipo],e=o.ext||{};if(!d)return'';const fi=energiaFiado(o);
   if(d.p==='fonte'){const c=Math.round((e.comb||0)*100);if(!(e.comb>0))return'sem gasolina';if(e.ligado===false)return'desligado · '+c+'% no tanque';return(fi?(o.rodando?'funcionando':'parado, ninguém puxa'):'ligado, sem fio')+' · '+c+'% no tanque';}
-  if(d.p==='bateria')return Math.round((e.carga||0)/d.cap*100)+'% ('+whTxt(e.carga||0)+')'+(o.energ?' · carregando':'');
+  if(d.p==='bateria'){const R=redeEletDe(o),fl=R?(R.Pg||0)-(R.D||0):0,c=e.carga||0;   // v10.3.0: "carregando" só quando sobra energia de verdade
+    return Math.round(c/d.cap*100)+'% ('+whTxt(c)+')'+(R&&fl<0&&c>0.5&&R.D>0?' · descarregando':o.energ&&fl>0&&c<d.cap-1?' · carregando':c>=d.cap-1?' · cheia':'');}
   if(d.p==='logica'){const on=logicaLigada(o);let t=o.tipo==='interruptor'?(on?'ligado':'desligado'):o.tipo==='temporizador'?'das '+(e.h0??18)+'h às '+(e.h1??6)+'h · '+(on?'deixando passar':'fechado'):
       o.tipo==='sensor'?(on?'percebeu movimento':'esperando')+' · '+({zumbi:'zumbis',gente:'gente',todos:'todos'}[e.modo||'zumbi']):'3 saídas';return t+(fi?(o.energ?' · com energia':' · sem energia'):' · sem fio');}
   if(!fi)return'sem fio · gasta '+wTxt(d.w);return(o.energ?'com energia':'sem energia')+' · gasta '+wTxt(querW(o)||d.w);}
@@ -42,12 +43,28 @@ function abrirEnergia(o){if(!eletDe(o)||G.modo!=='jogo')return;painelVolta();eid
   const _fe=fecharEstacao;fecharEstacao=function(){const r=_fe.apply(this,arguments);if(G.modo!=='estacao')painelVolta();return r;};}
 PASSOS.push(function painelEnergiaVolta(){if(ENER.painel&&G.modo!=='estacao')painelVolta();});
 function vagaE(icon,t,s,f,pronta){return'<div class="es-vaga'+(pronta?' pronta':'')+'">'+svgUse(icon)+'<span><b>'+t+'</b><small>'+s+'</small></span>'+(f!==undefined&&f!==null?barraHTML(f):'')+'</div>';}
+/* v10.3.0 (Himalaia: "melhora o painel de energia"): os números da rede em blocos (gerando, gastando, baterias) e a lista do que
+   está ligado em cada tomada da peça (entradas verdes, saídas amarelas, como no mundo) */
+function enerKpi(R,extra){const F=R.L.filter(o=>ELET[o.tipo].p==='fonte'),B=R.L.filter(o=>ELET[o.tipo].p==='bateria'),gera=R.Pg||0,gasta=R.D||0,fl=gera-gasta,
+    pmax=F.reduce((s,o)=>s+(ELET[o.tipo].prod||0),0),k=(c,t,v,s)=>'<div class="en-k '+c+'"><small>'+t+'</small><b>'+v+'</b><span>'+s+'</span></div>';
+  let h='<div class="en-kpi">'+k('gera','Gerando',wTxt(gera),F.length?F.length+' fonte'+(F.length>1?'s':'')+' · até '+wTxt(pmax):'nenhuma fonte nesta rede');
+  h+=k(R.falta?'mal':'','Gastando',wTxt(gasta),R.falta?'<span class="mal">falta energia: a rede não dá conta</span>':gasta<=0?'nada pedindo energia':fl>=0?'<span class="bom">sobra '+wTxt(fl)+'</span>':B.length&&R.carga>1?'a bateria cobre '+wTxt(-fl):'<span class="mal">falta '+wTxt(-fl)+'</span>');
+  if(B.length){const b=R.cap?R.carga/R.cap:0,carr=B.filter(q=>q.energ&&(q.ext.carga||0)<ELET.bateriaBase.cap-1).length,tx=Math.min(Math.max(0,fl),ELET.bateriaBase.taxa*carr);
+    h+=k('bat',B.length>1?B.length+' baterias':'Bateria',Math.round(b*100)+'%',fl<0&&R.carga>1?'descarregando · dura '+horasTxt(R.carga/(-fl)*60):b>=0.995?'cheia · '+whTxt(R.carga):tx>0?'carregando '+wTxt(tx)+' · cheia em '+horasTxt((R.cap-R.carga)/tx*60):'parada · '+whTxt(R.carga)+' de '+whTxt(R.cap));}
+  else h+=k('bat','Bateria','—','sem bateria: a sobra se perde');
+  return h+(extra||'')+'</div>';}
+function enerLigacoes(o){const id=o.ext&&o.ext.eid,d=ELET[o.tipo];if(!id||!d||!(d.ent||d.sai))return'';const E_=[],S_=[];for(const f of ENER.fios){if(f.b===id)E_.push(f);if(f.a===id)S_.push(f);}
+  const ponta=(f,x,ent)=>{if(!x)return'?';let n=eletNome(x);if(ELET[x.tipo].quadro){const i=ENER.fios.filter(q=>ent?q.a===x.ext.eid:q.b===x.ext.eid).indexOf(f);if(i>=0)n+=ent?' · circuito '+(i+1):' · entrada '+(i+1);}
+      const dx=ELET[x.tipo],st=dx.p==='bateria'?Math.round((x.ext.carga||0)/dx.cap*100)+'%':dx.p==='fonte'?(x.rodando?'gerando':'parada'):x.energ?'com energia':'sem energia';return n+' <small>· '+st+'</small>';},
+    lin=(c,t,f,x,ent)=>'<div class="en-l'+(f?'':' vazia')+'"><i class="'+c+'"></i><span>'+t+'</span><b>'+(f?ponta(f,x,ent):'<small>livre</small>')+'</b></div>';
+  let h='<div><div class="en-h">Ligações</div><div class="en-lig">';
+  for(let i=0;i<(d.ent||0);i++){const f=E_[i];h+=lin('e','← Entrada'+(d.ent>1?' '+(i+1):''),f,f&&eletPorEid(f.a),true);}
+  for(let i=0;i<(d.sai||0);i++){const f=S_[i];h+=lin('s','→ Saída'+(d.sai>1?' '+(i+1):''),f,f&&eletPorEid(f.b),false);}
+  return h+'</div></div>';}
 ESTACAO_UI.energia={resumo:o=>eletEstado(o),
   render(o){const d=ELET[o.tipo]||{},e=o.ext||(o.ext={}),fi=energiaFiado(o),R=redeEletDe(o),D=OBRAS[o.tipo];let c='<div class="es-lista">';
-    c+=vagaE(D.icon,eletNome(o),eletEstado(o),d.p==='bateria'?(e.carga||0)/d.cap:d.p==='fonte'?(e.comb||0):null,!!(o.energ||o.rodando));
-    if(R){const nG=R.L.filter(q=>ELET[q.tipo].p==='fonte').length,nB=R.L.filter(q=>ELET[q.tipo].p==='bateria').length;
-      c+=vagaE('i-energia','Rede: '+R.L.length+' peça'+(R.L.length>1?'s':''),(R.falta?'FALTA ENERGIA · ':'')+'pede '+wTxt(R.D)+' · gerador '+(nG?wTxt(R.Pg):'nenhum')+(nB?' · baterias '+whTxt(R.carga)+' de '+whTxt(R.cap):''),R.cap?R.carga/R.cap:null,!R.falta&&R.D>0);}
-    c+='</div>';const A=[],nf=ENER.fios.filter(f=>f.a===e.eid||f.b===e.eid).length;
+    c+=vagaE(D.icon,eletNome(o),eletEstado(o),d.p==='bateria'?(e.carga||0)/d.cap:d.p==='fonte'?(d.renov&&typeof renovPot==='function'?renovPot(o)/d.prod:(e.comb||0)):null,!!(o.energ||o.rodando));
+    c+='</div>';if(R)c+=enerKpi(R);c+=enerLigacoes(o);const A=[],nf=ENER.fios.filter(f=>f.a===e.eid||f.b===e.eid).length;
     let info='';
     switch(o.tipo){
       case'gerador':{const gas=invCount('gasolina');A.push({id:'tog',t:e.ligado===false?'Ligar o gerador':'Desligar o gerador',s:fi?'com fio: trabalha quando alguém puxa energia':'sem fio: acende os postes perto à noite',ok:true,prim:e.ligado===false&&(e.comb||0)>0});

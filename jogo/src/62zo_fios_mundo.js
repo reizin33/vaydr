@@ -20,18 +20,23 @@ const PINO_TIPO={interruptor:{e:[[-0.07,1.0,0.06]],s:[[0.07,1.0,0.06]]},temporiz
 function pinosDe(o){const d=ELET[o.tipo];if(!d||o.hp<=0)return[];const D=OBRAS[o.tipo]||{},T=PINO_TIPO[o.tipo];let Ent=T&&T.e||[],Sai=T&&T.s||[];
   if(!T){const h=clamp((ELET_ALT[o.tipo]??D.hCol??1)*0.55,0.2,1.6),z=(D.hd||0.3)+0.03;Ent=[];Sai=[];for(let i=0;i<d.ent;i++)Ent.push([-0.14-0.1*i,h,z]);for(let i=0;i<d.sai;i++)Sai.push([0.14+0.12*i,h,z]);}
   const c=Math.cos(o.yaw||0),s=Math.sin(o.yaw||0),W=l=>[o.x+l[0]*c+l[2]*s,(o.y??ground(o.x,o.z))+l[1],o.z-l[0]*s+l[2]*c],out=[];
-  for(let i=0;i<d.ent;i++)out.push({o,k:'e',i,p:W(Ent[i]||Ent[Ent.length-1]||[0,0.5,0.3])});for(let i=0;i<d.sai;i++)out.push({o,k:'s',i,p:W(Sai[i]||Sai[Sai.length-1]||[0.15,0.5,0.3])});return out;}
+  /* via: pontos por onde o fio passa logo ao sair da tomada (o quadro: das entradas de cima o fio sobe e desce por trás do poste) */
+  for(let i=0;i<d.ent;i++){const t={o,k:'e',i,p:W(Ent[i]||Ent[Ent.length-1]||[0,0.5,0.3])};if(T&&T.ev&&T.ev[i])t.via=T.ev[i].map(W);out.push(t);}
+  for(let i=0;i<d.sai;i++){const t={o,k:'s',i,p:W(Sai[i]||Sai[Sai.length-1]||[0.15,0.5,0.3])};if(T&&T.sv&&T.sv[i])t.via=T.sv[i].map(W);out.push(t);}return out;}
 /* em qual tomada cada fio está: pela ordem dos fios de cada peça */
 function fioTomadas(){const sai=new Map(),ent=new Map(),r=new Map();for(const f of ENER.fios){const a=sai.get(f.a)||0,b=ent.get(f.b)||0;sai.set(f.a,a+1);ent.set(f.b,b+1);r.set(f,[a,b]);}return r;}
 function tomadaOcupada(t){const id=t.o.ext&&t.o.ext.eid;if(!id)return false;const L=ENER.fios.filter(f=>t.k==='s'?f.a===id:f.b===id);return L.length>t.i;}
 function fioDaTomada(t){const id=t.o.ext&&t.o.ext.eid;if(!id)return null;const L=ENER.fios.filter(f=>t.k==='s'?f.a===id:f.b===id);return L[t.i]||L[L.length-1]||null;}
 /* o caminho do fio: tomada → pontos presos → tomada; sem pontos, rente ao chão (desce, corre com grampos e sobe) */
 const chaoFio=(x,z,yRef)=>{let y=typeof chaoEm==='function'?chaoEm(x,z,yRef):ground(x,z);if(!(y>-1e8))y=ground(x,z);const n=aguaNivel(x,z);if(n!==null&&n>y+0.05)y=n+0.12;return y+0.035;};
-function fioCaminho(A,B,pts){if(pts&&pts.length)return{L:[A,...pts,B],chao:false};
-  const dh=Math.hypot(B[0]-A[0],B[2]-A[2]);if(dh<2.2)return{L:[A,B],chao:false,curto:true};
-  const ya=chaoFio(A[0],A[2],A[1]),yb=chaoFio(B[0],B[2],B[1]),L=[A,[A[0],Math.min(A[1],ya),A[2]]],n=Math.ceil(dh);
-  for(let i=1;i<n;i++){const t=i/n,x=A[0]+(B[0]-A[0])*t,z=A[2]+(B[2]-A[2])*t,yr=A[1]+(B[1]-A[1])*t;L.push([x,chaoFio(x,z,yr),z]);}
-  L.push([B[0],Math.min(B[1],yb),B[2]],B);return{L,chao:true};}
+function fioCaminho(A0,B0,pts,va,vb){if(pts&&pts.length)va=vb=null;   // com pontos presos, quem decide o caminho é o jogador
+  const A=va&&va.length?va[va.length-1]:A0,B=vb&&vb.length?vb[vb.length-1]:B0;let C;
+  if(pts&&pts.length)C={L:[A,...pts,B],chao:false};
+  else{const dh=Math.hypot(B[0]-A[0],B[2]-A[2]);if(dh<2.2)C={L:[A,B],chao:false,curto:true};
+    else{const ya=chaoFio(A[0],A[2],A[1]),yb=chaoFio(B[0],B[2],B[1]),L=[A,[A[0],Math.min(A[1],ya),A[2]]],n=Math.ceil(dh);
+      for(let i=1;i<n;i++){const t=i/n,x=A[0]+(B[0]-A[0])*t,z=A[2]+(B[2]-A[2])*t,yr=A[1]+(B[1]-A[1])*t;L.push([x,chaoFio(x,z,yr),z]);}
+      L.push([B[0],Math.min(B[1],yb),B[2]],B);C={L,chao:true};}}
+  if(va&&va.length)C.L=[A0,...va.slice(0,-1),...C.L];if(vb&&vb.length)C.L=[...C.L,...vb.slice(0,-1).reverse(),B0];return C;}
 function caminhoComp(L){let s=0;for(let i=1;i<L.length;i++)s+=Math.hypot(L[i][0]-L[i-1][0],L[i][1]-L[i-1][1],L[i][2]-L[i-1][2]);return s;}
 /* malha de um caminho: fio de borracha (com pouca barriga entre pontos no ar), conector nas pontas e grampos no chão */
 function fioGeoCaminho(g,C,cor,cor2,grampo){const L=C.L;
@@ -45,7 +50,7 @@ function fioGeoCaminho(g,C,cor,cor2,grampo){const L=C.L;
 /* troca o desenho dos fios do 61o: saem das tomadas e seguem o caminho */
 fiosMontar=function(){const g=new GB(4096,8),cor=lin(0x1d1d1b),cor2=lin(0x3a3226),gr=lin(0x55595c),T=fioTomadas();
   for(const f of ENER.fios){const a=eletPorEid(f.a),b=eletPorEid(f.b);if(!a||!b)continue;const ix=T.get(f)||[0,0],pa=pinosDe(a).filter(t=>t.k==='s'),pb=pinosDe(b).filter(t=>t.k==='e');
-    const A=(pa[ix[0]]||pa[0]||{p:[a.x,a.y+1,a.z]}).p,B=(pb[ix[1]]||pb[0]||{p:[b.x,b.y+1,b.z]}).p;fioGeoCaminho(g,fioCaminho(A,B,f.pts),cor,cor2,gr);}
+    const ta=pa[ix[0]]||pa[0]||{p:[a.x,a.y+1,a.z]},tb=pb[ix[1]]||pb[0]||{p:[b.x,b.y+1,b.z]};fioGeoCaminho(g,fioCaminho(ta.p,tb.p,f.pts,ta.via,tb.via),cor,cor2,gr);}
   return g.n?litMesh(g.data()):null;};
 {const _fa=fiosAssinatura;fiosAssinatura=function(){let s=_fa.apply(this,arguments);for(const f of ENER.fios)if(f.pts)s+='p'+f.pts.length;for(const o of OB)if(ELET[o.tipo])s+=Math.round((o.yaw||0)*100);return s;};}
 
