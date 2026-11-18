@@ -105,7 +105,11 @@ function ligarFio(a,b,gratis){const m=podeLigar(a,b);if(m)return m;const n=fioCu
 function cortarFio(f){const i=ENER.fios.indexOf(f);if(i<0)return;ENER.fios.splice(i,1);if(f.n){const l=invAdd('fio',f.n);if(l>0)soltarItens([['fio',l]],P.x,P.z);}eletMapa();energiaResolver(0);sfx('clique');}
 /* peça nova que gasta energia sai ligada na fonte (ou divisor, interruptor...) mais perto, se tiver fio */
 /* prefere quem já tem energia (gerador com gasolina, baterias com carga, divisor ou interruptor que recebe energia); senão, o mais perto */
-function eletAlimentada(q){const d=ELET[q.tipo],e=q.ext||{};return d.p==='fonte'?e.ligado!==false&&(e.comb||0)>0:d.p==='bateria'?(e.carga||0)>0.5||!!q.energ:!!q.energ;}
+function eletAlimentada(q){const d=ELET[q.tipo],e=q.ext||{};return d.p==='fonte'?fontePot(q)>0:d.p==='bateria'?(e.carga||0)>0.5||!!q.energ:!!q.energ;}
+/* quanto uma fonte produz agora (W). Gerador: 1200 W com gasolina e ligado. v10.3.0: as fontes sem gasolina (roda d'água, cata-vento,
+   placa solar: 62zn) produzem conforme a água, o vento e o sol, e menos quando estão gastas (renovPot) */
+function fontePot(o){const d=ELET[o.tipo],e=o.ext||{};if(!d||d.p!=='fonte'||o.hp<=0||e.ligado===false)return 0;
+  if(d.renov)return typeof renovPot==='function'?renovPot(o):0;return(e.comb||0)>0?d.prod:0;}
 function autoLigar(o,silencio){const d=eletDe(o);if(!d||!d.ent||fiosEntrada(eidDe(o)&&o))return null;let best=null,bd=1e9;
   for(const q of OB){const dq=eletDe(q);if(!dq||q===o||!dq.sai||q.y<SUB_FUNDO!==o.y<SUB_FUNDO)continue;const dd=d2(q.x,q.z,o.x,o.z);if(dd>=25*25)continue;eidDe(q);if(fiosSaida(q)>=dq.sai)continue;
     const nota=Math.sqrt(dd)+(eletAlimentada(q)?0:100);if(nota>=bd)continue;bd=nota;best=q;}
@@ -134,14 +138,17 @@ function energiaResolver(dtMin){eletMapa();const M=ENER.mapa,pai=new Map(),acha=
       if(d.p==='logica'&&!logicaLigada(q))continue;if(d.p==='logica'||(passaBat&&d.p==='bateria'))fila.push(b);}}return vis;};
   const dtH=dtMin/60;ENER.redes=[];
   for(const L of grupos.values()){const gens=L.filter(o=>ELET[o.tipo].p==='fonte'),bats=L.filter(o=>ELET[o.tipo].p==='bateria');
-    const gensOk=gens.filter(g=>g.ext.ligado!==false&&(g.ext.comb||0)>0),deG=alcanca(gensOk.map(g=>g.ext.eid),true),deB=alcanca(bats.filter(b=>(b.ext.carga||0)>0.5).map(b=>b.ext.eid));
+    const pot=new Map();for(const g of gens)pot.set(g,fontePot(g));
+    const gensOk=gens.filter(g=>pot.get(g)>0),deG=alcanca(gensOk.map(g=>g.ext.eid),true),deB=alcanca(bats.filter(b=>(b.ext.carga||0)>0.5).map(b=>b.ext.eid));
     const cons=L.filter(o=>ELET[o.tipo].p==='consumo'),ligG=cons.filter(o=>deG.has(o.ext.eid)),ligB=cons.filter(o=>!deG.has(o.ext.eid)&&deB.has(o.ext.eid));
     const D=[...ligG,...ligB].reduce((s,o)=>s+querW(o),0),carregar=bats.filter(b=>deG.has(b.ext.eid)&&(b.ext.carga||0)<ELET.bateriaBase.cap-1);
-    const Pg=gensOk.length?gensOk.length*ELET.gerador.prod:0,Pb=bats.filter(b=>deB.size&&(b.ext.carga||0)>0.5).reduce((s,b)=>s+Math.min(ELET.bateriaBase.taxa,(b.ext.carga||0)/Math.max(dtH,1/120)),0);
+    const Pg=gensOk.reduce((t,g)=>t+pot.get(g),0),PgR=gensOk.reduce((t,g)=>t+(ELET[g.tipo].renov?pot.get(g):0),0),Pb=bats.filter(b=>deB.size&&(b.ext.carga||0)>0.5).reduce((s,b)=>s+Math.min(ELET.bateriaBase.taxa,(b.ext.carga||0)/Math.max(dtH,1/120)),0);
     const precisa=D>0||carregar.length>0,ok=D<=Pg+Pb+0.01,rede={L,D:Math.round(D),Pg:gensOk.length&&precisa?Pg:0,carga:0,cap:bats.length*ELET.bateriaBase.cap,ok};
     let usaG=0;if(ok&&D>0){usaG=Math.min(D,Pg);const falta=D-usaG;if(falta>0&&bats.length){const porB=falta/Math.max(1,bats.filter(b=>(b.ext.carga||0)>0.5).length);for(const b of bats)if((b.ext.carga||0)>0.5)b.ext.carga=Math.max(0,b.ext.carga-porB*dtH);}}
     if(gensOk.length&&carregar.length){const sobra=Math.max(0,Pg-usaG),porB=Math.min(ELET.bateriaBase.taxa,sobra/carregar.length);for(const b of carregar)b.ext.carga=Math.min(ELET.bateriaBase.cap,(b.ext.carga||0)+porB*dtH);usaG+=Math.min(sobra,porB*carregar.length);}
-    for(const g of gens){const roda=gensOk.includes(g)&&precisa;g.rodando=roda;if(roda&&dtMin>0){const carga=clamp(usaG/Math.max(1,Pg),0,1);g.ext.comb=Math.max(0,(g.ext.comb||0)-dtH*0.125*(0.3+0.7*carga));if(g.ext.comb<=0&&d2(g.x,g.z,P.x,P.z)<60*60)feed('O gerador ficou sem gasolina',true);}}
+    const PgF=Pg-PgR,usaF=Math.max(0,usaG-PgR);   // a gasolina entra só no que a água, o vento e o sol não cobrem
+    for(const g of gens){if(ELET[g.tipo].renov){g.rodando=pot.get(g)>0;continue;}
+      const roda=gensOk.includes(g)&&precisa&&(usaF>0||PgR<=0);g.rodando=roda;if(roda&&dtMin>0){const carga=clamp(usaF/Math.max(1,PgF),0,1);g.ext.comb=Math.max(0,(g.ext.comb||0)-dtH*0.125*(0.3+0.7*carga));if(g.ext.comb<=0&&d2(g.x,g.z,P.x,P.z)<60*60)feed('O gerador ficou sem gasolina',true);}}
     for(const o of cons)o.energ=ok&&(ligG.includes(o)||ligB.includes(o))&&!!(Pg||Pb);
     for(const o of L)if(ELET[o.tipo].p==='logica')o.energ=deG.has(o.ext.eid)||deB.has(o.ext.eid);
     for(const b of bats)b.energ=deG.has(b.ext.eid);
