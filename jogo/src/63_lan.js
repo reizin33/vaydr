@@ -208,6 +208,14 @@ function lanHud(){const el=$('lan-hud');if(!el)return;el.hidden=!LAN.on;if(!LAN.
   for(const c of LAN.chat.slice(-7)){if(!abre&&agora-c.t>14000)continue;const p=document.createElement('p');if(c.nome){const b=document.createElement('b');b.textContent=c.nome+': ';p.appendChild(b);}else p.className='sis';
     p.appendChild(document.createTextNode(c.txt));L.appendChild(p);}}
 setInterval(()=>{if(LAN.on)lanHud();},2000);
+/* comandos do bate-papo: /ir (vai para o lado do anfitrião, no seu mundo) e /ir Nome (para o lado de quem tem esse nome) */
+function lanComando(t){const[c,...r]=t.slice(1).split(/\s+/),arg=r.join(' ').trim().toLowerCase();
+  if(c==='ir'){const L=[...LAN.jog.values()].filter(q=>q.m&&q.ok);const q=arg?L.find(j=>j.nome.toLowerCase().startsWith(arg)):(L.find(j=>j.anf)||L[0]);
+    if(!q){lanChatAdd(null,arg?'Ninguém com esse nome no mundo agora.':'Ninguém da partida está num mundo agora.');return;}
+    if(CARRO&&CARRO.ativo){lanChatAdd(null,'Saia do veículo antes de usar /ir.');return;}
+    const a=Math.random()*6.283;let x=q.tx+Math.cos(a)*1.6,z=q.tz+Math.sin(a)*1.6;if(typeof pointBlocked==='function'&&pointBlocked(x,z,0.4)){x=q.tx;z=q.tz;}
+    P.x=x;P.z=z;P.y=Math.max(typeof chaoEm==='function'?chaoEm(x,z,q.ty+0.5):ground(x,z),q.ty);P.vx=P.vz=P.vy=0;lanChatAdd(null,'Você foi para o lado de '+q.nome+'.');sfx('clique');return;}
+  lanChatAdd(null,'Comandos: /ir (vai até o anfitrião) · /ir Nome (vai até essa pessoa)');}
 function lanChatAbrir(){const i=$('lan-chat-in');i.hidden=false;i.value='';i.focus();lanHud();}
 function lanChatFechar(){const i=$('lan-chat-in');i.hidden=true;i.blur();lanHud();}
 window.addEventListener('keydown',e=>{if(!LAN.on||G.modo!=='jogo'||e.repeat)return;if(e.code!=='Enter'&&e.code!=='NumpadEnter')return;if(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName||''))return;e.preventDefault();lanChatAbrir();});
@@ -235,9 +243,9 @@ window.addEventListener('keydown',e=>{if(!LAN.on||G.modo!=='jogo'||e.repeat)retu
 .mp-jog{display:flex;flex-wrap:wrap;gap:6px}.mp-jog span{padding:4px 10px;border-radius:999px;background:rgba(98,184,255,.16);font:700 13px/1.2 var(--f-ui);color:#e4f2ff}
 .mp-acoes{display:flex;gap:10px;flex-wrap:wrap}`;document.head.appendChild(st);}
 {document.body.insertAdjacentHTML('beforeend','<div id="lan-nomes" aria-hidden="true"></div><div id="lan-hud" hidden><div id="lan-hud-topo"></div><div id="lan-hud-nomes"></div><div id="lan-hud-chat"></div>'+
-   '<input id="lan-chat-in" type="text" maxlength="160" placeholder="Mensagem para a partida (Enter manda, Esc fecha)" autocomplete="off" hidden></div>');
+   '<input id="lan-chat-in" type="text" maxlength="160" placeholder="Mensagem (Enter manda, Esc fecha) · /ir vai até o anfitrião" autocomplete="off" hidden></div>');
  const ci=$('lan-chat-in');
- ci.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();const t=ci.value.trim();if(t){lanMandar({t:'chat',txt:t.slice(0,160)});lanChatAdd(LAN.nome,t.slice(0,160));}lanChatFechar();}
+ ci.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();const t=ci.value.trim();if(t.startsWith('/'))lanComando(t);else if(t){lanMandar({t:'chat',txt:t.slice(0,160)});lanChatAdd(LAN.nome,t.slice(0,160));}lanChatFechar();}
    else if(e.key==='Escape'){e.preventDefault();lanChatFechar();}});
  ci.addEventListener('blur',()=>{if(!ci.hidden)setTimeout(()=>{if(document.activeElement!==ci)lanChatFechar();},50);});}
 {const esq=document.querySelector('#t-multi .mp-esq');if(esq){esq.innerHTML='<span class="vl-tag">Teste de LAN</span><h3>Jogar junto</h3>'+
