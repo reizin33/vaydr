@@ -448,7 +448,7 @@ function posProcessar(){const X=POSTX;
   const u=PCOMP.u;gl.useProgram(PCOMP.p);gl.bindTexture(gl.TEXTURE_2D,X.tex);gl.uniform1i(u.uT,0);
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,bloomOn?X.lv[0].t:X.tex);gl.uniform1i(u.uB,1);gl.activeTexture(gl.TEXTURE0);
   gl.uniform1f(u.uExp,E.exp);gl.uniform1f(u.uBloomK,bloomOn?E.bloom:0);gl.uniform1f(u.uSat,E.sat);gl.uniform3fv(u.uLift,E.lift);gl.uniform3fv(u.uGain,E.gain);
-  gl.uniform1f(u.uVig,E.vig||0.62);gl.uniform1f(u.uGrain,cfg.graf==='baixo'?0:0.028);gl.uniform1f(u.uTime,G.t);gl.uniform1f(u.uCont,0.15);gl.uniform2f(u.uRes,canvas.width,canvas.height);
+  gl.uniform1f(u.uVig,E.vig||0.62);gl.uniform1f(u.uGrain,cfg.cores!=='vivas'?(cfg.graf==='baixo'?0.03:0.042):(cfg.graf==='baixo'?0:0.028));gl.uniform1f(u.uTime,G.t);gl.uniform1f(u.uCont,cfg.cores!=='vivas'?0.21:0.15);   // v10.3.3: fim do mundo (62zs)gl.uniform2f(u.uRes,canvas.width,canvas.height);
   gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,aoOn?X.ao.t:X.tex);gl.uniform1i(u.uAO,2);gl.uniform1f(u.uAOk,aoOn?0.85:0);
   gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,raioK>0?X.raio.t:X.tex);gl.uniform1i(u.uRaios,3);gl.uniform1f(u.uRaioK,raioK*0.42);gl.uniform3f(u.uRaioC,1.0,0.84,0.6);gl.activeTexture(gl.TEXTURE0);
   gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.bindVertexArray(null);}

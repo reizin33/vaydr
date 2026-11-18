@@ -177,10 +177,10 @@ function clearingProps(C,N,R){const fx=FIRE[0],fz=FIRE[2],y=FIRE[1];
     add(N,boxTris(0.09,0.06,0.09),mat(fx+Math.cos(a)*r,y+0.04,fz+Math.sin(a)*r,0,R()*3,0),hot?lin(0xff5418):lin(0x3a1d12),{e:hot?1.8:0,j:0.3,rnd:R});}
   colCircle(fx,fz,0.75);
   // barraca
-  {const g=ground(TENT[0],TENT[1]),base=mat(TENT[0],g,TENT[1],0,TENT_YAW,0),ph=-Math.PI/2;
-    add(C,cylTris(1.22,1.22,2.5,3,{phase:ph,bottom:true}),mm(base,mat(0,0.61,-1.25,Math.PI/2,0,0)),lin(0x4f5c3b),{j:0.07,rnd:R});
-    add(C,cylTris(0.8,0.8,0.03,3,{phase:ph,bottom:true}),mm(base,mat(0,0.4,1.25,Math.PI/2,0,0)),lin(0x141812));
-    add(C,boxTris(2.6,0.03,2.9),mm(base,mat(0,0.0,0.05)),lin(0x3a3f2e));
+  {const g=ground(TENT[0],TENT[1]),base=mat(TENT[0],g,TENT[1],0,TENT_YAW,0),ph=-Math.PI/2,Ct=(typeof acampBarraca==='function'&&acampBarraca())?D:C;   // v10.3.3: a barraca de lona nova (62zu) entra no lugar
+    add(Ct,cylTris(1.22,1.22,2.5,3,{phase:ph,bottom:true}),mm(base,mat(0,0.61,-1.25,Math.PI/2,0,0)),lin(0x4f5c3b),{j:0.07,rnd:R});
+    add(Ct,cylTris(0.8,0.8,0.03,3,{phase:ph,bottom:true}),mm(base,mat(0,0.4,1.25,Math.PI/2,0,0)),lin(0x141812));
+    add(Ct,boxTris(2.6,0.03,2.9),mm(base,mat(0,0.0,0.05)),lin(0x3a3f2e));
     colBox(TENT[0],TENT[1],1.1,1.3,TENT_YAW);const d=fwd(TENT_YAW,2.0);
     interAdd({id:'cama',kind:'cama',x:TENT[0]+d[0],z:TENT[1]+d[1],label:'Descansar na barraca',sub:'salva o jogo'});}
   // bancos
