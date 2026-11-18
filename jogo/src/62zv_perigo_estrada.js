@@ -3,7 +3,8 @@
    fora da cidade e longe da base, de vez em quando um grupinho de 2 a 4 mortos aparece lá longe na estrada (nasce a uns 80 m,
    na neblina, à frente de para onde você vai) e vem andando devagar para onde você está. Um a cada 2 a 4 minutos, no máximo
    um grupo por vez; quem fica para trás (a mais de 140 m) some. Não acontece de noite (a horda já vem), dentro da cidade (lá já
-   tem os dela), perto da base, de carro andando rápido nem no modo criativo. */
+   tem os dela), perto da base, dentro dos lugares (sítio, fazenda, vila, posto: só na estrada entre eles), de carro andando
+   rápido nem no modo criativo. */
 const ESTRADA={t:140,ids:[],grupos:0};
 /* anda "dist" metros pela estrada a partir do ponto dela mais perto de (px,pz), para o lado s (+1 ou -1); null se acabar antes */
 function estradaAnda(r,i,q,s,dist){let x=q[0],z=q[1],k=s>0?i+1:i;
@@ -16,7 +17,9 @@ function estradaPonto(px,pz,vx,vz,dist){let best=null;
 function estradaPode(){if(G.modo!=='jogo'||!P.alive||window.__semZumbi||(typeof ADM!=='undefined'&&ADM.ativo))return false;
   if(G.hora<6.5||G.hora>17.5)return false;if(dentroCidade(P.x,P.z,25))return false;
   const bc=typeof baseCentro==='function'?baseCentro():[FIRE[0],FIRE[2]];if(Math.hypot(P.x-bc[0],P.z-bc[1])<60||Math.hypot(P.x-FIRE[0],P.z-FIRE[2])<60)return false;
-  if(CARRO&&CARRO.ativo&&Math.abs(CARRO.v||0)>6)return false;return roadInfo(P.x,P.z).d<12;}
+  if(CARRO&&CARRO.ativo&&Math.abs(CARRO.v||0)>6)return false;
+  if(PLACES.some(p=>Math.hypot(P.x-p.x,P.z-p.z)<p.r+18))return false;   // v10.3.5: só na estrada entre os lugares (no sítio, na fazenda ou na vila, não)
+  return roadInfo(P.x,P.z).d<12;}
 PASSOS.push(function estradaPasso(dt){
   /* quem ficou para trás some */
   if(ESTRADA.ids.length){for(let j=ESTRADA.ids.length-1;j>=0;j--){const id=ESTRADA.ids[j],k=Z.findIndex(q=>q.id===id);
