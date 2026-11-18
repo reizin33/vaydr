@@ -14,7 +14,7 @@ Object.assign(OBRAS,{
     desc:'Toca enquanto recebe energia: ponha um sensor de movimento antes dela e ela avisa quando um zumbi chega e de que lado. O barulho atrai os zumbis de perto.'},
   holofote:{nome:'Holofote',icon:'i-holofote',custo:{sucata:6,chapaFerro:2,fio:3},hp:220,hw:0.32,hd:0.32,solid:true,hCol:2.6,etapa:3,desb:'oficina',
     desc:'À noite, com energia, acende um facho forte: varre a frente dele e segue o zumbi que chegar a até 35 m.'}});
-Object.assign(ELET,{sirene:{p:'consumo',w:80},holofote:{p:'consumo',w:250}});
+Object.assign(ELET,{sirene:{p:'consumo',w:80,ent:1,sai:0},holofote:{p:'consumo',w:250,ent:1,sai:0}});
 for(const k of['sirene','holofote']){E17_OBRAS.push(k);OBRA_ORDEM.push(k);if(!OBRAS_CHAO.includes(k))OBRAS_CHAO.push(k);}
 if(typeof OBRAS_PREDIO!=='undefined'&&!OBRAS_PREDIO.includes('sirene'))OBRAS_PREDIO.push('sirene');
 {const c=OBRA_CATS.find(q=>q.id==='energia');if(c)for(const k of['holofote','sirene'])if(!c.t.includes(k)){const i=c.t.indexOf('sensor');c.t.splice(i>=0?i+1:c.t.length,0,k);}}
@@ -73,9 +73,9 @@ DESENHO.opaco.push(function sireneHolofoteDesenho(Pg){const M=SIREH.m;if(!M)retu
     const yw=o.hYaw===undefined?(o.yaw||0):o.hYaw,pt=o.hPit===undefined?-0.2:o.hPit;trs(_MSH,o.x,(o.y||0)+2.35,o.z,-pt,yw,0,1,1,1);drawStat(Pg,M.cab,_MSH);drawStat(Pg,o.aceso?M.lenteOn:M.lente,_MSH);}});
 DESENHO.aditivo.push(function sireneHolofoteBrilho(){const n=E.n||0;
   for(const o of OB){if(o.hp<=0||d2(o.x,o.z,cam.pos[0],cam.pos[2])>120*120)continue;
-    if(o.tipo==='sirene'&&o.tocando){const a=G.t*7,y=(o.y||0)+2.21;bb(o.x+Math.sin(a)*0.35,y,o.z+Math.cos(a)*0.35,0.45,1,0.18,0.1,0.55+0.35*n);bb(o.x,y,o.z,0.35,1,0.3,0.2,0.35);continue;}
+    if(o.tipo==='sirene'&&o.tocando){const a=G.t*7,y=(o.y||0)+2.21;bb(o.x+Math.sin(a)*0.3,y,o.z+Math.cos(a)*0.3,0.26,1,0.16,0.08,0.45+0.3*n);bb(o.x,y,o.z,0.18,1,0.3,0.2,0.3);continue;}
     if(o.tipo!=='holofote'||!o.aceso||o.hYaw===undefined)continue;const k=Math.min(1,(n-0.25)/0.3);if(k<=0)continue;
-    const h=holoCab(o),e=holoFim(o),L=Math.hypot(e[0]-h[0],e[1]-h[1],e[2]-h[2]);bb(h[0],h[1],h[2],0.6,1,0.98,0.9,0.85*k);
+    const h=holoCab(o),e=holoFim(o),L=Math.hypot(e[0]-h[0],e[1]-h[1],e[2]-h[2]);bb(h[0],h[1],h[2],0.32,1,0.98,0.9,0.6*k);
     for(let i=1,N=16;i<=N;i++){const t=i/N;bb(h[0]+(e[0]-h[0])*t,h[1]+(e[1]-h[1])*t,h[2]+(e[2]-h[2])*t,0.3+t*L*0.14,0.86,0.92,1,0.06*k*(1-t*0.55));}
     bb(e[0],e[1]+0.15,e[2],2.4,0.92,0.96,1,0.2*k);}});
 /* ---------- manual ---------- */
