@@ -1177,6 +1177,14 @@ body.criativo .ad-selo{display:block}
   font:400 clamp(26px,3vw,34px)/1 var(--f-display);letter-spacing:.1em;text-align:left;color:var(--bone)}
 :is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo) .cartao h2::after{
   content:"";display:block;width:64px;height:3px;margin-top:10px;background:linear-gradient(90deg,var(--ember),transparent)}
+/* v10.3.3 (capturas das telas novas): Diário, Territórios e Conquistas mais largos (as abas cabem numa linha e o título
+   também), a lista rola dentro do cartão e o Voltar fica sempre embaixo, dentro dele (antes vazava pela borda); no Mapa o
+   Fechar é um botão do canto, não uma faixa da largura toda */
+:is(#t-conquistas,#t-terr,#t-diario) .cq-cartao{display:flex;flex-direction:column;width:min(700px,94vw);max-height:min(90vh,820px)}
+:is(#t-conquistas,#t-terr,#t-diario) .cq-cartao>*{flex-shrink:0}
+:is(#t-conquistas,#t-terr,#t-diario) .cq-cartao>.cq-lista{flex:1 1 auto;min-height:0;overflow-y:auto}
+#mapa-x{width:auto;flex:0 0 auto;min-height:38px;padding:0 16px}
+.mapa-topo h2{margin:0}
 /* abas: faixa com sublinhado laranja (no lugar das pílulas) */
 .cq-abas{gap:0;border-bottom:1px solid var(--ui-linha);flex-wrap:wrap}
 .cq-aba{padding:10px 14px 9px;border:0;border-bottom:2px solid transparent;border-radius:0;margin-bottom:-1px;background:transparent;color:var(--ash);
@@ -1200,6 +1208,9 @@ body.criativo .ad-selo{display:block}
 .btn:not(:disabled):hover{background:rgba(236,228,210,.1);border-color:rgba(236,228,210,.3)}
 .btn.prim{background:var(--ember-deep);border-color:var(--ember);color:#fff7ee}.btn.prim:not(:disabled):hover{background:#d4621f}
 .vc-acoes .btn{border-radius:3px;text-transform:none;letter-spacing:.02em}.vc-acoes .btn small{text-transform:none;letter-spacing:0}
+/* v10.3.3: o .btn de base centraliza (justify-content:center) e a coluna da grade encolhia no texto curto: os botões de uma palavra
+   ficavam centralizados e os de duas linhas encostados à esquerda. Agora a coluna ocupa o botão todo e tudo fica à esquerda */
+.vc-acoes .btn{justify-content:stretch;align-content:center;grid-template-columns:minmax(0,1fr)}
 :is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo) :is(.es-vaga,.en-k,.en-l,.qd2-f,.qd2-c,.qd2-graf,.vc-l,.es-barra,.chip-e,.chip-v){border-radius:3px}
 /* Tab (mochila, fabricar, tarefas, nível, baú): o jogo atrás, chapas retas e quadradinhos como no Rust */
 .inv{background:radial-gradient(125% 95% at 50% 45%,rgba(5,7,6,.55),rgba(3,4,4,.9));backdrop-filter:blur(2px)}
