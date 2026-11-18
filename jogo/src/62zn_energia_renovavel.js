@@ -102,7 +102,9 @@ DESENHO.opaco.push(function renovDesenho(Pg){const now=performance.now(),dt=RENO
       trs(_MRV2,0,0.16,0.62,0,0,o.rvGiro,1,1,1);mul(_MRV3,_MRV,_MRV2);drawStat(Pg,MESH.cataVentoPas,_MRV3);}}});
 
 /* ---------- painel (segure E): quanto gera, por quê, conservação ---------- */
-{const _ee=eletEstado;eletEstado=function(o){const d=ELET[o.tipo];if(!d||!d.renov)return _ee.apply(this,arguments);const e=o.ext||{},c=Math.round(renovConserva(o)*100);
+{const _ee=eletEstado;eletEstado=function(o){const d=ELET[o.tipo];
+  if(o.tipo==='combinador')return'2 entradas, 1 saída'+(energiaFiado(o)?(o.energ?' · com energia':' · sem energia'):' · sem fio');
+  if(!d||!d.renov)return _ee.apply(this,arguments);const e=o.ext||{},c=Math.round(renovConserva(o)*100);
   if(e.ligado===false)return'desligada · conservação '+c+'%';const p=renovPot(o);return(p>0?'gerando '+wTxt(p)+' de '+wTxt(d.prod):'parada')+' · '+renovMotivo(o)+' · conservação '+c+'%'+(energiaFiado(o)?'':' · sem fio');};}
 {const U=ESTACAO_UI.energia,_r=U.render,_a=U.acao;
   U.render=function(o){const r=_r.apply(this,arguments);const d=ELET[o.tipo];
