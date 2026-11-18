@@ -4,6 +4,8 @@
    Zumbis não aparecem (o minimapa continua mostrando os que estão perto). O jogo fica parado enquanto o mapa está aberto. */
 TELAS_NOVAS.push('t-mapa');
 let mapaVolta='jogo';
+const MAPA_SOBRE=[];   // v10.3.7: desenhos por cima das construções e por baixo das marcas e dos nomes (grade, escala, ruínas: 62zz_mapa_grade)
+const MAPA_NOMES=[];   // v10.3.7: nomes a mais (o Bloqueio), que entram depois dos lugares no mesmo arranjo sem um cobrir o outro
 function abrirMapa(){if(G.modo!=='jogo')return;mapaVolta='jogo';G.modo='mapa';IN.attack=false;IN.mx=IN.mz=0;if(document.pointerLockElement)document.exitPointerLock();
   tela('t-mapa');desenharMapaGrande();sfx('clique');}
 function fecharMapa(){if(G.modo!=='mapa')return;G.modo=mapaVolta;tela(null);sfx('clique');}
@@ -22,6 +24,7 @@ function desenharMapaGrande(){const c=$('mapa-g');if(!c)return;const css=Math.ma
   g.fillStyle='#6d6b64';for(const q of CID.quadras)g.fillRect(X(q.x0),Y(q.z0),(q.x1-q.x0)*k,(q.z1-q.z0)*k);
   for(const p of CID.predios){if(p.rural)continue;g.fillStyle=p.tipo==='hospital'?'#c9d3cf':'#a59f93';g.fillRect(X(p.x0),Y(p.z0),(p.x1-p.x0)*k,(p.z1-p.z0)*k);}
   g.fillStyle='#a07a4a';for(const o of OB){const D=OBRAS[o.tipo];if(!D)continue;g.save();g.translate(X(o.x),Y(o.z));g.rotate(-o.yaw);g.fillRect(-D.hw*k,-Math.max(D.hd,0.25)*k,D.hw*2*k,Math.max(D.hd,0.25)*2*k);g.restore();}
+  for(const f of MAPA_SOBRE){try{f(g,X,Y,k,dp,Wd);}catch(e){console.error('mapa',e);}}
   // marcas
   const marca=(x,z,cor,raio)=>{g.fillStyle=cor;g.beginPath();g.arc(X(x),Y(z),raio*dp,0,Math.PI*2);g.fill();g.strokeStyle='#070a09';g.lineWidth=1.3*dp;g.stroke();};
   marca(FIRE[0],FIRE[2],'#ffcf8a',4);marca(TOWER[0],TOWER[1],'#ff5a4a',3.4);
@@ -42,6 +45,7 @@ function desenharMapaGrande(){const c=$('mapa-g');if(!c)return;const css=Math.ma
     usados.push(pos[2]);g.lineWidth=3.5*dp;g.strokeStyle='rgba(7,10,9,.85)';g.strokeText(t,pos[0],pos[1]);g.fillStyle='#ece4d2';g.fillText(t,pos[0],pos[1]);};
   nome('Cidade',X((CIDADE.x0+CIDADE.x1)/2),Y(CIDADE.z0)+14*dp,0);
   for(const p of PLACES)if(p.nome)nome(p.nome,X(p.x),Y(p.z),p.r*k);
+  for(const f of MAPA_NOMES){try{const e=f();if(e)nome(e.t,X(e.x),Y(e.z),(e.r||0)*k+(e.px||0)*dp);}catch(e){console.error('mapa',e);}}
   // você (seta na direção que está olhando)
   const px=X(P.x),py=Y(P.z),f=[Math.sin(P.yaw),Math.cos(P.yaw)],s=11*dp;g.save();g.translate(px,py);g.fillStyle='#ece4d2';g.strokeStyle='#070a09';g.lineWidth=2*dp;g.beginPath();
   g.moveTo(f[0]*s,f[1]*s);g.lineTo(-f[1]*s*0.7-f[0]*s*0.7,f[0]*s*0.7-f[1]*s*0.7);g.lineTo(-f[0]*s*0.25,-f[1]*s*0.25);g.lineTo(f[1]*s*0.7-f[0]*s*0.7,-f[0]*s*0.7-f[1]*s*0.7);g.closePath();g.stroke();g.fill();g.restore();
