@@ -425,10 +425,10 @@ body[data-tela="pc"] .obra-acoes .btn{min-height:32px;padding:0 11px;font-size:1
 
 /* mira e aviso */
 .mira{position:fixed;left:50%;top:50%;z-index:4;width:22px;height:22px;margin:-11px 0 0 -11px;pointer-events:none;transition:opacity .3s}
-.mira::before,.mira::after{content:"";position:absolute;background:var(--bone);border-radius:1px;box-shadow:0 0 3px var(--shadow)}
-.mira::before{left:10px;top:0;width:2px;height:22px;clip-path:polygon(0 0,100% 0,100% 30%,0 30%,0 70%,100% 70%,100% 100%,0 100%)}
-.mira::after{top:10px;left:0;width:22px;height:2px;clip-path:polygon(0 0,30% 0,30% 100%,0 100%,0 0,70% 0,100% 0,100% 100%,70% 100%)}
-.mira.acerto::before,.mira.acerto::after{background:var(--blood)}
+/* v10.2.6 (Himalaia: "muda essa mira, coloca o ponto"): a cruz virou um ponto no meio, claro com contorno escuro (aparece no
+   céu e na parede clara); no acerto o ponto fica vermelho e cresce um pouco. A caixa continua de 22 px (o anel do arco gira em volta) */
+.mira::before{content:"";position:absolute;left:8px;top:8px;width:6px;height:6px;border-radius:50%;background:var(--bone);box-shadow:0 0 0 1.5px rgba(10,12,11,.6),0 0 4px var(--shadow);transition:transform .08s,background .08s}
+.mira.acerto::before{background:var(--blood);transform:scale(1.45)}
 .mira-anel{position:absolute;left:-7px;top:-7px;width:36px;height:36px;border-radius:50%;display:none;background:conic-gradient(var(--bone) calc(var(--puxa,0)*360deg),rgba(0,0,0,.25) 0);-webkit-mask:radial-gradient(circle,transparent 14.5px,#000 15px,#000 17px,transparent 17.5px);mask:radial-gradient(circle,transparent 14.5px,#000 15px,#000 17px,transparent 17.5px)}
 .mira.puxando .mira-anel{display:block}.mira.cheio .mira-anel{background:#e8a33c}
 .prompt{position:fixed;left:0;top:0;z-index:4;display:flex;align-items:center;gap:8px;padding:7px 11px;white-space:nowrap;pointer-events:none;font:700 13.5px/1 var(--f-ui);transition:opacity .2s}
