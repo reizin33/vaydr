@@ -52,6 +52,27 @@ const LUGARES=[
   // caixas militares de madeira nos pontos de saque, e uma pilha perto da tenda
   [[-12,-4,0.2],[-12,4.2,-0.15],[11,11,0.5],[-11.4,-3.3,1.35],[7.3,6.0,0.1],[8.9,6.1,0.05]]
     .forEach(([lx,lz,y],i)=>add('caixa'+i,'caixaMilitar',lx,lz,y,{dist:70}));})();
+/* v10.2.7 · etapa 4, passo 6: a Base Militar maior e destruída (62zl põe as crateras queimadas). Fora do anel de sacos de areia
+   (que continua onde estava, com a tenda, o gerador, as torres e os pontos de saque): o alojamento desabado ao norte, um segundo
+   bloco de garagens (o depósito) a sudoeste, o paiol (bunker) ao sul, o comboio abandonado na estrada do portão (caminhão-baú e
+   blindado, um de cada lado), muros de sacos de areia nas posições de fora, barreiras e tambores. O lugar do helicóptero
+   (oeste) e a estrada do portão (leste) ficam livres. */
+(function baseMaior(){const X=BASEM.x,Z=BASEM.z;
+  const add=(id,m,lx,lz,yaw,o)=>LUGARES.push(Object.assign({id:'bm2_'+id,m,nome:'Base Militar Serra Velha',x:X+lx,z:Z+lz,yaw,dist:160,semChao:true},o||{}));
+  add('alojamento','predioDestruido',2,-25,0,{semChao:false,blend:6,plano:1.5,limpa:4,dist:240});
+  add('deposito','garagens',-27,14,0,{semChao:false,blend:4,plano:1,limpa:2.5,dist:220});
+  add('paiol','bunker',6,27,Math.PI,{semChao:false,blend:5,plano:1,limpa:3,dist:200});
+  add('bau2','caminhaoBau',28,-7.5,0.15,{limpa:1.5,dist:180});add('blindado2','blindado',31,7,-0.5,{limpa:1.5,dist:200});
+  [[2,-19.6,0.04],[-9.5,-20.2,0.5],[-19,24.5,0.6],[19.5,21,-0.6],[12.5,-21.5,-0.3],[-20,-12,1.45]].forEach(([lx,lz,y],i)=>add('sacos'+i,'sacosAreia',lx,lz,y,{dist:130}));
+  [[24,-11,0.5],[25,11.5,-0.4],[-31,4.5,0.2],[0,31.5,1.2]].forEach(([lx,lz,y],i)=>add('barreira'+i,'barreira',lx,lz,y,{dist:110}));
+  [[-22.5,9.6,0],[-23.1,10.3,0.5],[-22.0,10.9,1.1],[13.6,23.4,0.3],[14.2,24.1,1]].forEach(([lx,lz,y],i)=>add('tambor'+i,'tambor',lx,lz,y,{dist:90}));
+  [[12.8,25.6,0.25],[13.2,26.8,-0.1]].forEach(([lx,lz,y],i)=>add('caixa2_'+i,'caixaMilitar',lx,lz,y,{dist:70}));})();
+/* v10.2.7 · etapa 4, passo 5 (o portal do túnel da serra, 62zk): na saída do túnel, um muro de sacos de areia de cada lado da
+   linha, um terceiro caído na diagonal e duas barreiras de concreto mais para fora; a linha e a frente do portão ficam livres */
+(function portalTunel(){if(typeof FERRO==='undefined'||!FERRO.portal)return;const X=FERRO.portal.x,Z=FERRO.portal.z;
+  const add=(id,m,lx,lz,yaw,o)=>LUGARES.push(Object.assign({id:'pt_'+id,m,nome:'Túnel da serra',x:X+lx,z:Z+lz,yaw,dist:130,semChao:true},o||{}));
+  add('sacos0','sacosAreia',6.4,-3.7,0.06);add('sacos1','sacosAreia',6.2,3.8,-0.08);add('sacos2','sacosAreia',9.4,-6.2,0.95);
+  add('barreira0','barreira',10.2,-2.9,0.45);add('barreira1','barreira',9.8,3.2,-0.3,{dist:110});})();
 const LUG={malhas:{},info:{},col:0};
 /* meia-largura e meia-profundidade do modelo (com folga f) e o giro */
 function lugRet(L,f){const t=LUGX[L.m].tam,c=Math.cos(L.yaw),s=Math.sin(L.yaw),hx=t[0]/2+f,hz=t[2]/2+f;return{c,s,hx,hz};}

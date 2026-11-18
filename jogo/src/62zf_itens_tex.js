@@ -29,7 +29,7 @@ function itxMalha(id,f,esc,veic,chave){const nt=Math.floor(f.length/33),grupos={
   for(let t=0;t<nt;t++){const o=t*33,r=(f[o+3]+f[o+14]+f[o+25])/3,g=(f[o+4]+f[o+15]+f[o+26])/3,b=(f[o+5]+f[o+16]+f[o+27])/3,lum=0.2126*r+0.7152*g+0.0722*b;
     /* veículo: lataria pintada (não madeira; a pintura verde-oliva também: o "verde é folha" só vale para os itens); o vidro
        azulado vai liso de verdade; pneu e borracha (bem escuros) ficam com o relevo de detalhe */
-    const k=(veic&&id!=='v_jangada'?(b>r*1.15&&b>=g*0.95&&lum<0.08?'vidro':lum<0.024?null:chave||(ITX_DADOS.lataria?'lataria':'metal')):itxMaterial(id,r,g,b))||'liso';(grupos[k]||(grupos[k]=[])).push(t);}
+    const k=(veic&&id!=='v_jangada'?(b>r*1.15&&b>=g*0.95&&lum<0.03?'vidro':lum<0.024?null:chave||(ITX_DADOS.lataria?'lataria':'metal')):itxMaterial(id,r,g,b))||'liso';(grupos[k]||(grupos[k]=[])).push(t);}
   if(Object.keys(grupos).length===1&&grupos.liso)return null;const partes=[];
   for(const k in grupos){const tris=grupos[k],ff=new Float32Array(tris.length*33),uv=new Float32Array(tris.length*6);
     tris.forEach((t,j)=>{const a=t*33;ff.set(f.subarray(a,a+33),j*33);

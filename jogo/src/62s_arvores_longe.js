@@ -8,12 +8,15 @@
    · Pinheiros: a placa entra logo depois do pinheiro de verdade (PINHO_R); antes, entre ele e o fim do "perto", ficava o
      pinheiro detalhado antigo, de outra cara. As outras árvores passam para a placa no fim do "perto" (arvPerto).
    · A sombra continua a de antes (a das versões leve e detalhada, que têm a mesma forma).
-   · No gráfico Baixo (aparelho fraco) fica tudo como antes.
+   · No gráfico Baixo (aparelho fraco) ficava tudo como antes; desde a v10.2.7 as placas valem lá também (arvlLigado).
    · Enquanto as texturas do pinheiro não carregam, fica a versão leve; a foto é tirada assim que elas chegam (ou, se elas
      não chegarem em 15 s, com o pinheiro detalhado antigo, e de novo quando chegarem). */
 const ARVL={ok:false,erro:false,tex:null,m:{},pinhos:[],lim:{},info:null,desl:false,resto:true,t0:0,comFir:false};
 const ARVL_CEL=256,ARVL_PAD=4;
-function arvlLigado(){return!ARVL.desl&&cfg.graf!=='baixo';}
+/* v10.2.7 (Himalaia joga no Baixo: "ainda tem árvores no modo antigo"): as placas valem também no gráfico Baixo. Elas custam
+   menos que a versão leve (4 triângulos por árvore em vez de ~150) e o jogo agora é só de PC; antes o Baixo ficava com os cones
+   e os bolos de folha no horizonte. */
+function arvlLigado(){return!ARVL.desl;}
 
 /* medidas das árvores detalhadas (o mesmo desenho que vira MESH.pineN, roundN, birchN e deadN) */
 function arvlLimites(f){const lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
