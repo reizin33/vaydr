@@ -134,7 +134,9 @@ function energiaResolver(dtMin){eletMapa();const M=ENER.mapa,pai=new Map(),acha=
   const saidas=new Map();for(const f of ENER.fios){if(!saidas.has(f.a))saidas.set(f.a,[]);saidas.get(f.a).push(f.b);}
   /* quem a energia alcança: atravessa interruptor, temporizador, sensor e divisor ligados; a do gerador atravessa também as baterias
      (elas deixam passar enquanto carregam), a das baterias sai só da carga delas */
-  const alcanca=(ini,passaBat)=>{const vis=new Set(),fila=[...ini];while(fila.length){const id=fila.shift();for(const b of saidas.get(id)||[]){if(vis.has(b))continue;vis.add(b);const q=M.get(b),d=ELET[q.tipo];
+  /* v10.3.1: o quadro de energia (62zp) decide circuito por circuito (a saída k dele) se a energia passa */
+  const alcanca=(ini,passaBat)=>{const vis=new Set(),fila=[...ini];while(fila.length){const id=fila.shift(),qo=M.get(id),qd=qo&&ELET[qo.tipo];const S=saidas.get(id)||[];for(let k=0;k<S.length;k++){const b=S[k];
+      if(qd&&qd.quadro&&typeof quadroPassa==='function'&&!quadroPassa(qo,k))continue;if(vis.has(b))continue;vis.add(b);const q=M.get(b),d=ELET[q.tipo];
       if(d.p==='logica'&&!logicaLigada(q))continue;if(d.p==='logica'||(passaBat&&d.p==='bateria'))fila.push(b);}}return vis;};
   const dtH=dtMin/60;ENER.redes=[];
   for(const L of grupos.values()){const gens=L.filter(o=>ELET[o.tipo].p==='fonte'),bats=L.filter(o=>ELET[o.tipo].p==='bateria');
