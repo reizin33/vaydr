@@ -184,8 +184,8 @@ function propPorteira(C,N,M,nome,R){const m=lin(0x6b4a2e);for(const s of[-1,1])a
   add(C,bvTris(2.1,0.08,0.06),mm(G,mat(1.0,0.75,0,0,0,0.5)),m);}
 /* galpão aberto: esteios, telhado de zinco, bancada, tambores, pneus e sacos */
 function propGalpao(C,N,M,R){const w=7,d=5.4,h=3.1,m=lin(0x5a412a);for(const x of[-w/2,0,w/2])for(const z of[-d/2,d/2])add(C,bvTris(0.16,h,0.16),mm(M,mat(x,h/2,z)),m,{j:0.05,rnd:R});
-  for(const z of[-d/2,d/2])add(C,bvTris(w+0.2,0.14,0.14),mm(M,mat(0,h,z)),m);add(C,bvTris(w+0.9,0.06,d+0.9),mm(M,mat(0,h+0.22,0,0.09,0,0)),lin(0x8a8e92),{j:0.05,rnd:R});
-  for(let i=0;i<10;i++)add(C,bvTris(0.02,0.03,d+0.9),mm(M,mat(-w/2-0.3+i*(w+0.6)/9,h+0.26,0,0.09,0,0)),lin(0x6a6e70));
+  for(const z of[-d/2,d/2])add(C,bvTris(w+0.2,0.14,0.14),mm(M,mat(0,h,z)),m);add(C,bvTris(w+0.9,0.06,d+0.9),mm(M,mat(0,h+0.22,0,0.09,0,0)),lin(0x6e6862),{j:0.05,rnd:R});   // v10.3.6: zinco velho, oxidado
+  for(let i=0;i<10;i++)add(C,bvTris(0.02,0.03,d+0.9),mm(M,mat(-w/2-0.3+i*(w+0.6)/9,h+0.26,0,0.09,0,0)),lin(0x58524c));
   add(C,bvTris(2.2,0.08,0.7),mm(M,mat(0,0.92,-d/2+0.5)),lin(0x7a5a3c));for(const x of[-1,1])add(C,bvTris(0.08,0.9,0.6),mm(M,mat(x,0.45,-d/2+0.5)),m);
   add(C,bvTris(0.5,0.25,0.3),mm(M,mat(-0.5,1.08,-d/2+0.5)),lin(0xa8261d));add(C,bvTris(0.9,0.02,0.04),mm(M,mat(0.4,0.97,-d/2+0.6,0,0.4,0)),lin(0x9aa1a6));
   for(let i=0;i<2;i++)add(C,cylTris(0.3,0.3,0.9,10),mm(M,mat(w/2-0.6,0,-d/2+0.6+i*0.7)),lin(i?0x355a7a:0x8a2f22),{j:0.08,rnd:R});

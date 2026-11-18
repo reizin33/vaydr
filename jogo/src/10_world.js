@@ -250,22 +250,22 @@ function gasStation(C,N,R){const P=placeById('posto'),cx=P.x,cz=P.z,white=lin(0x
   ZSPAWN.posto=[[cx,cz+4],[cx-6,cz-2],[cx+8,cz+1],[cx-2,cz+10],[cx+10,cz-14],[cx-12,cz-3]];}
 
 function farm(C,N,R){const P=placeById('fazenda'),cx=P.x,cz=P.z;
-  const casa=house(C,cx+7,cz-6,Math.PI*0.85,9,7,3.3,0xc9b89a,0x6e2f22,R,{chimney:true,rh:2.4});
+  const casa=house(C,cx+7,cz-6,Math.PI*0.85,9,7,3.3,0x9a8f7c,0x4c332b,R,{chimney:true,rh:2.4});   // v10.3.6 (campo largado): parede desbotada, telha escura
   interAdd({id:'faz-casa',kind:'bau',x:casa.dx,z:casa.dz,label:'Revistar a casa',tabela:'casa',respawn:3});
-  // celeiro
+  // celeiro (v10.3.6, campo largado: o vermelho desbotou até a cor da madeira velha, o zinco enferrujou e o branco das tábuas encardiu)
   {const x=cx-11,z=cz+5,yaw=0.15,g=ground(x,z),b=mat(x,g,z,0,yaw,0);
-    add(C,boxTris(12,5,9),mm(b,mat(0,2.5,0)),lin(0x8a2f22),{j:0.05,rnd:R});
-    add(C,roofTris(9.8,3.2,12.8),mm(b,mat(0,5,0,0,Math.PI/2,0)),lin(0x3d4246));
-    add(C,boxTris(4.2,3.8,0.12),mm(b,mat(0,1.9,4.52)),lin(0x5e1f17));
-    add(C,boxTris(0.16,3.9,0.14),mm(b,mat(0,1.95,4.56)),lin(0xd8d0c0));add(C,boxTris(4.4,0.16,0.14),mm(b,mat(0,3.85,4.56)),lin(0xd8d0c0));
-    add(C,boxTris(0.14,4.2,0.14),mm(b,mat(0,1.9,4.58,0,0,0.83)),lin(0xd8d0c0));add(C,boxTris(0.14,4.2,0.14),mm(b,mat(0,1.9,4.58,0,0,-0.83)),lin(0xd8d0c0));
+    add(C,boxTris(12,5,9),mm(b,mat(0,2.5,0)),lin(0x6c4838),{j:0.05,rnd:R});
+    add(C,roofTris(9.8,3.2,12.8),mm(b,mat(0,5,0,0,Math.PI/2,0)),lin(0x4d4540));
+    add(C,boxTris(4.2,3.8,0.12),mm(b,mat(0,1.9,4.52)),lin(0x5a3c2c));
+    add(C,boxTris(0.16,3.9,0.14),mm(b,mat(0,1.95,4.56)),lin(0xb2aa9c));add(C,boxTris(4.4,0.16,0.14),mm(b,mat(0,3.85,4.56)),lin(0xb2aa9c));
+    add(C,boxTris(0.14,4.2,0.14),mm(b,mat(0,1.9,4.58,0,0,0.83)),lin(0xb2aa9c));add(C,boxTris(0.14,4.2,0.14),mm(b,mat(0,1.9,4.58,0,0,-0.83)),lin(0xb2aa9c));
     colBox(x,z,6,4.5,yaw);const d=fwd(yaw,5.3);
     interAdd({id:'faz-celeiro',kind:'bau',x:x+d[0],z:z+d[1],label:'Revistar o celeiro',tabela:'celeiro',respawn:3,missao:'cabo'});}
   // poço
   {const x=cx+2,z=cz-14,g=ground(x,z);add(C,cylTris(0.95,1.0,0.8,10,{top:false}),mat(x,g,z),lin(0x7d7a72),{j:0.1,rnd:R});
     add(C,cylTris(0.8,0.8,0.05,10),mat(x,g+0.7,z),lin(0x1a2a33));
     for(const sx of[-0.85,0.85])add(C,boxTris(0.12,1.9,0.12),mat(x+sx,g+0.95,z),lin(0x5a412a));
-    add(C,roofTris(1.6,0.7,2.2),mat(x,g+1.9,z,0,Math.PI/2,0),lin(0x6e2f22));
+    add(C,roofTris(1.6,0.7,2.2),mat(x,g+1.9,z,0,Math.PI/2,0),lin(0x4c332b));
     colCircle(x,z,1.05);interAdd({id:'poco',kind:'agua',x,z:z+1.6,label:'Poço',sub:'beber ou encher garrafas'});}
   // cerca e plantação
   {const x0=cx+10,z0=cz+6,w=18,dd=14;for(let i=0;i<=Math.round(w/2.5);i++)for(const zz of[z0,z0+dd]){const x=x0+i*(w/Math.round(w/2.5));add(C,boxTris(0.12,1.1,0.12),mat(x,ground(x,zz)+0.55,zz),lin(0x6b5034));}
