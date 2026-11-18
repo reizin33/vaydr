@@ -25,6 +25,11 @@ iconesNovos({'i-quadro':'<rect x="4" y="3" width="16" height="18" rx="1.5"/><pat
 BASE_DICAS.quadroEnergia='Quadro de energia: com o alicate, ligue as fontes e baterias nas entradas de cima e cada circuito (saídas de baixo) no que ele vai alimentar. Toque E para o painel.';
 ELET_CURTO.quadroEnergia='Quadro';ELET_ALT.quadroEnergia=1.2;
 if(typeof PINO_TIPO!=='undefined')PINO_TIPO.quadroEnergia={e:[[-0.36,1.66,0.14],[-0.12,1.66,0.14],[0.12,1.66,0.14],[0.36,1.66,0.14]],s:[[-0.4,0.62,0.14],[-0.24,0.62,0.14],[-0.08,0.62,0.14],[0.08,0.62,0.14],[0.24,0.62,0.14],[0.4,0.62,0.14]]};
+/* bateria e quadro podem ter fio nos dois sentidos: a saída da bateria numa entrada do quadro (ela alimenta a base) e um circuito
+   do quadro na entrada dela (ele carrega com a sobra). Entre as outras peças continua proibido */
+{const _pl=podeLigar;podeLigar=function(a,b){const m=_pl.apply(this,arguments);if(m==='Já tem um fio no sentido contrário'&&a&&b&&((a.tipo==='quadroEnergia'&&b.tipo==='bateriaBase')||(a.tipo==='bateriaBase'&&b.tipo==='quadroEnergia'))){
+    const db=ELET[b.tipo],da=ELET[a.tipo];if(fiosSaida(a)>=da.sai)return OBRAS[a.tipo].nome+': as '+da.sai+' saídas já estão ocupadas';if(fiosEntrada(b)>=db.ent)return OBRAS[b.tipo].nome+': a entrada já está ocupada';
+    if(Math.hypot(a.x-b.x,a.z-b.z)>FIO_MAX)return'Longe demais: o fio vai até '+FIO_MAX+' m';return'';}return m;};}
 /* estado de cada circuito (fica salvo com a peça) */
 function qdCirc(q,k){const e=q.ext||(q.ext={});if(!Array.isArray(e.circ))e.circ=[];const c=e.circ[k]||(e.circ[k]={});if(c.on===undefined)c.on=true;if(!c.modo)c.modo='sempre';if(!c.prio)c.prio=QD.prio[k];return c;}
 function qdRede(q){return ENER.redes.find(r=>r.L.includes(q))||null;}
