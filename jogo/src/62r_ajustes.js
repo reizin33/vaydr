@@ -7,7 +7,7 @@
 /* 12/11 (lobby novo): o Himalaia pediu abas de Som, Resolução e Sensibilidade. Resolução é nova (modo de tela e resolução do
    desenho); Sensibilidade saiu de Controles, que ficou com as teclas, o tipo de controle e os comandos na tela. */
 const AJ_SECOES=[['graficos','Gráficos',['aj-graf','aj-graf-nota','aj-tex','aj-fps','aj-fov']],['resolucao','Resolução',['aj-modo-tela','aj-res','aj-res-info']],['som','Som',['aj-som','aj-mus','aj-efx']],
-  ['sens','Sensibilidade',['aj-sens','aj-sensgp','aj-invy']],['controles','Controles e teclas',['aj-teclas-btn','aj-tela','aj-teclas']],['jogo','Jogo',['aj-dif','aj-cam','aj-camdist','aj-animabre','aj-criativo']],
+  ['sens','Sensibilidade',['aj-sens','aj-sensgp','aj-invy']],['mira','Mira',['aj-mira-prev','aj-mira-estilo','aj-mira-cor','aj-mira-tam','aj-mira-esp','aj-mira-abre','aj-mira-opac','aj-mira-cont','aj-mira-padrao']],['controles','Controles e teclas',['aj-teclas-btn','aj-tela','aj-teclas']],['jogo','Jogo',['aj-dif','aj-cam','aj-camdist','aj-animabre','aj-criativo']],
   ['acess','Acessibilidade',['aj-hud']],['conta','Conta e perfil',[]]];
 /* ---------- Resolução ----------
    Modo de tela: no PC (aplicativo) pede ao aplicativo (o mesmo do F11); no navegador, a tela cheia do navegador.
@@ -61,7 +61,7 @@ let ajSecao='graficos',ajApagaConfirma=false;
  const ICO={graficos:'<path d="M3 5h18v12H3zM8 21h8M12 17v4"/>',som:'<path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
    controles:'<rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M6.5 10.5v3M5 12h3M15.5 11h.01M18 13h.01"/>',
    resolucao:'<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4M7 8h3M7 8v3M17 12h-3M17 12V9"/>',
-   sens:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',jogo:'<path d="M12 3 4 7v5c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V7z"/>',
+   sens:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',mira:'<path d="M12 4v5M12 15v5M4 12h5M15 12h5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',jogo:'<path d="M12 3 4 7v5c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V7z"/>',
    acess:'<circle cx="12" cy="4.5" r="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5M12 14.5 8.5 21M12 14.5l3.5 6.5"/>',conta:'<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.9-3.8 3.9-6 7.5-6s6.6 2.2 7.5 6"/>'};
  const paineis={};
  for(const[k,nome,ids]of AJ_SECOES){const b=document.createElement('button');b.type='button';b.dataset.secB=k;b.setAttribute('aria-pressed','false');

@@ -425,11 +425,23 @@ body[data-tela="pc"] .obra-acoes .btn{min-height:32px;padding:0 11px;font-size:1
 
 /* mira e aviso */
 .mira{position:fixed;left:50%;top:50%;z-index:4;width:22px;height:22px;margin:-11px 0 0 -11px;pointer-events:none;transition:opacity .3s}
-/* v10.2.6 (Himalaia: "muda essa mira, coloca o ponto"): a cruz virou um ponto no meio, claro com contorno escuro (aparece no
-   céu e na parede clara); no acerto o ponto fica vermelho e cresce um pouco. A caixa continua de 22 px (o anel do arco gira em volta) */
-.mira::before{content:"";position:absolute;left:8px;top:8px;width:6px;height:6px;border-radius:50%;background:var(--bone);box-shadow:0 0 0 1.5px rgba(10,12,11,.6),0 0 4px var(--shadow);transition:transform .08s,background .08s}
-.mira.acerto::before{background:var(--blood);transform:scale(1.45)}
-.mira-anel{position:absolute;left:-7px;top:-7px;width:36px;height:36px;border-radius:50%;display:none;background:conic-gradient(var(--bone) calc(var(--puxa,0)*360deg),rgba(0,0,0,.25) 0);-webkit-mask:radial-gradient(circle,transparent 14.5px,#000 15px,#000 17px,transparent 17.5px);mask:radial-gradient(circle,transparent 14.5px,#000 15px,#000 17px,transparent 17.5px)}
+/* v10.2.6 (Himalaia: "muda essa mira, coloca o ponto" e "coloca uma opção para customizar a mira"): a mira é um desenho feito
+   pelas escolhas de Ajustes > Mira (62zm_mira.js: formato, cor, tamanho, espessura, abertura, opacidade e contorno); a de
+   fábrica é um ponto claro com contorno escuro. No acerto ela fica vermelha e cresce um pouco. O ponto em CSS fica de reserva
+   (se o desenho não sair). O anel do arco gira em volta do meio, qualquer que seja o tamanho. */
+.mira:not(.svg)::before{content:"";position:absolute;left:8px;top:8px;width:6px;height:6px;border-radius:50%;background:var(--bone);box-shadow:0 0 0 1.5px rgba(10,12,11,.6),0 0 4px var(--shadow)}
+.mira:not(.svg).acerto::before{background:var(--blood);transform:scale(1.45)}
+.mira svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;transition:transform .08s}
+.mira svg .f{fill:var(--mc,#efe9da)}.mira svg .s{fill:none;stroke:var(--mc,#efe9da)}.mira svg .o{fill:none;stroke:rgba(8,10,9,.62)}.mira svg .of{fill:rgba(8,10,9,.62)}
+.mira.acerto{--mc:var(--blood)!important}.mira.acerto svg{transform:scale(1.25)}
+.mira-prev{position:relative;height:96px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(90deg,#8fb3cf 0 33%,#3d4a3b 33% 66%,#d9d3c4 66%)}
+.mira-prev .mira-demo{left:50%;top:50%}
+.mira-prev::after{content:"céu · mata · parede clara";position:absolute;left:8px;bottom:6px;font:700 11px/1 var(--f-ui);color:rgba(255,255,255,.75);text-shadow:0 1px 2px #000}
+.mira-demo{position:absolute}
+.aj-segs-quebra{flex-wrap:wrap}.aj-segs-quebra button{flex:1 1 auto;padding:0 10px}
+.aj-cor{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.mira-anel{position:absolute;left:calc(50% - 18px);top:calc(50% - 18px);width:36px;height:36px;border-radius:50%;display:none;background:conic-gradient(var(--bone) calc(var(--puxa,0)*360deg),rgba(0,0,0,.25) 0);-webkit-mask:radial-gradient(circle,transparent 14.5px,#000 15px,#000 17px,transparent 17.5px);mask:radial-gradient(circle,transparent 14.5px,#000 15px,#000 17px,transparent 17.5px)}
 .mira.puxando .mira-anel{display:block}.mira.cheio .mira-anel{background:#e8a33c}
 .prompt{position:fixed;left:0;top:0;z-index:4;display:flex;align-items:center;gap:8px;padding:7px 11px;white-space:nowrap;pointer-events:none;font:700 13.5px/1 var(--f-ui);transition:opacity .2s}
 .prompt small{font:600 12px/1 var(--f-ui);color:var(--ash)}
@@ -1454,6 +1466,15 @@ body.criativo .ad-selo{display:block}
     <div class="opcao"><label for="aj-mus">Volume da música</label><input type="range" id="aj-mus" min="0" max="1" step="0.05" value="0.55"></div>
     <div class="opcao"><label for="aj-efx">Volume dos efeitos</label><input type="range" id="aj-efx" min="0" max="1" step="0.05" value="0.9"></div>
     <div class="opcao"><span class="rot">Modo criativo (testes)</span><div class="segs" id="aj-criativo"><button type="button" data-v="0">Desligado</button><button type="button" data-v="1">Ligado</button></div></div>
+    <div class="opcao"><div class="mira-prev" id="aj-mira-prev" aria-hidden="true"><div class="mira mira-demo" id="aj-mira-demo"></div></div></div>
+    <div class="opcao"><span class="rot">Formato</span><div class="segs aj-segs-quebra" id="aj-mira-estilo"><button type="button" data-v="ponto">Ponto</button><button type="button" data-v="cruz">Cruz</button><button type="button" data-v="cruzPonto">Cruz e ponto</button><button type="button" data-v="circulo">Círculo</button><button type="button" data-v="circuloPonto">Círculo e ponto</button><button type="button" data-v="t">T</button></div></div>
+    <div class="opcao"><span class="rot">Cor</span><div class="segs aj-segs-quebra" id="aj-mira-cor"></div></div>
+    <div class="opcao"><label for="aj-mira-tam">Tamanho <b id="aj-mira-tam-v">100%</b></label><input type="range" id="aj-mira-tam" min="0.6" max="2" step="0.1" value="1"></div>
+    <div class="opcao"><label for="aj-mira-esp">Espessura das linhas <b id="aj-mira-esp-v">2</b></label><input type="range" id="aj-mira-esp" min="1" max="4" step="0.5" value="2"></div>
+    <div class="opcao"><label for="aj-mira-abre">Abertura no meio da cruz <b id="aj-mira-abre-v">3</b></label><input type="range" id="aj-mira-abre" min="0" max="10" step="1" value="3"></div>
+    <div class="opcao"><label for="aj-mira-opac">Opacidade <b id="aj-mira-opac-v">100%</b></label><input type="range" id="aj-mira-opac" min="0.3" max="1" step="0.05" value="1"></div>
+    <div class="opcao"><span class="rot">Contorno escuro</span><div class="segs" id="aj-mira-cont"><button type="button" data-v="1">Com contorno</button><button type="button" data-v="0">Sem contorno</button></div></div>
+    <div class="opcao"><span class="rot">Voltar a mira de fábrica</span><button class="btn" id="aj-mira-padrao" type="button">Ponto osso, tamanho normal</button></div>
     <button class="btn prim" id="aj-ok" type="button">Pronto</button>
   </div>
 </div>
