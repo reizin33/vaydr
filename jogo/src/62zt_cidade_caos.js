@@ -16,14 +16,14 @@
    · FACHADAS: montes de entulho caídos na frente de vários prédios (longe das portas).
    · FUMAÇA E BRASA: os escombros soltam fumaça escura (62zh) e têm brasas que brilham à noite.
    Tudo com sorteio fixo (o mundo é sempre o mesmo e os jogos salvos não mudam), concreto com a textura de pedra. */
-const CAOS={ruinas:[],pronto:false,info:null,carros:[]};
+const CAOS={ruinas:[],pronto:false,info:null,carros:[],moitas:[]};
 const CAOS_EVITA=[[230,-14,24],[220,28,20]];   // hospital e Aurora (a cena do começo)
 function caosLivre(x,z,r){if(x<CIDADE.x0+3||x>CIDADE.x1-3||z<CIDADE.z0+3||z>CIDADE.z1-3)return false;
   for(const p of CID.predios)if(x>p.x0-r&&x<p.x1+r&&z>p.z0-r&&z<p.z1+r)return false;
   if(typeof BURACOS!=='undefined')for(const b of BURACOS)if(x>b.x0-r-0.6&&x<b.x1+r+0.6&&z>b.z0-r-0.6&&z<b.z1+r+0.6)return false;
   return!caosBloq(x,z,r);}
 /* como o pointBlocked, mas sem o que é do metrô ou fica todo embaixo do chão (a estação passa embaixo de alguns lotes) */
-function caosBloq(x,z,r){for(const c of colQuery(x,z,r+1)){if(!c.solid||c.sub||c.metro||(c.y1!==undefined&&c.y1<-0.5))continue;
+function caosBloq(x,z,r){for(const c of colQuery(x,z,r+1)){if(!(c.solid||c.tree||c.entulho)||c.sub||c.metro||(c.y1!==undefined&&c.y1<-0.5))continue;
     if(c.t===0){if(Math.hypot(x-c.x,z-c.z)<r+c.r)return c;}else{const dx=x-c.x,dz=z-c.z,lx=dx*c.c-dz*c.s,lz=dx*c.s+dz*c.c,qx=clamp(lx,-c.hw,c.hw),qz=clamp(lz,-c.hd,c.hd);if(Math.hypot(lx-qx,lz-qz)<r)return c;}}return null;}
 function caosEvita(x,z,m){return CAOS_EVITA.some(e=>Math.hypot(e[0]-x,e[1]-z)<e[2]+(m||0));}
 /* local → mundo no mesmo jeito do mat(): x local = (cos, -sen), z local = (sen, cos) */
@@ -126,9 +126,9 @@ function caosTorre(g,R,T){const{x:sx,z:sz,dir,Wd,Dp,lA,lB}=T,tw=T.tw||0.16,{hA,b
   /* o 3º andar quebrado: a parede de trás inteira, os lados baixando até sumir no lado da queda, pilares tortos, ferro */
   {const yb=base+0.13;add(g,boxTris(Wd,h3+0.4,0.3),mm(B,mat(0,yb+(h3+0.4)/2,-Dp/2+0.15)),C,{j:0.05,rnd:R});
     add(g,boxTris(Wd-0.7,1.45,0.06),mm(B,mat(0,yb+1.55,-Dp/2)),vid);
-    for(let x=-Wd/2+0.4;x<Wd/2-0.3;x+=0.7+R()*0.6){const h=0.3+R()*1.5;add(g,boxTris(0.6+R()*0.5,h,0.3),mm(B,mat(x,yb+h3+0.4+h/2-0.1,-Dp/2+0.15,0,0,(R()-0.5)*0.2)),C,{j:0.05,rnd:R});}   // a beirada de cima, recortada
-    for(const s of[-1,1])for(let z=-Dp/2+0.3;z<Dp/2-0.2;z+=0.6+R()*0.5){const k=(z+Dp/2)/Dp,h=Math.max(0.15,(h3+0.4)*(1-k*1.15)+(R()-0.5)*0.8);
-      add(g,boxTris(0.3,h,0.55+R()*0.4),mm(B,mat(s*(Wd/2-0.15),yb+h/2,z)),C,{j:0.05,rnd:R});}
+    {let h=0.9+R()*0.6;for(let x=-Wd/2+0.18;x<Wd/2-0.1;x+=0.36){h=clamp(h+(R()-0.5)*0.55,0.1,1.8);add(g,boxTris(0.38,h,0.3),mm(B,mat(x,yb+h3+0.4+h/2-0.05,-Dp/2+0.15)),C,{j:0.05,rnd:R});}}   // a beirada de cima, quebrada em degraus tortos
+    for(const s of[-1,1]){let e=(R()-0.5)*0.5;for(let z=-Dp/2+0.3;z<Dp/2-0.1;z+=0.36){const k=(z+Dp/2)/Dp;e=clamp(e+(R()-0.5)*0.45,-0.8,0.8);const h=Math.max(0.12,(h3+0.4)*(1-k*1.1)+e);
+      add(g,boxTris(0.3,h,0.38),mm(B,mat(s*(Wd/2-0.15),yb+h/2,z)),C,{j:0.05,rnd:R});}}
     for(const[px,pz]of[[-Wd/2+0.4,Dp/2-0.4],[Wd/2-0.4,Dp/2-0.4],[0,Dp/2-0.4],[-Wd/6,0.2],[Wd/6,-0.3]]){const h=0.6+R()*1.6;add(g,boxTris(0.42,h,0.42),mm(B,mat(px,yb+h/2,pz,(R()-0.5)*0.25,0,(R()-0.5)*0.25)),C2,{j:0.05,rnd:R});
       const w=xf(B,px,yb+h,pz);caosFerro(g,R,w[0],w[1],w[2],4);}
     add(g,boxTris(Wd*0.75,0.3,3.0),mm(B,mat((R()-0.5)*1.5,base-1.2,Dp/2+0.95,0.95,0,(R()-0.5)*0.2)),caosConcreto(R),{j:0.08,rnd:R});   // a laje de cima, pendurada para fora
@@ -217,19 +217,18 @@ function caosTelhados(g,R){let n=0;for(const p of CID.predios){if(p.casa||p.rura
 /* mato tomando conta: moitas no pé das paredes, nos cantos dos lotes, nas calçadas rachadas e no meio do entulho, e árvores
    novas crescendo nos terrenos (vão para a lista da rua: mesmas árvores da praça) */
 function caosMato(gV,R){const P=CID.props,verde=[lin(0x3b5528),lin(0x4a6230),lin(0x56683a),lin(0x34482a),lin(0x66663a)];let nM=0,nA=0;
-  const moita=(x,z,esc)=>{if(!dentroCidade(x,z,-1.5)||!caosLivre(x,z,0.35))return false;const y=caosY(x,z),k=2+Math.floor(R()*4),c=verde[Math.floor(R()*verde.length)];
-    for(let i=0;i<k;i++){const s=(0.3+R()*0.5)*esc;add(gV,icoTris(s,0.45,R),mat(x+(R()-0.5)*0.9*esc,y+s*0.55,z+(R()-0.5)*0.9*esc,R()*3,R()*6,R()*3,1,0.75+R()*0.4,1),mixc(c,verde[Math.floor(R()*verde.length)],R()*0.4),{j:0.18,rnd:R});}nM++;return true;};
+  const moita=(x,z,esc)=>{if(!dentroCidade(x,z,-1.5)||!caosLivre(x,z,0.35)||CAOS.moitas.some(m=>Math.abs(m[0]-x)<1.4&&Math.abs(m[1]-z)<1.4))return false;CAOS.moitas.push([x,z,clamp(0.55+esc*0.3,0.6,1.15),R()<0.3]);nM++;return true;};
   // no pé das paredes dos prédios (frente, fundos e lados)
-  for(const p of CID.predios){if(p.rural||!p.W||!p.D)continue;const k=2+Math.floor(R()*4);for(let i=0;i<k;i++){const lado=Math.floor(R()*4),a=R(),u=lado<2?a*p.W:lado===2?-0.55:p.W+0.55,v=lado<2?(lado===0?-0.55:p.D+0.55):a*p.D;
+  for(const p of CID.predios){if(p.rural||!p.W||!p.D)continue;const k=1+Math.floor(R()*3);for(let i=0;i<k;i++){const lado=Math.floor(R()*4),a=R(),u=lado<2?a*p.W:lado===2?-0.55:p.W+0.55,v=lado<2?(lado===0?-0.55:p.D+0.55):a*p.D;
       if((p.entradas||[]).some(e=>{const w=pw(p,u,v);return Math.hypot(e.x-w[0],e.z-w[1])<1.6;}))continue;const w=pw(p,u,v);moita(w[0],w[1],0.8+R()*0.6);}}
   // calçadas, cantos de lote e beira do meio-fio
-  for(let i=0;i<260;i++){const x=CIDADE.x0+2+R()*(CIDADE.x1-CIDADE.x0-4),z=CIDADE.z0+2+R()*(CIDADE.z1-CIDADE.z0-4);if(!quadraEm(x,z)||caosEvita(x,z,1))continue;moita(x,z,0.7+R()*0.9);}
+  for(let i=0;i<120;i++){const x=CIDADE.x0+2+R()*(CIDADE.x1-CIDADE.x0-4),z=CIDADE.z0+2+R()*(CIDADE.z1-CIDADE.z0-4);if(!quadraEm(x,z)||caosEvita(x,z,1))continue;moita(x,z,0.7+R()*0.9);}
   // no meio do entulho das ruínas
-  for(const q of CAOS.ruinas)for(let i=0;i<7;i++){const a=R()*6.283,d=3+R()*5;moita(q.x+Math.cos(a)*d,q.z+Math.sin(a)*d,0.8+R()*0.7);}
+  for(const q of CAOS.ruinas)for(let i=0;i<5;i++){const a=R()*6.283,d=3+R()*5;moita(q.x+Math.cos(a)*d,q.z+Math.sin(a)*d,0.8+R()*0.7);}
   // árvores novas nos terrenos e nas calçadas
-  for(let t=0;t<400&&nA<26;t++){const x=CIDADE.x0+4+R()*(CIDADE.x1-CIDADE.x0-8),z=CIDADE.z0+4+R()*(CIDADE.z1-CIDADE.z0-8);if(!quadraEm(x,z)||caosEvita(x,z,4)||!caosLivre(x,z,1.6))continue;
+  for(let t=0;t<400&&nA<16;t++){const x=CIDADE.x0+4+R()*(CIDADE.x1-CIDADE.x0-8),z=CIDADE.z0+4+R()*(CIDADE.z1-CIDADE.z0-8);if(!quadraEm(x,z)||caosEvita(x,z,4)||!caosLivre(x,z,1.6))continue;
     if(CAOS.ruinas.some(q=>Math.hypot(q.x-x,q.z-z)<6))continue;if(P.some(o=>o.k==='arvore'&&Math.hypot(o.x-x,o.z-z)<5))continue;
-    P.push({k:'arvore',x,z,s:0.6+R()*0.6,seed:R()});colCircle(x,z,0.3,{y0:-0.2,y1:6,tree:true});nA++;}
+    P.push({k:'arvore',x,z,s:0.55+R()*0.4,seed:R()});colCircle(x,z,0.3,{y0:-0.2,y1:6,tree:true});nA++;}
   return{moitas:nM,arvores:nA};}
 /* acha um terreno livre de W×D dentro dos lotes das quadras (sem prédio, árvore, carro nem poste) */
 function caosTerreno(W,D,R,evita,sep){const cand=[];for(const q of CID.quadras){const l=q.lote;for(let i=0;i<40;i++){const x=l.x0+W/2+1+R()*Math.max(0,l.x1-l.x0-W-2),z=l.z0+D/2+1+R()*Math.max(0,l.z1-l.z0-D-2);
@@ -282,6 +281,11 @@ function caosMontar(){const R=rng(52525),g=new GB(1<<16,8),info={torres:[],esque
   if(!CAOS.pronto){CAOS.pronto=true;try{caosMontar();}catch(e){console.error('cidade caótica',e);}}return r;};}
 {const _gc=gerarCidade;gerarCidade=function(){const r=_gc.apply(this,arguments);
   try{if(typeof RUINA!=='undefined')for(const q of CAOS.ruinas)RUINA.fumacas.push({x:q.x+0.6,z:q.z-0.6,y:q.y,acc:0,taxa:1.1});}catch(e){console.error('cidade caótica (fumaça)',e);}return r;};}
+/* as moitas da cidade entram no fim da lista de moitas, depois de toda a vegetação (os números das outras não mudam; o jogo
+   salvo guarda as colhidas pelo número). Três em cada dez dão fruta. */
+{const _pv=placeVegetation;placeVegetation=function(){const r=_pv.apply(this,arguments);
+  try{const R=rng(7171);for(const[x,z,s,fr]of CAOS.moitas)BUSHES.push({id:BUSHES.length,x,z,y:ground(x,z),s,r:R()*6.283,frutas:fr,cresce:0,t:0.85+R()*0.3,cidade:true});CAOS.nMoitas=CAOS.moitas.length;}
+  catch(e){console.error('cidade caótica (moitas)',e);}return r;};}
 const _MCAOS=M4();
 DESENHO.opaco.push(function caosDesenho(Pg){if(!CAOS.malha||!dentroCidade(cam.pos[0],cam.pos[2],260))return;trs(_MCAOS,0,0,0,0,0,0,1,1,1);drawStat(Pg,CAOS.malha,_MCAOS);});
 DESENHO.sombra.push(function caosSombra(Pg,perto){if(!CAOS.malha||!dentroCidade(P.x,P.z,perto?80:200))return;trs(_MCAOS,0,0,0,0,0,0,1,1,1);drawStat(Pg,CAOS.malha,_MCAOS);});

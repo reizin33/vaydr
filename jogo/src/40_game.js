@@ -680,7 +680,7 @@ function serializar(){const q=posSalvar();return{v:1,mv:MUNDO_V,dia:G.dia,hora:G
   P:{x:q.x,z:q.z,yaw:P.yaw,vida:P.vida,fome:P.fome,sede:P.sede,energia:P.energia,inv:P.inv,sel:P.sel,lanterna:P.lanterna,roupa:P.roupa,bat:+(P.bat||0).toFixed(1),y:+(q.y||0).toFixed(2)},tm:+(G.tm||0).toFixed(2),cama:G.cama||null,caixas:caixasSalvar(),mapaAlvo:G.mapaAlvo,mapaCid:G.mapaCid||null||null,mochila:P.mochila,
   obras:OB.map(o=>[o.tipo,+o.x.toFixed(2),+o.z.toFixed(2),+o.yaw.toFixed(3),Math.round(o.hp),o.hpMax,o.itens||0,+o.y.toFixed(2),o.ext&&Object.keys(o.ext).length?o.ext:0]),
   arvores:TREES.filter(t=>!t.alive).map(t=>t.id),rochas:ROCKS.filter(r=>!r.alive).map(r=>r.id),
-  arbustos:BUSHES.filter(b=>!b.frutas).map(b=>[b.id,b.cresce]),inter:INTER.filter(i=>i.dia!==undefined).map(i=>[i.id,i.dia]),
+  arbustos:BUSHES.filter(b=>!b.frutas&&!(b.cidade&&!b.cresce)).map(b=>[b.id,b.cresce]),inter:INTER.filter(i=>i.dia!==undefined).map(i=>[i.id,i.dia]),
   carro:(t=>({x:+t.x.toFixed(2),z:+t.z.toFixed(2),yaw:+t.yaw.toFixed(3),comb:+t.comb.toFixed(3),hp:Math.round(t.hp)}))(VEICS.find(v=>v.tipo==='caminhonete')||CARRO),
   cao:{a:CAO.ativo,st:CAO.st,m:CAO.modo,x:+CAO.x.toFixed(2),z:+CAO.z.toFixed(2),hp:Math.round(CAO.hp),fx:+CAO.ficaX.toFixed(2),fz:+CAO.ficaZ.toFixed(2)},
   prog:{xp:G.xp,nivel:G.nivel,pontos:G.pontos,perks:G.perks,tarefas:G.tarefas,tarefaN:G.tarefaN,luaSangue:G.luaSangue,caiuNoite:G.caiuNoite},fab:G.fab,cid:cidSalvar(),sob:sobrevSalvar(),x8:v8Salvar()};}

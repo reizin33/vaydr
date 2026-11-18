@@ -66,8 +66,8 @@ function acampBarracaGeo(gP,gM,gL,R){const B=mat(TENT[0],ground(TENT[0],TENT[1])
   add(gL,cylTris(0.045,0.045,0.12,7),mm(B,mat(-0.95,0,L+0.75)),lin(0x6d6f70));}
 
 /* a lona azul por cima da bancada do rádio: origem na bancada, +z para onde a gente fica de pé */
-function acampLonaGeo(gP,gM,R){const yw=-0.35,B=mat(BENCH[0],ground(BENCH[0],BENCH[1]),BENCH[1],0,yw,0),W=(x,y,z)=>xf(B,x,y,z),azul=lin(0x2e5776),vara=lin(0x6b5034),corda=lin(0xb8ad8c);
-  const X=2.05,Z0=-0.95,Z1=2.15,yA=2.02,yB=2.38,pos=(u,v)=>[-X+2*X*u,yA+(yB-yA)*v-0.17*Math.sin(Math.PI*u)*Math.sin(Math.PI*v),Z0+(Z1-Z0)*v];
+function acampLonaGeo(gP,gM,R){const yw=-0.35,B=mat(BENCH[0],ground(BENCH[0],BENCH[1]),BENCH[1],0,yw,0),W=(x,y,z)=>xf(B,x,y,z),azul=lin(0x3b5a6e),vara=lin(0x6b5034),corda=lin(0xb8ad8c);
+  const X=2.05,Z0=-0.95,Z1=2.15,yA=2.02,yB=2.38,pos=(u,v)=>[-X+2*X*u,yA+(yB-yA)*v-0.28*Math.sin(Math.PI*u)*Math.sin(Math.PI*v)-0.05*Math.sin(3*Math.PI*u)*Math.sin(2*Math.PI*v),Z0+(Z1-Z0)*v];
   acampGrade(gP,B,azul,pos,6,5,()=>[0,1,0],R);acampGrade(gP,B,scl(azul,0.8),(u,v)=>{const p=pos(u,v);return[p[0],p[1]-0.012,p[2]];},6,5,()=>[0,-1,0],R);
   for(const[x,z,y]of[[-1.85,-0.75,2.06],[1.85,-0.75,2.06],[-1.85,1.95,2.4],[1.85,1.95,2.4]]){add(gM,cylTris(0.035,0.042,y+0.1,6),mm(B,mat(x,0,z,(R()-0.5)*0.05,0,(R()-0.5)*0.05)),vara,{j:0.08,rnd:R});
     const sx=Math.sign(x),sz=z>0?1:-1;acampCorda(gM,W(x,y,z),W(x+sx*0.85,0.1,z+sz*0.8),0.008,corda);add(gM,boxTris(0.04,0.24,0.04),mm(B,mat(x+sx*0.85,0.08,z+sz*0.8,0,0,0.35*sx)),lin(0x6a5236));}}
