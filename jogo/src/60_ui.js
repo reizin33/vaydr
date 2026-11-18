@@ -95,7 +95,7 @@ function invRender(){if($('inv').hidden)return;if(invAba==='bau'&&!bauAberto)inv
     $('lista-tarefas').innerHTML=h||'<p class="vazio-txt">Sem tarefas agora. O rádio manda mais daqui a pouco.</p>';
     $('tar-info').innerHTML='<div class="det-tit">Tarefas do rádio</div><p>Cumpra para ganhar itens e experiência. Quando uma termina, chega outra.</p><p>Tarefas cumpridas: '+(G.tarefaN||0)+'.</p>';return;}
   if(invAba==='nivel'){let h='';for(const p of PERKS){const lv=perk(p.id),cheio=lv>=p.max,ok=G.pontos>0&&!cheio;
-      h+='<div class="receita">'+svgUse(p.ico)+'<div><b>'+p.nome+' <span class="nv-t">'+lv+'/'+p.max+'</span></b><small>'+p.desc+'</small></div>'+
+      h+='<div class="receita">'+svgUse(p.ico)+'<div><b>'+p.nome+' <span class="nv-pips" title="'+lv+' de '+p.max+'"><span class="nv-t">'+lv+'/'+p.max+'</span>'+'<i class="on"></i>'.repeat(lv)+'<i></i>'.repeat(Math.max(0,p.max-lv))+'</span></b><small>'+p.desc+'</small></div>'+
         '<button class="btn'+(ok?' prim':'')+'" type="button" data-perk="'+p.id+'"'+(ok?'':' disabled')+'>'+(cheio?'Completo':'Aprender')+'</button></div>';}
     $('lista-perks').innerHTML=h;
     $('niv-info').innerHTML='<div class="det-tit">Nível '+G.nivel+'</div><p>Experiência: '+G.xp+' de '+xpProx()+'.</p><p>'+(G.pontos>0?'Você tem <b>'+G.pontos+'</b> '+(G.pontos>1?'pontos':'ponto')+' para gastar.':'Ganhe experiência matando zumbis, revistando lugares, construindo, fabricando e sobrevivendo às noites.')+'</p>';return;}

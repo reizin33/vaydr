@@ -16,8 +16,9 @@ function rodaEl(){if(RODA.el)return RODA.el;const st=document.createElement('sty
 #roda-obras .rd-caixa{position:relative;width:min(580px,82vmin);aspect-ratio:1;margin-top:-4vmin}
 body.roda-aberta #obras,body.roda-aberta #obra-cats,body.roda-aberta #obra-acoes,body.roda-aberta #item-nome{visibility:hidden}
 #roda-obras svg.rd-anel{position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 6px 18px rgba(0,0,0,.55))}
-#roda-obras .rd-s{fill:rgba(12,14,16,.74);stroke:rgba(255,255,255,.1);stroke-width:1.2}
-#roda-obras .rd-s.rdc{fill:rgba(20,22,24,.82)}
+#roda-obras{background:radial-gradient(circle at 50% 47%,rgba(3,4,4,.6),rgba(3,4,4,.25) 42%,rgba(3,4,4,0) 64%)}
+#roda-obras .rd-s{fill:rgba(11,13,12,.86);stroke:rgba(236,228,210,.09);stroke-width:1.2}
+#roda-obras .rd-s.rdc{fill:rgba(19,22,20,.9)}
 #roda-obras .rd-s.ativa{fill:rgba(255,138,61,.13);stroke:rgba(255,138,61,.45)}
 #roda-obras .rd-s.mira{fill:rgba(255,138,61,.3);stroke:var(--ember);stroke-width:2}
 #roda-obras .rd-s.atual{stroke:rgba(255,220,180,.7);stroke-width:2}
@@ -32,9 +33,9 @@ body.roda-aberta #obras,body.roda-aberta #obra-cats,body.roda-aberta #obra-acoes
 #roda-obras .rd-i.falta .ico{opacity:.42}
 #roda-obras .rd-i.falta::after{content:"";position:absolute;top:-2px;right:22px;width:7px;height:7px;border-radius:50%;background:var(--blood-ink)}
 #roda-obras .rd-i.trav{opacity:.55}
-#roda-obras .rd-meio{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:110px;text-align:center;font:800 10px/1.2 var(--f-ui);color:var(--ash);letter-spacing:.06em;text-transform:uppercase}
+#roda-obras .rd-meio{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:112px;text-align:center;font:400 14px/1.15 var(--f-display);color:var(--bone);letter-spacing:.08em;text-transform:uppercase;text-shadow:0 1px 3px #000}
 #roda-obras .rd-info{position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);width:max-content;max-width:min(560px,94vw);display:flex;flex-wrap:wrap;justify-content:center;gap:6px 10px;
-  padding:8px 14px;border-radius:12px;border:1px solid var(--edge);background:var(--glass-hi);font:600 12px/1.3 var(--f-ui);color:var(--bone)}
+  padding:9px 16px;border-radius:3px;border:1px solid rgba(236,228,210,.1);background:linear-gradient(90deg,var(--ember),rgba(255,138,61,0) 50%) top left/100% 2px no-repeat,rgba(12,14,13,.94);font:600 12.5px/1.3 var(--f-ui);color:var(--bone);box-shadow:0 10px 30px rgba(0,0,0,.5)}
 #roda-obras .rd-info .cc{display:inline-flex;align-items:center;gap:4px}
 #roda-obras .rd-info .cc .ico{width:14px;height:14px}
 #roda-obras .rd-info .cc.f{color:#ff8a7a}

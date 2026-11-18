@@ -1162,6 +1162,93 @@ body.criativo .ad-selo{display:block}
   .cg-col{left:max(16px,env(safe-area-inset-left,0px));width:calc(100% - 32px)}
   .cg-rodape{left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));flex-wrap:wrap}}
 @media (prefers-reduced-motion:reduce){.cg-dica p.entra,.cg-status::before,.cg-linha .pular{animation:none!important}.cg-barra i{animation-duration:.01s}}
+/* ===== v10.3.1 · interface nova (Himalaia: "muda as interfaces"): as telas na linguagem do menu de pausa =====
+   fundo escuro com vinheta (o jogo continua atrás), chapas de cantos retos com filete laranja, título em estêncil com o risco
+   laranja embaixo, abas de sublinhado, listas em linhas retas, botões chapados. O manual (livro), a criação do personagem e os
+   menus de início e de pausa têm o desenho próprio e ficam como estão. */
+:root{--ui-chapa:rgba(15,18,16,.9);--ui-chapa2:rgba(236,228,210,.045);--ui-linha:rgba(236,228,210,.09);--ui-linha2:rgba(236,228,210,.16)}
+:is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo){
+  background:radial-gradient(125% 95% at 50% 42%,rgba(5,7,6,.5),rgba(3,4,4,.9));backdrop-filter:blur(2px);scrollbar-width:thin;scrollbar-color:rgba(236,228,210,.25) transparent}
+:is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo) .cartao{
+  border-radius:4px;border:1px solid var(--ui-linha);
+  background:linear-gradient(90deg,var(--ember),rgba(255,138,61,0) 45%) top left/100% 2px no-repeat,linear-gradient(180deg,rgba(18,21,19,.97),rgba(9,11,10,.97));
+  box-shadow:0 26px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.03)}
+:is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo) .cartao h2{
+  font:400 clamp(26px,3vw,34px)/1 var(--f-display);letter-spacing:.1em;text-align:left;color:var(--bone)}
+:is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo) .cartao h2::after{
+  content:"";display:block;width:64px;height:3px;margin-top:10px;background:linear-gradient(90deg,var(--ember),transparent)}
+/* abas: faixa com sublinhado laranja (no lugar das pílulas) */
+.cq-abas{gap:0;border-bottom:1px solid var(--ui-linha);flex-wrap:wrap}
+.cq-aba{padding:10px 14px 9px;border:0;border-bottom:2px solid transparent;border-radius:0;margin-bottom:-1px;background:transparent;color:var(--ash);
+  font:800 12px/1 var(--f-ui);letter-spacing:.12em;text-transform:uppercase;box-shadow:none}
+.cq-aba:hover{color:var(--bone);background:rgba(236,228,210,.04)}
+.cq-aba[aria-pressed="true"]{color:var(--bone);border-bottom-color:var(--ember);box-shadow:none;background:linear-gradient(180deg,transparent,rgba(255,138,61,.1))}
+.segs{padding:2px;border-radius:3px;background:rgba(0,0,0,.32);border:1px solid var(--ui-linha);gap:2px}
+.segs button{border-radius:2px;color:var(--ash);font:800 12px/1 var(--f-ui);letter-spacing:.1em;text-transform:uppercase}
+.segs button:hover{color:var(--bone);background:rgba(236,228,210,.05)}
+.segs button[aria-pressed="true"]{background:rgba(236,228,210,.1);color:var(--bone);box-shadow:inset 0 -2px 0 var(--ember)}
+/* listas: linhas retas, ícone num quadradinho */
+.cq-lista{gap:0;border-top:1px solid var(--ui-linha)}
+.cq-lista li{grid-template-columns:32px minmax(0,1fr);gap:12px;padding:10px 10px 10px 6px;border-radius:0;background:transparent;border:0;border-bottom:1px solid var(--ui-linha)}
+.cq-lista li:hover{background:rgba(236,228,210,.03)}
+.cq-lista li>.ico{width:32px;height:32px;padding:7px;border-radius:2px;background:var(--ui-chapa2);border:1px solid var(--ui-linha)}
+.cq-lista li.ok>.ico{border-color:rgba(232,192,96,.45);background:rgba(232,192,96,.08)}
+.cq-lista li b{font:800 14px/1.2 var(--f-ui);letter-spacing:.02em}
+.cq-lista li.dr-grupo{border-bottom:0;padding:14px 2px 6px}
+/* botões chapados: o principal laranja, o resto discreto */
+.btn{border-radius:3px;border-color:var(--ui-linha2);background:rgba(236,228,210,.045);font:800 13px/1 var(--f-ui);letter-spacing:.1em;text-transform:uppercase}
+.btn:not(:disabled):hover{background:rgba(236,228,210,.1);border-color:rgba(236,228,210,.3)}
+.btn.prim{background:var(--ember-deep);border-color:var(--ember);color:#fff7ee}.btn.prim:not(:disabled):hover{background:#d4621f}
+.vc-acoes .btn{border-radius:3px;text-transform:none;letter-spacing:.02em}.vc-acoes .btn small{text-transform:none;letter-spacing:0}
+:is(#t-ajuda,#t-ajustes,#t-confirma,#t-conquistas,#t-criativo,#t-diario,#t-doc,#t-estacao,#t-fios,#t-mapa,#t-salvo,#t-teclado,#t-teclas,#t-terr,#t-veiculo) :is(.es-vaga,.en-k,.en-l,.qd2-f,.qd2-c,.qd2-graf,.vc-l,.es-barra,.chip-e,.chip-v){border-radius:3px}
+/* Tab (mochila, fabricar, tarefas, nível, baú): o jogo atrás, chapas retas e quadradinhos como no Rust */
+.inv{background:radial-gradient(125% 95% at 50% 45%,rgba(5,7,6,.55),rgba(3,4,4,.9));backdrop-filter:blur(2px)}
+.inv-c{width:min(1180px,100%);padding:6px 4px;gap:10px;border-radius:0;background:transparent;border:0;box-shadow:none}
+.inv-top{border-bottom:1px solid var(--ui-linha);gap:0}
+.abas{gap:0}
+.abas button{clip-path:none;border-radius:0;min-height:46px;padding:0 18px;background:transparent;color:var(--ash);border-bottom:2px solid transparent;margin-bottom:-1px;
+  font:800 13px/1 var(--f-ui);letter-spacing:.14em}
+.abas button:hover{color:var(--bone);background:rgba(236,228,210,.04)}
+.abas button[aria-pressed="true"]{background:linear-gradient(180deg,transparent,rgba(255,138,61,.12));color:var(--bone);border-bottom-color:var(--ember)}
+.inv-top .x{border-radius:3px}
+.inv :is(.col-lado,.col-meio){border-radius:3px;background:var(--ui-chapa);border:1px solid var(--ui-linha);padding:12px}
+.inv .detalhe{border-radius:3px;background:var(--ui-chapa);border:1px solid var(--ui-linha);padding:0 14px 14px}
+.inv .det-tit{margin:0 -14px;padding:16px 14px 0;background:transparent;color:var(--bone);font:400 21px/1.05 var(--f-display);letter-spacing:.08em}
+.inv .det-tit::after{content:"";display:block;width:52px;height:3px;margin-top:9px;background:linear-gradient(90deg,var(--ember),transparent)}
+.inv .det-ico{border-radius:2px;background:rgba(0,0,0,.35);border-color:var(--ui-linha)}
+.inv .rot-grade,.inv .grade .rot-barra{font:400 11px/1 var(--f-radio);letter-spacing:.2em;color:var(--dim)}
+.inv .grade{gap:4px;grid-template-columns:repeat(auto-fill,minmax(58px,1fr))}
+.slot{border-radius:3px}
+.inv .slot{border-radius:2px;background:rgba(236,228,210,.05);border:1px solid rgba(236,228,210,.08)}
+.inv .slot:not(.travado):hover{background:rgba(236,228,210,.1);border-color:rgba(236,228,210,.2)}
+.inv .slot[aria-pressed="true"]{transform:none;border-color:var(--ember);background:rgba(255,138,61,.1);box-shadow:inset 0 0 0 1px var(--ember),0 0 16px rgba(255,138,61,.22)}
+.inv .slot.barra-r{background:rgba(236,228,210,.075);border-color:rgba(236,228,210,.14)}
+.inv .slot.travado{opacity:.2;border-style:solid}
+.inv .slot.roupa{border-color:rgba(214,170,102,.4);background:rgba(214,170,102,.07)}
+.inv .slot .q{font:800 11px/1 var(--f-ui);color:var(--bone);text-shadow:0 1px 2px #000}
+.inv .equip-v{border-radius:2px;background:rgba(0,0,0,.3);border-color:var(--ui-linha)}
+.inv .cats{gap:2px}
+.inv .cat{border-radius:0;border:0;border-left:2px solid transparent;background:transparent;padding:9px 9px 9px 10px;letter-spacing:.1em}
+.inv .cat:hover{background:rgba(236,228,210,.05)}
+.inv .cat[aria-pressed="true"]{background:linear-gradient(90deg,rgba(255,138,61,.16),transparent);border-left-color:var(--ember);color:var(--bone)}
+.inv .cat em{border-radius:2px}
+.inv .tiles{gap:4px;grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}
+.inv .tile{border-radius:2px;background:rgba(236,228,210,.05);border:1px solid rgba(236,228,210,.08)}
+.inv .tile:hover{background:rgba(236,228,210,.1);border-color:rgba(236,228,210,.2)}
+.inv .tile[aria-pressed="true"]{border-color:var(--ember);background:rgba(255,138,61,.1);box-shadow:inset 0 0 0 1px var(--ember)}
+.inv .receitas{gap:0;border-top:1px solid var(--ui-linha)}
+.inv .receita{border-radius:0;background:transparent;border-bottom:1px solid var(--ui-linha);padding:11px 10px}
+.inv .receita:hover{background:rgba(236,228,210,.03)}
+.inv .receita .prog{height:3px;border-radius:0}
+.inv .receita .btn{min-height:34px}
+#inv-tarefas .receita b{font:400 15px/1.25 var(--f-radio);letter-spacing:.02em}
+.inv .bancada-nv>*{border-radius:3px}
+.nv-pips{display:inline-flex;align-items:center;gap:3px;margin-left:9px;vertical-align:middle}.nv-pips .nv-t{display:none}
+/* construção: a roda (segure o botão direito) é o jeito principal; a barra grande de peças sai, fica a etiqueta com a peça e o custo */
+#obras,#obra-cats{display:none!important}
+.barra.construindo .item-nome{border-radius:3px;background:linear-gradient(90deg,var(--ember),rgba(255,138,61,0) 50%) top left/100% 2px no-repeat,rgba(12,14,13,.88);border-color:rgba(236,228,210,.12)}
+.barra.construindo .item-nome::after{content:"segure o botão direito: roda de peças · 1 a 9 e a rodinha também";flex-basis:100%;text-align:center;font:600 11px/1.2 var(--f-ui);color:var(--dim);letter-spacing:.02em}
+.nv-pips i{width:13px;height:5px;background:rgba(236,228,210,.16);transform:skewX(-20deg)}.nv-pips i.on{background:var(--ember);box-shadow:0 0 6px rgba(255,138,61,.5)}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
