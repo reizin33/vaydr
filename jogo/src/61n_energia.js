@@ -195,8 +195,10 @@ function ofertaExtraEnergia(){const D=terrD();if(!antenaEnergizada()||!D.ofertas
     nQuer=Math.max(1,Math.round(valor*(D.precos[quer]||1)/TERR_VAL[quer])),o={id:'o'+G.dia+'_'+g.id+'_e',g:g.id,grupo:g.nome,da:[da,nDa],quer:[quer,nQuer],aceita:false,extraE:true};D.ofertas.push(o);return o;}
 if(typeof terrOfertas==='function'){const _to=terrOfertas;terrOfertas=function(){const r=_to.apply(this,arguments);try{ofertaExtraEnergia();}catch(_){}return r;};}
 /* ---------- salvar ---------- */
-V8.salvar.energia=()=>({fios:ENER.fios.map(f=>[f.a,f.b,f.n||0])});
-V8.carregar.energia=s=>{ENER.fios=(s&&Array.isArray(s.fios)?s.fios:[]).filter(f=>Array.isArray(f)&&typeof f[0]==='string'&&typeof f[1]==='string').map(f=>({a:f[0],b:f[1],n:+f[2]||0}));ENER.ultTm=null;eletMapa();};
+/* v10.3.1: o fio guarda também os pontos onde foi preso (alicate na mão, 62zo), arredondados a 1 cm */
+V8.salvar.energia=()=>({fios:ENER.fios.map(f=>f.pts&&f.pts.length?[f.a,f.b,f.n||0,f.pts.map(q=>q.map(v=>Math.round(v*100)/100))]:[f.a,f.b,f.n||0])});
+V8.carregar.energia=s=>{ENER.fios=(s&&Array.isArray(s.fios)?s.fios:[]).filter(f=>Array.isArray(f)&&typeof f[0]==='string'&&typeof f[1]==='string').map(f=>{const r={a:f[0],b:f[1],n:+f[2]||0};
+    if(Array.isArray(f[3]))r.pts=f[3].filter(q=>Array.isArray(q)&&q.length===3&&q.every(v=>isFinite(+v))).slice(0,12).map(q=>q.map(Number));return r;});ENER.ultTm=null;eletMapa();};
 V8.novo.energia=()=>{ENER.fios=[];ENER.ultTm=null;ENER.fiados=new Set();};
 /* ---------- peça nova: id elétrico e ligação automática ---------- */
 {const _cr=criarObra;criarObra=function(){const o=_cr.apply(this,arguments);if(o&&eletDe(o))eidDe(o);return o;};}

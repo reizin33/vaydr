@@ -305,7 +305,7 @@ function updateHUD(dt,horda){hudAcc+=dt;
     teclasEl.classList.toggle('some',G.t-sessIni>240);hudExtras();hudArma();$('a-correr').setAttribute('aria-pressed',String(IN.run));$('a-agachar').setAttribute('aria-pressed',String(!!P.agachado));$('u-lanterna').setAttribute('aria-pressed',String(P.lanterna));}
   mapAcc+=dt;if(mapAcc>0.1){mapAcc=0;drawMap();if(CARRO.ativo){$('pc-vel').textContent=Math.round(Math.abs(CARRO.v)*3.6);$('pc-comb').style.width=Math.round(CARRO.comb)+'%';$('pc-hp').textContent='Lataria '+Math.round(CARRO.hp)+'%';$('pc-comb').classList.toggle('pouco',CARRO.comb<20);}}hudMarca();hudChefe();
   // mira, alvo e prompt
-  acertoT=Math.max(0,acertoT-dt);const mira=$('mira');mira.classList.toggle('escondido',lunetaAtiva()||!(G.modo==='jogo'&&P.alive&&(cfg.cam==='1'||(selDef()&&(selDef().fogo||selDef().arco||selDef().arremesso)&&P.aim>0.3)||OBRA.ativo)));
+  acertoT=Math.max(0,acertoT-dt);const mira=$('mira');mira.classList.toggle('escondido',lunetaAtiva()||!(G.modo==='jogo'&&P.alive&&(cfg.cam==='1'||(selDef()&&(selDef().fogo||selDef().arco||selDef().arremesso)&&P.aim>0.3)||OBRA.ativo||(typeof fiomAtivo==='function'&&fiomAtivo()))));
   {const pa=P.acao&&P.acao.tipo==='arco'?P.acao.puxa:0;mira.style.setProperty('--puxa',pa.toFixed(2));mira.classList.toggle('puxando',pa>0);mira.classList.toggle('cheio',pa>=1);}mira.classList.toggle('acerto',acertoT>0);
   alvoInter=OBRA.ativo?null:interAtual();const info=textoInter(alvoInter),pr=$('prompt');
   if(info&&G.modo==='jogo'){const a0=alvoInter,o=a0.k==='via'?(a0.o.u?a0.o.v.topo:a0.o.v.base):a0.o;const pt=project([o.x,(o.y??ground(o.x,o.z))+1.25,o.z]);

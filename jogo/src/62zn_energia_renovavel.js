@@ -40,13 +40,15 @@ Object.assign(BASE_DICAS,{rodaDagua:"Roda d'água pronta: ligue a saída dela (t
 /* ---------- quanto cada uma gera agora ---------- */
 function renovAmbiente(o){const e=o.ext||{};
   switch(o.tipo){
-    case'placaSolar':{if(G.hora<6||G.hora>=20)return 0;const s=Math.sin(Math.PI*(G.hora-6)/14);return Math.pow(Math.max(0,s),0.7)*(1-0.7*clamp(G.chuva||0,0,1))*(1-0.35*clamp(E.cloud||0,0,1));}
+    /* v10.3.1 (como no Rust): a placa gera mais virada para o sol — a face dela olha para a frente da peça (+z), inclinada 37° */
+    case'placaSolar':{const s=E.sun;if(!s||s[1]<=0.03)return 0;const c=Math.cos(o.yaw||0),sn=Math.sin(o.yaw||0),dot=0.8*sn*s[0]+0.6*s[1]+0.8*c*s[2];
+      return clamp(dot/0.85,0,1)*(1-0.7*clamp(G.chuva||0,0,1))*(1-0.35*clamp(E.cloud||0,0,1));}
     case'cataVento':{const w=E.wind?Math.hypot(E.wind[0],E.wind[1]):0.8;return clamp((w-0.35)/1.4,0.08,1)*clamp(0.8+(o.y||0)/30,0.8,1.3);}
     case'rodaDagua':{if(aguaProf(o.x,o.z)<0.25)return 0;const ch=RIO.enchente||0;return(e.corr?0.55:1)*(1+0.6*clamp(ch/1.5,0,1));}}
   return 0;}
 function renovConserva(o){const D=OBRAS[o.tipo];return D&&o.hpMax?clamp(o.hp/o.hpMax,0,1):1;}
 function renovPot(o){const d=ELET[o.tipo];if(!d)return 0;return Math.round(Math.min(d.prod*1.3,d.prod*renovAmbiente(o)*(0.35+0.65*renovConserva(o))));}
-function renovMotivo(o){if(o.tipo==='placaSolar')return G.hora<6||G.hora>=20?'de noite':(G.chuva||0)>0.4?'chuva':'sol';
+function renovMotivo(o){if(o.tipo==='placaSolar'){const s=E.sun;if(!s||s[1]<=0.03)return'de noite';if((G.chuva||0)>0.4)return'chuva';const c=Math.cos(o.yaw||0),sn=Math.sin(o.yaw||0),d=clamp((0.8*sn*s[0]+0.6*s[1]+0.8*c*s[2])/0.85,0,1);return'virada '+Math.round(d*100)+'% para o sol';}
   if(o.tipo==='cataVento'){const w=E.wind?Math.hypot(E.wind[0],E.wind[1]):0.8;return w<0.6?'vento fraco':w<1.3?'vento bom':'vento forte';}
   if(o.tipo==='rodaDagua')return aguaProf(o.x,o.z)<0.25?'sem água corrente':(RIO.enchente||0)>0.3?'rio cheio':(o.ext&&o.ext.corr?'córrego':'correnteza');return'';}
 
