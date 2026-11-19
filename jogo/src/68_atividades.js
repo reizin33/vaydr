@@ -98,7 +98,7 @@ INTERS.push(tryIt=>{for(const A of ABRIGOS){if(!abrigoPronto(A)||Math.hypot(P.x-
     if(S.ligado){if(A.cama)tryIt({k:'abrigoCama',o:A},A.cama.x,A.cama.z,1.5,2.4,-1,A.cama.y);if(A.bau)tryIt({k:'abrigoBau',o:A},A.bau.x,A.bau.z,1.4,2.4,-1,A.bau.y);}}});
 INTER_K.abrigoQuadro={texto:A=>{const S=abrigoD(A.id);if(S.ligado)return{t:'Quadro de força do abrigo',s:'a luz está acesa'};
     if(!S.limpo){const n=abrigoZumbis(A);return{t:'Quadro de força sem luz',s:n?'limpe a área antes: '+n+' zumbi'+(n>1?'s':'')+' por perto':'limpando a área…'};}
-    const f=ativFalta(A.custo);return f.length?{t:'Quadro de força sem luz',s:'falta '+f.join(', ')}:{t:'Religar a luz do abrigo',s:'gasta '+ativCusto(A.custo)+' · segure',hold:true,dur:2.4};},
+    const f=ativFalta(A.custo);return f.length?{t:'Quadro de força sem luz',s:'falta '+f.join(', ')+(A.ligarDica?' ('+A.ligarDica+')':'')}:{t:A.ligarT||'Religar a luz do abrigo',s:'gasta '+ativCusto(A.custo)+' · segure',hold:true,dur:2.4};},
   usar:(A,seg)=>{const S=abrigoD(A.id);if(S.ligado||!S.limpo)return;if(ativFalta(A.custo).length){sfx('vazio');return;}if(!seg)return;
     for(const k in A.custo)invRemove(k,A.custo[k]);S.ligado=true;ativLimpa();sfx('construir');sfx('missao');ganharXP(80);P.shake=Math.max(P.shake||0,0.15);
     toast('habilidade',A.nome+' aceso! Cama (dormir e voltar aqui se cair), baú e bancada. A luz não deixa os zumbis chegarem perto.');
