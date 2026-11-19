@@ -19,12 +19,12 @@ s = inicio("X('FAUNA_POP').ativosMax=0;")
 s += [js("vivo();X('BICHOS').length=0;Z.length=0;G.hora=10;n.cfg.movimento='realista';" + REC + LUGAR), ["gwait", 0.6]]
 # 1 arrancada
 s += [js(CORTA + "P.energia=100;"), ["down", "Shift"], ["down", "w"], ["gwait", 1.5],
-      ev("arrancada", CORTA + "const t0=r[0][0];let t90=null,pmax=0;for(const q of r){if(t90===null&&q[1]>=6.12)t90=q[0]-t0;pmax=Math.max(pmax,q[2]);}"
+      ev("arrancada", CORTA + "let i0=r.findIndex(q=>q[1]>0.3);if(i0<0)i0=0;const t0=r[i0][0];let t90=null,pmax=0;for(const q of r){if(t90===null&&q[1]>=6.12)t90=q[0]-t0;pmax=Math.max(pmax,q[2]);}"
          "return{t90:t90===null?null:r2(t90),vmax:r2(Math.max(...r.map(q=>q[1]))),inclinaFrente:r2(pmax),sobrevivente:!!P.ch.surv,quadros:r.length};")]
 # 2 parada
 s += [["up", "w"], ["up", "Shift"], ["gwait", 1.0],
-      ev("parada", CORTA + "const t0=r[0][0];let tp=null,ip=null;for(let i=0;i<r.length;i++)if(tp===null&&r[i][1]<0.3){tp=r[i][0]-t0;ip=i;}"
-         "const d=ip===null?null:Math.hypot(r[ip][9]-r[0][9],r[ip][10]-r[0][10]);return{tPara:tp===null?null:r2(tp),desliza:d===null?null:r2(d),inclinaTras:r2(Math.min(...r.map(q=>q[2])))};")]
+      ev("parada", CORTA + "let i0=r.findIndex(q=>q[1]<6.6);if(i0<0)i0=0;const t0=r[i0][0];let tp=null,ip=null;for(let i=i0;i<r.length;i++)if(tp===null&&r[i][1]<0.3){tp=r[i][0]-t0;ip=i;}"
+         "const d=ip===null?null:Math.hypot(r[ip][9]-r[i0][9],r[ip][10]-r[i0][10]);return{tPara:tp===null?null:r2(tp),desliza:d===null?null:r2(d),inclinaTras:r2(Math.min(...r.map(q=>q[2])))};")]
 # 3 andar devagar (Caps Lock)
 s += [js("P.yaw=P.body=window.__yaw0+Math.PI;" + CORTA), ["press", "CapsLock"], ["down", "w"], ["gwait", 1.6],
       ev("devagar", CORTA + "const v=r.slice(-20).map(q=>q[1]);return{ligado:!!P.devagar,vel:r2(v.reduce((a,b)=>a+b,0)/v.length),estado:X('SURV').estado};"),
@@ -41,9 +41,9 @@ s += [js("P.yaw=P.body=window.__yaw0;P.energia=100;"), ["down", "Shift"], ["down
       ["up", "w"], ["up", "Shift"], ["gwait", 1.0]]
 # 6 Ágil
 s += [js("n.cfg.movimento='agil';P.yaw=P.body=window.__yaw0+Math.PI;P.energia=100;" + CORTA), ["down", "Shift"], ["down", "w"], ["gwait", 1.2],
-      ev("agilArrancada", CORTA + "const t0=r[0][0];let t90=null;for(const q of r)if(t90===null&&q[1]>=6.12)t90=q[0]-t0;return{t90:t90===null?null:r2(t90)};"),
+      ev("agilArrancada", CORTA + "let i0=r.findIndex(q=>q[1]>0.3);if(i0<0)i0=0;const t0=r[i0][0];let t90=null;for(const q of r)if(t90===null&&q[1]>=6.12)t90=q[0]-t0;return{t90:t90===null?null:r2(t90)};"),
       ["up", "w"], ["up", "Shift"], ["gwait", 0.8],
-      ev("agilParada", CORTA + "const t0=r[0][0];let tp=null;for(const q of r)if(tp===null&&q[1]<0.3)tp=q[0]-t0;return{tPara:tp===null?null:r2(tp)};"),
+      ev("agilParada", CORTA + "let i0=r.findIndex(q=>q[1]<6.6);if(i0<0)i0=0;const t0=r[i0][0];let tp=null;for(let i=i0;i<r.length;i++)if(tp===null&&r[i][1]<0.3)tp=r[i][0]-t0;return{tPara:tp===null?null:r2(tp)};"),
       js("n.cfg.movimento='realista';")]
 # 7 zumbis caçando
 s += [js("window.__cadaPasso=(dt)=>{const P=__nnc.P;P.fome=100;P.sede=100;P.vida=100;const R=window.__zrec;if(!R)return;for(const z of __nnc.Z){const a=R[z.id];if(a&&a.length<2000)a.push([__nnc.G.t,z.x,z.z,z.ch.yaw,z.ch.pitch,dt]);}};"
