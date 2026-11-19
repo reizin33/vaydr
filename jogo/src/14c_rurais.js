@@ -16,7 +16,7 @@ function predioRural(sp){const ns=sp.frente==='S'||sp.frente==='N',hx=(ns?sp.W:s
   const p=Object.assign({andares:1},sp,{x0:sp.x-hx,x1:sp.x+hx,z0:sp.z-hz,z1:sp.z+hz,rural:true});p.id=CID.predios.length;CID.predios.push(p);p.salas=[];p.pecas=[];
   const F={S:[0,p.x0,p.z0],W:[Math.PI/2,p.x0,p.z1],N:[Math.PI,p.x1,p.z1],E:[-Math.PI/2,p.x1,p.z0]}[p.frente];
   p.yaw=F[0];p.ox=F[1];p.oz=F[2];p.c=Math.cos(p.yaw);p.s=Math.sin(p.yaw);
-  let yq=-1e9;for(const[x,z]of[[p.x0,p.z0],[p.x1,p.z0],[p.x0,p.z1],[p.x1,p.z1],[sp.x,sp.z]])yq=Math.max(yq,ground(x,z));p.yq=yq;p.y0=yq+0.12;
+  let yq=-1e9;for(const[x,z]of[[p.x0,p.z0],[p.x1,p.z0],[p.x0,p.z1],[p.x1,p.z1],[sp.x,sp.z]])yq=Math.max(yq,ground(x,z));if(typeof sp.yq==='number')yq=sp.yq;p.yq=yq;p.y0=yq+0.12;   // v10.6.0: o Morro do Sabiá dá a altura do lote (encosta)
   if(p.igreja){p.H=5.0;p.alt=1;predioIgreja(p);}else if(p.casa){p.H=2.9;predioCasa(p);}else{p.H=ANDAR_H;predioSalao(p);}
   p.yTopo=p.casa||p.igreja?p.y0+p.andares*p.H:p.y0+p.H*(p.alt||1.15);
   const q=p.quintal||[-1.2,p.W+1.2,p.igreja?-1.8:-1.4,p.D+1.4],cs=[pw(p,q[0],q[2]),pw(p,q[1],q[2]),pw(p,q[0],q[3]),pw(p,q[1],q[3])];

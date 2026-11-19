@@ -82,8 +82,9 @@ function predioCasa(p){const YQ=p.yq??QUADRA_Y,W=p.W,D=p.D,E=0.2,I=0.1,n=p.andar
     // mureta na beira do vão da escada (lado de cima)
     boxL(p,esc.u0,esc.u1,esc.v0-0.06,esc.v0,y1,y1+1.0);peca(p,esc.u0,esc.u1,y1,y1+1.0,esc.v0-0.06,esc.v0,0x5a3a2a,0.62);}
   if(hp)poraoMontar(p,hp,coz);
-  // telhado de duas águas (cumeeira paralela à fachada) e oitões em degraus
-  {const hr=1.5,run=D/2+0.45,th=Math.atan2(hr,run),L=Math.hypot(run,hr);
+  // telhado de duas águas (cumeeira paralela à fachada) e oitões em degraus; v10.6.0: casa do Morro do Sabiá tem laje (64d_morro)
+  if(p.laje&&typeof morroLajeCasa==='function')morroLajeCasa(p,yT,cF);
+  else{const hr=1.5,run=D/2+0.45,th=Math.atan2(hr,run),L=Math.hypot(run,hr);
     peca(p,-0.4,W+0.4,yT+hr/2-0.06,yT+hr/2+0.06,(-0.45+D/2)/2-L/2,(-0.45+D/2)/2+L/2,cT,0,0,0,-th);
     peca(p,-0.4,W+0.4,yT+hr/2-0.06,yT+hr/2+0.06,(D/2+D+0.45)/2-L/2,(D/2+D+0.45)/2+L/2,cT,0,0,0,th);
     for(let k=0;k<10;k++){const hw=Math.max(0.04,(D/2+0.45)*(1-(k+1)/10)-0.1);for(const[a,b]of[[0,0.2],[W-0.2,W]])peca(p,a,b,yT+k*hr/10,yT+(k+1)*hr/10,D/2-hw,D/2+hw,cF,0);}
