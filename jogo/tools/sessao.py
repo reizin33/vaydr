@@ -18,6 +18,8 @@ with sync_playwright() as p:
     pg.on('pageerror', lambda e: erros.append(str(e)[:400]))
     pg.on('console', lambda m: erros.append('console: ' + m.text[:400]) if m.type == 'error' else None)
     pg.add_init_script("try{localStorage.setItem('nnc_cfg_v1',JSON.stringify({graf:'alto',grafManual:true}))}catch(e){}")
+    if os.environ.get('INIT'):   # INIT=arquivo.js: roda antes da página (ex.: um window.vaydrPC de mentira para testar o que só existe no .exe)
+        pg.add_init_script(path=os.environ['INIT'])
     t0 = time.time()
     pg.goto('file://' + BASE + PAG + '#teste', wait_until='domcontentloaded', timeout=180000)
     pg.wait_for_function("typeof __nnc!=='undefined'&&__nnc.G.modo==='menu'", timeout=900000, polling=500)

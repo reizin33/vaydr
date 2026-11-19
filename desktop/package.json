@@ -35,6 +35,8 @@
       "main.js",
       "preload.js",
       "lan.js",
+      "saves.js",
+      "firewall.js",
       "app/**/*",
       "package.json"
     ],

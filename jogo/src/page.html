@@ -533,7 +533,10 @@ body[data-tela="pc"] .obra-acoes .btn{min-height:32px;padding:0 11px;font-size:1
 .tela-fade{position:fixed;inset:0;z-index:40;pointer-events:none;background:#000;opacity:0;transition:opacity .34s ease}
 .tela-fade.on{opacity:1}
 .tr-lista li{grid-template-columns:28px minmax(0,1fr) auto}
-.sv-lista li{grid-template-columns:28px minmax(0,1fr) auto}
+/* v10.4.3: com o id, para ganhar da regra nova de .cq-lista li (2 colunas) que espremia o botão "Voltar para esta" embaixo do ícone;
+   e o cartão rola se não couber (as linhas fixas do .cq-cartao deixavam os botões por cima do texto) */
+#t-salvo .sv-lista li{grid-template-columns:32px minmax(0,1fr) auto}
+#t-salvo .cq-cartao{grid-template-rows:none;overflow-y:auto}
 .sv-lista li .btn{min-height:34px;padding:0 12px}
 .sv-msg{margin:0;min-height:1.2em;color:var(--bone);font:600 13px/1.35 var(--f-ui)}
 .sv-msg.ruim{color:#ff9a7a}

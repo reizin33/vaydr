@@ -12,7 +12,7 @@
    O que ainda é de cada um: baús, portas, construções, itens no chão, animais, carros e o dia (cada mundo segue no seu dia e
    salva normal). Quando o anfitrião abre a mochila, o mapa ou a pausa, o mundo dele (os zumbis) continua andando.
    Protocolo (JSON) no cabeçalho do desktop/lan.js. */
-const LAN={on:false,papel:'',ws:null,id:0,anfId:0,nome:'',jog:new Map(),zMap:new Map(),status:'',erro:'',ips:[],porta:47811,hostNome:'',orig:null,alvo:null,visualK:'',visualT:0,
+const LAN={on:false,papel:'',ws:null,id:0,anfId:0,nome:'',jog:new Map(),zMap:new Map(),status:'',erro:'',ips:[],porta:47811,fw:'',hostNome:'',orig:null,alvo:null,visualK:'',visualT:0,
   chat:[],tRede:null,ultMundo:0,ultRender:0,info:{enviados:0,recebidos:0,hits:0,danos:0}};
 const LAN_CORES=[[0x8a2f22,0x2a3a5a],[0x2f5a8a,0x3a3028],[0x4a6a2a,0x2a2a30],[0xc9a227,0x3a4a6a],[0x6a2a6a,0x2a2a2a],[0x2a7a7a,0x4a3a2a],[0xb8642a,0x2a3a2a]];
 const lanVersao=()=>(window.vaydrPC&&vaydrPC.versao)||'dev';
@@ -24,9 +24,10 @@ function lanConectar(url,papel){lanDesligar(true);LAN.papel=papel;LAN.status='Co
   let ws;try{ws=new WebSocket(url);}catch(e){LAN.erro='Endereço inválido.';LAN.papel='';lanTela();return;}
   LAN.ws=ws;lanTela();
   const espera=setTimeout(()=>{if(LAN.ws===ws&&!LAN.on){LAN.erro='Não achei a partida nesse IP. Confira o número, se vocês estão na mesma rede (ou no Radmin) e se o Windows de quem abriu liberou o VAYDR.';try{ws.close();}catch(_){}lanDesligar(true);lanTela();}},12000);
-  ws.onopen=()=>{ws.send(JSON.stringify({t:'oi',nome:LAN.nome||'Jogador',papel,versao:lanVersao()}));};
+  ws.onopen=()=>{ws.__abriu=true;ws.send(JSON.stringify({t:'oi',nome:LAN.nome||'Jogador',papel,versao:lanVersao()}));};
   ws.onmessage=e=>{if(LAN.ws!==ws)return;let m;try{m=JSON.parse(e.data);}catch(_){return;}LAN.info.recebidos++;try{lanReceber(m);}catch(err){console.error('lan',err);}};
-  ws.onclose=()=>{clearTimeout(espera);if(LAN.ws!==ws)return;const era=LAN.on;lanDesligar(true);if(era)toast('alerta','A conexão da partida em rede caiu.');lanTela();};
+  ws.onclose=()=>{clearTimeout(espera);if(LAN.ws!==ws)return;const era=LAN.on;lanDesligar(true);if(era)toast('alerta','A conexão da partida em rede caiu.');
+    else if(!LAN.erro){LAN.status='';LAN.erro=ws.__abriu?'A partida fechou a conexão.':'A conexão foi recusada: confira se a partida está aberta no computador de quem abriu.';}lanTela();};
   ws.onerror=()=>{};
   if(!LAN.tRede)LAN.tRede=setInterval(lanRede,100);}
 function lanDesligar(quieto){const ws=LAN.ws;LAN.ws=null;if(ws)try{ws.close();}catch(_){}
@@ -37,13 +38,33 @@ function lanDesligar(quieto){const ws=LAN.ws;LAN.ws=null;if(ws)try{ws.close();}c
   if(!quieto)LAN.status='';lanHud();lanTela();}
 /* abrir a partida (só no .exe: o servidor fica no aplicativo) */
 async function lanHospedar(){if(!(window.vaydrPC&&vaydrPC.lanHospedar)){LAN.erro='Abrir a partida só funciona no jogo de PC (.exe).';lanTela();return;}
-  LAN.erro='';LAN.status='Abrindo a partida…';lanTela();
+  LAN.erro='';
+  if(vaydrPC.lanFirewall&&vaydrPC.lanLiberar){LAN.status='Conferindo o Firewall do Windows…';lanTela();let f=null;try{f=await vaydrPC.lanFirewall();}catch(_){}
+    if(f&&f.windows!==false&&!f.ok)await lanLiberar(true);else LAN.fw=f&&f.ok&&f.windows!==false?'ok':'';}
+  LAN.status='Abrindo a partida…';lanTela();
   let r=null;try{r=await vaydrPC.lanHospedar(LAN.porta);}catch(e){r={ok:false,erro:String(e&&e.message||e)};}
   if(!r||!r.ok){LAN.status='';LAN.erro='Não deu para abrir a partida: '+((r&&r.erro)||'erro desconhecido')+'.';lanTela();return;}
   LAN.ips=(r.ips||[]).map(q=>q.ip);lanConectar('ws://127.0.0.1:'+r.porta,'anfitriao');}
-function lanEntrar(txt){txt=String(txt||'').trim().replace(/^ws:\/\//,'').replace(/\/.*$/,'');
+async function lanEntrar(txt){txt=String(txt||'').trim().replace(/^ws:\/\//,'').replace(/\/.*$/,'');
   if(!/^[\w.-]+(:\d{2,5})?$/.test(txt)){LAN.erro='Digite o IP que aparece na tela de quem abriu a partida (por exemplo 192.168.0.12).';lanTela();return;}
-  try{store.set('vaydr_lan_ip',txt);}catch(_){}lanConectar('ws://'+(txt.includes(':')?txt:txt+':'+LAN.porta),'convidado');}
+  try{store.set('vaydr_lan_ip',txt);}catch(_){}
+  const host=txt.split(':')[0],porta=txt.includes(':')?+txt.split(':')[1]:LAN.porta;
+  /* no .exe: antes de conectar, vê se o computador de quem abriu responde e diz o motivo certo (v10.4.3) */
+  if(window.vaydrPC&&vaydrPC.lanTestar){lanDesligar(true);LAN.erro='';LAN.status='Procurando a partida em '+host+'…';lanTela();let r=null;try{r=await vaydrPC.lanTestar(host,porta);}catch(_){}
+    if(r&&!r.ok){LAN.status='';LAN.erro=lanMotivo(r.codigo,host);lanTela();return;}}
+  lanConectar('ws://'+host+':'+porta,'convidado');}
+function lanMotivo(c,ip){switch(c){
+  case'ECONNREFUSED':return'O computador '+ip+' respondeu, mas a partida não está aberta nele. Peça para quem vai receber clicar em "Abrir a partida" e tente de novo.';
+  case'ETIMEDOUT':return'Nenhuma resposta de '+ip+'. O mais comum é o Firewall do Windows de quem abriu a partida: lá, em Jogar junto, clique em "Liberar no Firewall" e depois em Sim no aviso do Windows. Confira também o IP e se vocês estão na mesma rede (ou os dois no Radmin VPN).';
+  case'EHOSTUNREACH':case'ENETUNREACH':case'EADDRNOTAVAIL':return'O IP '+ip+' não está na sua rede. Confira o número e se vocês estão na mesma rede (ou os dois no Radmin VPN).';
+  case'ENOTFOUND':case'ENDERECO':return'Esse endereço não existe. Digite o IP que aparece na tela de quem abriu (por exemplo 192.168.0.12).';
+  default:return'Não deu para chegar em '+ip+' ('+c+'). Confira o IP e se vocês estão na mesma rede.';}}
+/* Firewall do Windows de quem abre a partida (desktop/firewall.js): libera o VAYDR em todo tipo de rede (o aviso do Windows pede Sim) */
+async function lanLiberar(antesDeAbrir){if(!(window.vaydrPC&&vaydrPC.lanLiberar))return false;LAN.fw='pedindo';LAN.erro='';
+  LAN.status='O Windows vai perguntar se o VAYDR pode fazer alterações: clique em Sim. É para liberar o jogo no Firewall e os amigos conseguirem entrar.';lanTela();
+  let r=null;try{r=await vaydrPC.lanLiberar();}catch(_){}LAN.fw=r&&r.ok?'ok':'falta';
+  if(!antesDeAbrir){LAN.status=LAN.fw==='ok'?'Pronto: o VAYDR está liberado no Firewall do Windows. Peça para o amigo tentar de novo.':'';if(LAN.fw!=='ok')LAN.erro='O Firewall não foi liberado (o aviso do Windows foi cancelado?). Sem isso, os amigos podem não conseguir entrar.';}
+  lanTela();return LAN.fw==='ok';}
 
 /* ---------- mensagens que chegam ---------- */
 function lanReceber(m){switch(m.t){
@@ -240,6 +261,7 @@ window.addEventListener('keydown',e=>{if(!LAN.on||G.modo!=='jogo'||e.repeat)retu
 .mp-ips{display:grid;gap:4px;font:700 15px/1.35 var(--f-ui);color:#e4f2ff}.mp-ips small{font:600 12px/1.35 var(--f-ui);color:#a8bfd3}
 .mp-ips code{font:800 20px/1.2 ui-monospace,Consolas,monospace;color:#ffcf8a;letter-spacing:.02em;user-select:all}
 .mp-estado{min-height:1.4em;font:700 14px/1.45 var(--f-ui);color:#cfe7ff}.mp-estado.erro{color:#ffb4a0}
+.mp-fw{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font:600 13px/1.35 var(--f-ui);color:#ffcf8a}.mp-fw.ok{color:#a8e0a0;grid-template-columns:1fr}
 .mp-jog{display:flex;flex-wrap:wrap;gap:6px}.mp-jog span{padding:4px 10px;border-radius:999px;background:rgba(98,184,255,.16);font:700 13px/1.2 var(--f-ui);color:#e4f2ff}
 .mp-acoes{display:flex;gap:10px;flex-wrap:wrap}`;document.head.appendChild(st);}
 {document.body.insertAdjacentHTML('beforeend','<div id="lan-nomes" aria-hidden="true"></div><div id="lan-hud" hidden><div id="lan-hud-topo"></div><div id="lan-hud-nomes"></div><div id="lan-hud-chat"></div>'+
@@ -251,8 +273,8 @@ window.addEventListener('keydown',e=>{if(!LAN.on||G.modo!=='jogo'||e.repeat)retu
 {const esq=document.querySelector('#t-multi .mp-esq');if(esq){esq.innerHTML='<span class="vl-tag">Teste de LAN</span><h3>Jogar junto</h3>'+
   '<p>Um abre a partida e os amigos entram com o IP dele, na mesma rede ou pelo Radmin VPN. Vocês se veem, conversam (Enter), ficam na mesma hora e no mesmo clima, e os <b>zumbis são os mesmos para todos</b>: o jogo de quem abriu decide. Baús, portas, construções e itens ainda são de cada um.</p>'+
   '<div class="mp-lan"><label>Seu nome na partida<input id="lan-nome" maxlength="20" autocomplete="off"></label>'+
-  '<div class="mp-ops"><div class="mp-op"><b>Abrir a partida e chamar os amigos</b><span>O seu mundo vira o da partida. Se o Windows perguntar, clique em Permitir.</span>'+
-  '<div class="mp-linha"><button class="btn prim" id="lan-hospedar" type="button">Abrir a partida</button></div><div class="mp-ips" id="lan-ips" hidden></div></div>'+
+  '<div class="mp-ops"><div class="mp-op"><b>Abrir a partida e chamar os amigos</b><span>O seu mundo vira o da partida. Na primeira vez, o Windows pergunta se o VAYDR pode fazer alterações: clique em Sim (é para liberar a partida no Firewall).</span>'+
+  '<div class="mp-linha"><button class="btn prim" id="lan-hospedar" type="button">Abrir a partida</button></div><div class="mp-ips" id="lan-ips" hidden></div><div class="mp-fw" id="lan-fw" hidden><span id="lan-fw-t"></span><button class="btn" id="lan-fw-b" type="button">Liberar no Firewall</button></div></div>'+
   '<div class="mp-op"><b>Entrar na partida de um amigo</b><span>Digite o IP que aparece na tela de quem abriu.</span>'+
   '<div class="mp-linha"><input id="lan-ip" placeholder="192.168.0.12" inputmode="decimal" autocomplete="off"><button class="btn" id="lan-entrar" type="button">Entrar</button></div></div></div>'+
   '<div class="mp-estado" id="lan-estado" role="status"></div><div class="mp-jog" id="lan-jog"></div>'+
@@ -266,6 +288,9 @@ function lanTela(){const e=$('lan-estado');if(!e)return;const ni=$('lan-nome');i
   e.className='mp-estado'+(LAN.erro?' erro':'');e.textContent=LAN.erro||(LAN.on?(LAN.papel==='anfitriao'?'Partida aberta. Agora escolha o mundo e jogue: os amigos entram quando quiserem.':'Você entrou na partida de '+(LAN.hostNome||'um amigo')+'. Agora escolha um mundo seu e jogue.'):LAN.status);
   const ips=$('lan-ips');if(ips){const mostra=LAN.on&&LAN.papel==='anfitriao';ips.hidden=!mostra;
     if(mostra)ips.innerHTML='<small>Seus amigos digitam:</small>'+(LAN.ips.length?LAN.ips.map(ip=>'<code>'+ip+'</code>').join(''):'<code>(sem rede: conecte o PC na rede ou no Radmin)</code>')+'<small>No Radmin, use o IP que começa com 26.</small>';}
+  const fw=$('lan-fw');if(fw){const anf=LAN.papel==='anfitriao'||LAN.fw==='pedindo';fw.hidden=!anf||!LAN.fw;const ft=$('lan-fw-t'),fb=$('lan-fw-b');
+    if(ft)ft.textContent=LAN.fw==='ok'?'Firewall do Windows: o VAYDR está liberado.':LAN.fw==='pedindo'?'Esperando o aviso do Windows…':'O Firewall do Windows pode estar barrando os amigos.';
+    if(fb){fb.hidden=LAN.fw==='ok';fb.disabled=LAN.fw==='pedindo';}fw.classList.toggle('ok',LAN.fw==='ok');}
   const j=$('lan-jog');if(j){j.textContent='';if(LAN.on){const L=[LAN.nome+' (você)'];for(const q of LAN.jog.values())L.push(q.nome+(q.anf?' (abriu)':''));for(const n of L){const s=document.createElement('span');s.textContent=n;j.appendChild(s);}}}
   const pc=!!(window.vaydrPC&&vaydrPC.lanHospedar),h=$('lan-hospedar');if(h){h.disabled=LAN.on||!pc;h.title=pc?'':'Só no jogo de PC (.exe)';}
   const en=$('lan-entrar');if(en)en.disabled=LAN.on;const ip=$('lan-ip');if(ip)ip.disabled=LAN.on;
@@ -275,6 +300,7 @@ function lanTela(){const e=$('lan-estado');if(!e)return;const ni=$('lan-nome');i
  const ip=$('lan-ip');if(ip){try{ip.value=store.get('vaydr_lan_ip')||'';}catch(_){}ip.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();$('lan-entrar').click();}});}
  const nomeOk=()=>{if(!LAN.nome.trim())LAN.nome=(typeof PERFIL!=='undefined'&&PERFIL&&PERFIL.nome)||'Jogador';return true;};
  if($('lan-hospedar'))$('lan-hospedar').addEventListener('click',()=>{sfx('clique');nomeOk();lanHospedar();});
+ if($('lan-fw-b'))$('lan-fw-b').addEventListener('click',()=>{sfx('clique');lanLiberar(false);});
  if($('lan-entrar'))$('lan-entrar').addEventListener('click',()=>{sfx('clique');nomeOk();lanEntrar($('lan-ip').value);});
  if($('lan-sair'))$('lan-sair').addEventListener('click',()=>{sfx('clique');lanDesligar(false);});
  if($('lan-jogar'))$('lan-jogar').addEventListener('click',()=>{sfx('clique');const b=$('m-sozinho');if(b)b.click();});

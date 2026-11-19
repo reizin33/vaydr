@@ -14,4 +14,15 @@ contextBridge.exposeInMainWorld('vaydrPC', {
   // partida em rede local (LAN): abre o servidor neste PC e devolve a porta e os IPs para os amigos
   lanHospedar: (porta) => ipcRenderer.invoke('vaydr:lan-hospedar', porta),
   lanParar: () => ipcRenderer.invoke('vaydr:lan-parar'),
+  // v10.4.3: testar se o computador de quem abriu responde (com o motivo) e o Firewall do Windows de quem abre
+  lanTestar: (ip, porta) => ipcRenderer.invoke('vaydr:lan-testar', String(ip), +porta),
+  lanFirewall: () => ipcRenderer.invoke('vaydr:lan-firewall?'),
+  lanLiberar: () => ipcRenderer.invoke('vaydr:lan-liberar'),
+  // cópia automática dos jogos salvos em arquivo (v10.4.3, saves.js): gravar (sem esperar, ou esperando ao fechar), listar, ler, apagar
+  saveGravar: (chave, texto, esperar) => { try { if (esperar) return ipcRenderer.sendSync('vaydr:save-gravar', String(chave), String(texto)); ipcRenderer.send('vaydr:save-gravar', String(chave), String(texto)); return true; } catch (_) { return false; } },
+  saveLista: () => { try { const r = ipcRenderer.sendSync('vaydr:save-lista'); return Array.isArray(r) ? r : []; } catch (_) { return []; } },
+  saveLer: (chave) => { try { const r = ipcRenderer.sendSync('vaydr:save-ler', String(chave)); return typeof r === 'string' ? r : null; } catch (_) { return null; } },
+  saveApagar: (chave) => { try { ipcRenderer.send('vaydr:save-apagar', String(chave)); } catch (_) {} },
+  savePasta: () => { try { return String(ipcRenderer.sendSync('vaydr:save-pasta?') || ''); } catch (_) { return ''; } },
+  saveAbrirPasta: () => { try { ipcRenderer.send('vaydr:save-abrir-pasta'); } catch (_) {} },
 });

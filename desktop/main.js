@@ -187,8 +187,24 @@ ipcMain.on('vaydr:sair', (e) => { if (daPagina(e) && win) win.close(); });
 // Configurações > Resolução > Modo de tela (o mesmo que F11 e Alt+Enter; a escolha fica lembrada como sempre)
 ipcMain.on('vaydr:tela-cheia', (e, ligar) => { if (daPagina(e) && win) win.setFullScreen(!!ligar); });
 ipcMain.on('vaydr:tela-cheia?', (e) => { e.returnValue = !!(win && !win.isDestroyed() && win.isFullScreen()); });
+/* cópia automática dos jogos salvos em arquivo (v10.4.3, saves.js): Documentos\VAYDR\Jogos salvos (ou a pasta de dados do jogo) */
+const { criarSaves } = require('./saves.js');
+let savesArq = null;
+const saves = () => savesArq || (savesArq = criarSaves([path.join(app.getPath('documents'), 'VAYDR', 'Jogos salvos'), path.join(app.getPath('userData'), 'jogos-salvos')], log));
+// a página manda pelo send (sem esperar) e, ao fechar a janela, pelo sendSync (a cópia termina antes de a janela fechar)
+ipcMain.on('vaydr:save-gravar', (e, chave, texto) => { const ok = daPagina(e) && typeof texto === 'string' && saves().gravar(String(chave), texto); e.returnValue = !!ok; });
+ipcMain.on('vaydr:save-lista', (e) => { let r = []; try { if (daPagina(e)) r = saves().listar(); } catch (_) {} e.returnValue = r; });
+ipcMain.on('vaydr:save-ler', (e, chave) => { let r = null; try { if (daPagina(e)) r = saves().ler(String(chave)); } catch (_) {} e.returnValue = r; });
+ipcMain.on('vaydr:save-apagar', (e, chave) => { if (daPagina(e)) { try { saves().apagar(String(chave)); } catch (_) {} } });
+ipcMain.on('vaydr:save-pasta?', (e) => { let r = ''; try { if (daPagina(e)) r = saves().pasta() || ''; } catch (_) {} e.returnValue = r; });
+ipcMain.on('vaydr:save-abrir-pasta', (e) => { if (!daPagina(e)) return; const p = saves().pasta(); if (p) shell.openPath(p).then((erro) => { if (erro) log('saves: abrir a pasta: ' + erro); }); });
 /* partida em rede local (LAN, v10.4.0): o servidor fica aqui no aplicativo de quem abre a partida (lan.js) */
 const { criarServidorLan } = require('./lan.js');
+/* v10.4.3 (firewall.js): quem entra testa a porta antes e recebe o motivo certo; quem abre libera o VAYDR no Firewall do Windows */
+const fw = require('./firewall.js');
+ipcMain.handle('vaydr:lan-testar', async (e, ip, porta) => (daPagina(e) ? fw.testar(String(ip), +porta, 6000) : { ok: false, codigo: 'origem' }));
+ipcMain.handle('vaydr:lan-firewall?', async (e) => (daPagina(e) ? fw.regraExiste() : { ok: false }));
+ipcMain.handle('vaydr:lan-liberar', async (e) => { if (!daPagina(e)) return { ok: false }; const r = await fw.liberar(process.execPath, false); log('lan: firewall', r); return r; });
 let lanSrv = null;
 ipcMain.handle('vaydr:lan-hospedar', async (e, porta) => {
   if (!daPagina(e)) return { ok: false, erro: 'origem' };
@@ -219,6 +235,14 @@ function falhar(e) { rel.ok = false; rel.excecao = String((e && e.stack) || e); 
 const INFO_GL = "(()=>{const c=document.createElement('canvas'),gl=c.getContext('webgl2');if(!gl)return{webgl2:false};const d=gl.getExtension('WEBGL_debug_renderer_info');"
   + "return{webgl2:true,placa:d?gl.getParameter(d.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER),falha3D:!document.getElementById('falha').hidden,"
   + "fonte:document.fonts?[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family+' '+f.weight).slice(0,12):[],tela:[innerWidth,innerHeight]};})()";
+// a cópia automática do save (saves.js) existe e é a mesma gravação (salvoEm) que a página tem
+function arquivoSave(salvoEm) {
+  try {
+    const pasta = saves().pasta(); if (!pasta) return { ok: false, motivo: 'sem pasta' };
+    const arq = path.join(pasta, 'nnc_jogo_v1.json'), t = fs.readFileSync(arq, 'utf8'), s = JSON.parse(t);
+    return { ok: !!salvoEm && s.salvoEm === salvoEm, pasta, bytes: t.length, salvoEm: s.salvoEm, esperado: salvoEm || null, lista: saves().listar().map((q) => q.chave) };
+  } catch (e) { return { ok: false, erro: String((e && e.message) || e) }; }
+}
 const FPS = "new Promise(r=>{let n=0;const t0=performance.now();const f=()=>{n++;const dt=performance.now()-t0;if(dt<6000)requestAnimationFrame(f);else r(Math.round(n/(dt/1000)*10)/10);};requestAnimationFrame(f);})";
 async function fumaca() {
   const js = (c) => win.webContents.executeJavaScript(c, true);
@@ -270,9 +294,24 @@ async function fumaca() {
     const fim = Date.now() + 30000; while (testes.downloads.length === antes && Date.now() < fim) await dormir(300);
     const dl = testes.downloads[antes] || null;
     passo('cópia do save em arquivo', { ok: !!dl && dl.estado === 'completed' && dl.tam > 100, dl });
+    // 10.4.3: a cópia automática no computador (saves.js) tem o mesmo save que acabou de ser gravado
+    await dormir(1500);
+    const auto = arquivoSave(s1.salvoEm);
+    passo('cópia automática no computador', auto);
+    // 10.4.3: partida em rede como o amigo faria: abre o servidor, testa a porta (aberta e fechada) e a página conecta por um IP
+    // da rede (não 127.0.0.1); e a regra do Firewall (o Windows do GitHub roda como administrador: cria sem o aviso e apaga depois)
+    const lanR = await js("(async()=>{const P=window.vaydrPC;const r=await P.lanHospedar(47811);if(!r||!r.ok)return{abriu:false,r};const ip=(r.ips||[]).map(q=>q.ip).find(x=>x&&x!=='127.0.0.1')||'127.0.0.1';"
+      + "const aberta=await P.lanTestar(ip,r.porta),fechada=await P.lanTestar('127.0.0.1',47899);"
+      + "const ws=await new Promise(res=>{let w;try{w=new WebSocket('ws://'+ip+':'+r.porta);}catch(e){return res({erro:String(e)});}const tm=setTimeout(()=>{try{w.close();}catch(_){}res({tempo:true});},8000);"
+      + "w.onopen=()=>{clearTimeout(tm);try{w.close();}catch(_){}res({abriu:true});};w.onerror=()=>{};w.onclose=()=>{clearTimeout(tm);res({fechou:true});};});"
+      + "await P.lanParar();return{abriu:true,ip,porta:r.porta,aberta,fechada,ws};})()");
+    const lanOk = !!(lanR && lanR.abriu && lanR.aberta && lanR.aberta.ok && lanR.fechada && lanR.fechada.codigo === 'ECONNREFUSED' && lanR.ws && lanR.ws.abriu);
+    passo('partida em rede: porta e conexão por IP da rede', { ok: lanOk, ...lanR });
+    const fwR = { antes: await fw.regraExiste() }; fwR.liberar = await fw.liberar(process.execPath, true); fwR.depois = await fw.regraExiste(); fwR.apagar = await fw.apagarRegra(); fwR.fim = await fw.regraExiste();
+    passo('Firewall: regra da partida em rede (informativo)', fwR);
     await js("__nnc.P.fome=33.3");
     rel.marca = { fome: 33.3, salvoEmAntes: s1.salvoEm };
-    rel.ok = menu && jogando && s1.tem && !!dl && dl.estado === 'completed' && erros().length === 0;
+    rel.ok = menu && jogando && s1.tem && !!dl && dl.estado === 'completed' && auto.ok && lanOk && erros().length === 0;
     codigoSaida = rel.ok ? 0 : 1;
     passo('fechando a janela como o jogador (o jogo deve salvar sozinho)', { errosNaPagina: erros().length });
     win.close();
@@ -284,6 +323,9 @@ async function fumaca() {
   const continuar = await js("!document.getElementById('m-continuar').hidden");
   const salvouAoFechar = !!(s && anterior && anterior.marca && s.salvoEm > anterior.marca.salvoEmAntes && Math.abs(s.fome - anterior.marca.fome) < 1.5);
   passo('save depois de reabrir', { save: s, botaoContinuar: continuar, salvouAoFechar });
+  // 10.4.3: o save feito ao fechar a janela também foi para a cópia automática no computador (gravada antes de a janela fechar)
+  const autoFechar = arquivoSave(s && s.salvoEm);
+  passo('cópia automática atualizada ao fechar', autoFechar);
   await js("document.getElementById('m-continuar').click()");
   const jogando = await esperar("__nnc.G.modo==='jogo'", 240000);
   await dormir(15000);
@@ -294,7 +336,7 @@ async function fumaca() {
   await dormir(1500);
   const sair = await js("!!document.getElementById('m-sair')&&!document.getElementById('t-menu').hidden");
   passo('menu com o botão Sair do jogo', { ok: sair });
-  rel.ok = !!s && continuar && salvouAoFechar && jogando && sair && erros().length === 0;
+  rel.ok = !!s && continuar && salvouAoFechar && autoFechar.ok && jogando && sair && erros().length === 0;
   codigoSaida = rel.ok ? 0 : 1;
   escrever();
   // a espera: no Windows da nuvem a placa de vídeo é feita na CPU e, com a serra e a mata da 10.2.0, um quadro do menu leva ~10 s;
