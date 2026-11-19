@@ -110,7 +110,7 @@ function updateCamera(dt){const asp=W/H,first=cfg.cam==='1';
     const dist=lerp(lerp(3.1,2.5,aimK)*(cfg.camDist||1),lerp(2.2,1.9,aimK),camIn),side=lerp(lerp(0.5,0.68,aimK),0.42,camIn)*(cfg.camLado??1);   // v10.5.0: Ajustes > Jogo > Lado da câmera (1 direita, 0 meio, -1 esquerda)
    
     const alvo=[P.x+rx*side,P.y+lerp(1.62,1.15,P.agK||0)+Math.sin(P.ph*2)*0.006*P.amp,P.z+rz*side];
-    if(!camPiv||Math.hypot(alvo[0]-camPiv[0],alvo[2]-camPiv[2])>3)camPiv=alvo.slice();else{const kp=1-Math.exp(-dt*24);for(let i=0;i<3;i++)camPiv[i]+=(alvo[i]-camPiv[i])*(i===1?kp*0.7:kp);}
+    if(!camPiv||Math.hypot(alvo[0]-camPiv[0],alvo[2]-camPiv[2])>3)camPiv=alvo.slice();else{const kp=1-Math.exp(-dt*MOV_PESO.cam);for(let i=0;i<3;i++)camPiv[i]+=(alvo[i]-camPiv[i])*(i===1?kp*0.7:kp);}
     // teto suavizado: desce na hora (não atravessa a laje) e sobe devagar (na escada o teto muda a cada degrau e a câmera pulava)
     const piv=camPiv;let dd=dist;const teto0=tetoEm(P.x,P.y+0.3,P.z);
     if(teto0===null)camTeto=null;else if(camTeto===null||teto0<camTeto)camTeto=teto0;else camTeto+=(teto0-camTeto)*(1-Math.exp(-dt*2.5));
@@ -150,11 +150,11 @@ function updatePlayer(dt){const ch=P.ch;
   const moving=ml>0.15,running=IN.run&&moving&&P.energia>3&&mz>-0.2&&!P.agachado&&!pernaRuim()&&!P.voo;
   /* v10.3.2 (Himalaia: "movimentação muito ruim"): passo normal 4,2 m/s (era 3,7), disparada 6,8 (era 6,2), agachado 2,0;
      de costas 72% e de lado 88% da velocidade de frente (antes tudo igual) */
-  let spd=running?6.8*(1+0.08*perk('corrida')):(P.agachado?2.0:4.2);if(!running&&moving&&!P.voo)spd*=mz<-0.25?0.72:Math.abs(mx)>Math.abs(mz)+0.1?0.88:1;if(P.acao&&(P.acao.tipo==='usar'||P.acao.tipo==='revistar'||P.acao.tipo==='recarga'))spd*=0.45;if(P.fome<=0||P.sede<=0)spd*=0.8;if(P.aim>0.5)spd*=0.6;if(P.acao&&P.acao.tipo==='arco')spd*=0.85;if(naAgua(P.x,P.y,P.z))spd*=0.55;spd*=lesaoVel()*sonoVel()*(P.lentoMata||1);
+  let spd=running?6.8*(1+0.08*perk('corrida')):(P.agachado?2.0:4.2);if(!running&&moving&&!P.voo)spd*=mz<-0.25?0.72:Math.abs(mx)>Math.abs(mz)+0.1?0.88:1;if(P.acao&&(P.acao.tipo==='usar'||P.acao.tipo==='revistar'||P.acao.tipo==='recarga'))spd*=0.45;if(P.fome<=0||P.sede<=0)spd*=0.8;if(P.aim>0.5)spd*=0.6;if(P.acao&&P.acao.tipo==='arco')spd*=0.85;if(naAgua(P.x,P.y,P.z))spd*=0.55;spd*=lesaoVel()*sonoVel()*(P.lentoMata||1)*movFatorVel(running);
   if(P.voo)spd=IN.run?34:13;   // voando no modo criativo (v10.2.2): 13 m/s, com Shift 34 m/s (antes era o passo de andar, 3,7 m/s)
   if(P.travaAnda>0){P.travaAnda-=dt;mx=mz=0;}const px0=P.x,pz0=P.z;
   const sy=Math.sin(P.yaw),cy=Math.cos(P.yaw);const dx=sy*mz-cy*mx,dz=cy*mz+sy*mx;
-  const k=(1-Math.exp(-dt*(P.voo?3.5:moving?(running?7:10):17)))*(P.noChao||P.voo||P.coyote>0?1:0.22);P.vx+=(dx*spd-P.vx)*k;P.vz+=(dz*spd-P.vz)*k;P.runK=approach(P.runK||0,running&&Math.hypot(P.vx,P.vz)>4?1:0,dt*2.5);P.correndo=running&&Math.hypot(P.vx,P.vz)>3;
+  const k=(1-Math.exp(-dt*(P.voo?3.5:moving?(running?MOV_PESO.corre:MOV_PESO.anda):MOV_PESO.para)))*(P.noChao||P.voo||P.coyote>0?1:0.22);P.vx+=(dx*spd-P.vx)*k;P.vz+=(dz*spd-P.vz)*k;P.runK=approach(P.runK||0,running&&Math.hypot(P.vx,P.vz)>4?1:0,dt*2.5);P.correndo=running&&Math.hypot(P.vx,P.vz)>3;
   {const ox=P.x,oz=P.z;P.x+=P.vx*dt;P.z+=P.vz*dt;
     /* beirada: andando no alto, não despenca sem querer (correndo ou pulando dá para saltar) */
     if(P.noChao&&!running&&P.y-ground(ox,oz)>2.2&&chaoEm(P.x,P.z,P.y)<P.y-1.2){P.x=ox;P.z=oz;P.vx*=0.2;P.vz*=0.2;dica('beirada','corpo','Beirada! Andando você não cai. Para saltar daqui, corra ou pule.');}}
@@ -172,10 +172,10 @@ function updatePlayer(dt){const ch=P.ch;
   else if(cfg.corpo==='movimento'){if(sp>0.5)bodyT=Math.atan2(P.vx,P.vz);}
   else if(sp>0.5){bodyT=running?Math.atan2(P.vx,P.vz):P.yaw;P.giraCorpo=false;}
   else{const df=Math.abs(angDiff(P.body,P.yaw));if(df>1.1)P.giraCorpo=true;if(P.giraCorpo){bodyT=P.yaw;if(df<0.08)P.giraCorpo=false;}}
-  P.body=angLerp(P.body,bodyT,1-Math.exp(-dt*(P.acao||P.aim>0.3?16:sp>0.5?12:7)));
-  P.amp=approach(P.amp,sp>0.4?(running?1:0.75):0,dt*4);P.ph+=dt*(running?11:7.5)*(sp>0.3?1:0.25);
+  P.body=movVirar(P.body,bodyT,dt,sp);   // v10.8.1: virar com peso (68b_movimento.js)
+  P.amp=approach(P.amp,sp>0.4?(running?1:P.devagar?0.55:0.75):0,dt*4);P.ph+=dt*(running?11:P.devagar&&!P.agachado?6.2:7.5)*(sp>0.3?1:0.25);
   {const st=Math.floor(P.ph/Math.PI);if(st!==P.passoN){P.passoN=st;if(sp>0.6&&P.noChao){const agua=naAgua(P.x,P.y,P.z),ri=agua?null:roadInfo(P.x,P.z),sup=agua?'agua':dentroCidade(P.x,P.z,-2)?'asf':ri.road&&ri.d<ri.road.w/2?(ri.road.cor==='asfalto'?'asf':'terra'):'grama';
-      sfx('passo',undefined,undefined,agua?(running?0.7:0.45):running?0.5:P.agachado?0.1:0.26,sup);if(agua){barulho(P.x,P.z,running?13:P.agachado?4:8,true,P.y);dica('agua','corpo','Na água você anda devagar e cada passo faz barulho. Agachado faz menos. Mais fundo, você nada.');}}}}
+      sfx('passo',undefined,undefined,agua?(running?0.7:0.45):running?0.5:P.agachado||P.devagar?0.1:0.26,sup);if(agua){barulho(P.x,P.z,running?13:P.agachado?4:8,true,P.y);dica('agua','corpo','Na água você anda devagar e cada passo faz barulho. Agachado faz menos. Mais fundo, você nada.');}}}}
   if(running&&sp>2)barulho(P.x,P.z,9,true);
   // mira
   const d=selDef();P.aim=approach(P.aim,((IN.aim&&d&&(d.fogo||d.arco||d.arremesso))||(P.acao&&P.acao.tipo==='arco'))?1:0,dt*(P.acao&&P.acao.tipo==='arco'?9:6));
@@ -410,9 +410,9 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
         let slow=1;for(const ob of OB){if((ob.tipo==='estacas'||ob.tipo==='espetosFerro')&&d2(ob.x,ob.z,z.x,z.z)<2.2){const dx2=z.x-ob.x,dz2=z.z-ob.z,lx=dx2*ob.col.c-dz2*ob.col.s,lz=dx2*ob.col.s+dz2*ob.col.c;
           if(Math.abs(lx)<1.05&&Math.abs(lz)<0.6){const fe=ob.tipo==='espetosFerro';slow=fe?0.35:0.45;z.hp-=(fe?26:14)*dt;z.flash=0.05;ob.hp-=(fe?3:6)*dt;if(ob.hp<=0)destruirObra(ob);if(z.hp<=0){z.vivo=false;z.st='morrendo';z.t=0;G.kills++;zMorreu(z);}}}
           else if(ob.tipo==='arame'&&d2(ob.x,ob.z,z.x,z.z)<3.2)slow=Math.min(slow,arameZumbi(z,ob,dt));}
-        const v=spd*slow*zVelAgua(z);z.x+=(dx*v+sx*1.5)*dt;z.z+=(dz*v+sz*1.5)*dt;
-        ch.yaw=angLerp(ch.yaw,Math.atan2(dx,dz),1-Math.exp(-dt*7));z.ph+=dt*v*3.2;
-        const hit=collide(z,S.r*(ch.s||1),c=>c.solid);
+        const v=spd*slow*zVelAgua(z),mv=zPasso(z,dx,dz,v,dt);z.x+=(mv[0]+sx*1.5)*dt;z.z+=(mv[1]+sz*1.5)*dt;   // v10.8.1: jeito de andar e inércia (68b_movimento.js)
+        ch.yaw=angLerp(ch.yaw,Math.atan2(mv[2],mv[3]),1-Math.exp(-dt*7));z.ph+=dt*mv[4]*3.2;
+        const zcx=z.x,zcz=z.z,hit=collide(z,S.r*(ch.s||1),c=>c.solid);zParede(z,zcx,zcz);
         if(hit&&(hit.obra||hit.porta)&&(z.st==='caca'||z.st==='marcha'||z.st==='alerta'||(z.st==='derruba'&&!(hit.obra&&hit.obra.tipo==='pilar'&&hit.obra!==z.obra)))){if(z.st==='derruba')z.derrubando=true;z.st='quebra';z.obra=hit.obra||hit.porta;z.t=0;}
         z.stuck+=dt;if(z.stuck>1.2){const mv=Math.hypot(z.x-z.lastX,z.z-z.lastZ);if(mv<0.25&&z.desvio<=0&&!z.lan){z.desvio=0.9;z.desvioS=Math.random()<0.5?-1:1;}z.stuck=0;z.lastX=z.x;z.lastZ=z.z;}}}
     else if(z.st==='atordoado')collide(z,S.r*(ch.s||1),c=>c.solid);
