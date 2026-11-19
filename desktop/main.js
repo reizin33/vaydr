@@ -235,12 +235,12 @@ function falhar(e) { rel.ok = false; rel.excecao = String((e && e.stack) || e); 
 const INFO_GL = "(()=>{const c=document.createElement('canvas'),gl=c.getContext('webgl2');if(!gl)return{webgl2:false};const d=gl.getExtension('WEBGL_debug_renderer_info');"
   + "return{webgl2:true,placa:d?gl.getParameter(d.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER),falha3D:!document.getElementById('falha').hidden,"
   + "fonte:document.fonts?[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family+' '+f.weight).slice(0,12):[],tela:[innerWidth,innerHeight]};})()";
-// a cópia automática do save (saves.js) existe e é a mesma gravação (salvoEm) que a página tem
+// a cópia automática do save (saves.js) existe e é a gravação que a página tem, ou uma mais nova (o "baixar a cópia" salva de novo logo depois)
 function arquivoSave(salvoEm) {
   try {
     const pasta = saves().pasta(); if (!pasta) return { ok: false, motivo: 'sem pasta' };
     const arq = path.join(pasta, 'nnc_jogo_v1.json'), t = fs.readFileSync(arq, 'utf8'), s = JSON.parse(t);
-    return { ok: !!salvoEm && s.salvoEm === salvoEm, pasta, bytes: t.length, salvoEm: s.salvoEm, esperado: salvoEm || null, lista: saves().listar().map((q) => q.chave) };
+    return { ok: !!salvoEm && s.salvoEm >= salvoEm, pasta, bytes: t.length, salvoEm: s.salvoEm, esperado: salvoEm || null, lista: saves().listar().map((q) => q.chave) };
   } catch (e) { return { ok: false, erro: String((e && e.message) || e) }; }
 }
 const FPS = "new Promise(r=>{let n=0;const t0=performance.now();const f=()=>{n++;const dt=performance.now()-t0;if(dt<6000)requestAnimationFrame(f);else r(Math.round(n/(dt/1000)*10)/10);};requestAnimationFrame(f);})";
