@@ -9,7 +9,7 @@
 import sys, os; sys.path.insert(0, os.path.dirname(__file__))
 from vt import *
 s = inicio("X('FAUNA_POP').ativosMax=0;")
-s += [js("vivo();X('BICHOS').length=0;Z.length=0;G.hora=10;window.__cadaPasso=()=>{const n=__nnc;n.P.fome=100;n.P.sede=100;if(window.__imortal)n.P.vida=100;if(window.__semZ)n.Z.length=0;};window.__semZ=true;")]
+s += [js("vivo();X('BICHOS').length=0;Z.length=0;G.hora=10;window.__cadaPasso=()=>{const n=__nnc;n.P.fome=100;n.P.sede=100;if(window.__imortal)n.P.vida=1e6;else if(n.P.vida>1000)n.P.vida=100;if(window.__semZ)n.Z.length=0;};window.__semZ=true;")]
 # 1 Liga com
 s += [ev("liga", "const h=X('ligaHtml'),txt=id=>{const d=document.createElement('div');d.innerHTML=h(id);return d.textContent;};"
          "const I=X('ligaIndice')(),ids=['fusivel','fio','fita','pregos','gasolina','bandagem','sucata','municao9'];"
