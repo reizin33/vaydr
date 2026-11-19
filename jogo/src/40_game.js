@@ -107,7 +107,8 @@ function updateCamera(dt){const asp=W/H,first=cfg.cam==='1';
     // dentro de prédio (corredor, escada): a câmera chega mais perto e mais para trás do ombro, devagar, sem ficar batendo nas paredes
     {const dentro=P.y>-20&&!!salaEm(P.x,P.y+0.4,P.z);camIn+=((dentro?1:0)-camIn)*(1-Math.exp(-dt*3));}
     /* v10.3.2: mais perto do ombro (3,6 → 3,1 m) e sem o sobe e desce do passo (dava enjoo e parecia a câmera atrasada) */
-    const dist=lerp(lerp(3.1,2.5,aimK)*(cfg.camDist||1),lerp(2.2,1.9,aimK),camIn),side=lerp(lerp(0.5,0.68,aimK),0.42,camIn);
+    const dist=lerp(lerp(3.1,2.5,aimK)*(cfg.camDist||1),lerp(2.2,1.9,aimK),camIn),side=lerp(lerp(0.5,0.68,aimK),0.42,camIn)*(cfg.camLado??1);   // v10.5.0: Ajustes > Jogo > Lado da câmera (1 direita, 0 meio, -1 esquerda)
+   
     const alvo=[P.x+rx*side,P.y+lerp(1.62,1.15,P.agK||0)+Math.sin(P.ph*2)*0.006*P.amp,P.z+rz*side];
     if(!camPiv||Math.hypot(alvo[0]-camPiv[0],alvo[2]-camPiv[2])>3)camPiv=alvo.slice();else{const kp=1-Math.exp(-dt*24);for(let i=0;i<3;i++)camPiv[i]+=(alvo[i]-camPiv[i])*(i===1?kp*0.7:kp);}
     // teto suavizado: desce na hora (não atravessa a laje) e sobe devagar (na escada o teto muda a cada degrau e a câmera pulava)
@@ -339,6 +340,7 @@ function updateZombies(dt){const ag=(P.agK||0)>0.5,vis=zVisao()*(ag?0.6:1);let h
       if(k>=1){z.sink=0;z.st='caca';z.viu=0;z.lx=P.x;z.lz=P.z;if(ch.sk)skParar(ch,5);}continue;}
     if(dp>120&&!z.noturno){ch.vis=false;continue;}
     ch.vis=dp<100;
+    if(z.st==='derrubado'){zDerrubadoPasso(z,dt);continue;}   // v10.5.0 (64b_combate.js): no chão depois da voadora ou do golpe pesado
     if(z.st==='dorme'){   // emboscada: parada no escuro até alguém chegar perto, fazer barulho ou bater nela
       if(z.ouvir){z.ouvir.t-=dt;if(z.ouvir.t<=0){z.st='alerta';z.ax=z.ouvir.x;z.az=z.ouvir.z;z.ay=z.ouvir.y;z.ouvir=null;ch.pitch=0;}}
       if(z.st==='dorme'&&!z.lan&&P.alive&&((dp<(ag?2.0:3.6)&&Math.abs(P.y-z.y)<2)||z.flash>0)){z.st='caca';z.viu=0;z.lx=P.x;z.lz=P.z;z.ly=P.y;ch.pitch=0;sfx('ataqueZ',z.x,z.z,1,z.tipo);}
