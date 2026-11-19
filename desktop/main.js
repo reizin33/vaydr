@@ -382,7 +382,7 @@ if (SMOKE === 'versao') {
       iniciarAtualizacao();
       return;   // este teste não precisa da janela do jogo
     }
-    if (SMOKE) setTimeout(() => { rel.ok = false; rel.motivo = 'tempo esgotado'; escrever(); app.exit(3); }, 14 * 60 * 1000);   // o passo do GitHub espera até 15
+    if (SMOKE) setTimeout(() => { rel.ok = false; rel.motivo = 'tempo esgotado'; escrever(); app.exit(3); }, 23 * 60 * 1000);   // o passo do GitHub espera até 25 (10.7.0: o Windows da nuvem às vezes leva 7 min só para o menu)
     criarJanela();
     iniciarAtualizacao();
   });

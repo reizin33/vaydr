@@ -107,7 +107,7 @@ jobs:
           New-Item -ItemType Directory -Force $env:VAYDR_TESTE_SAIDA | Out-Null
           $p = Start-Process -FilePath "desktop\dist\win-unpacked\VAYDR.exe" -ArgumentList "--smoke=1" -PassThru
           $null = $p.Handle
-          if (-not $p.WaitForExit(900000)) { $p.Kill(); throw "o jogo não fechou em 15 minutos" }
+          if (-not $p.WaitForExit(1500000)) { $p.Kill(); throw "o jogo não fechou em 25 minutos" }
           Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-1.json" -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { throw "teste 1 falhou (código $($p.ExitCode))" }
 
@@ -119,7 +119,7 @@ jobs:
         run: |
           $p = Start-Process -FilePath "desktop\dist\win-unpacked\VAYDR.exe" -ArgumentList "--smoke=2" -PassThru
           $null = $p.Handle
-          if (-not $p.WaitForExit(900000)) { $p.Kill(); throw "o jogo não fechou em 15 minutos" }
+          if (-not $p.WaitForExit(1500000)) { $p.Kill(); throw "o jogo não fechou em 25 minutos" }
           Get-Content "$env:VAYDR_TESTE_SAIDA\relatorio-2.json" -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { throw "teste 2 falhou (código $($p.ExitCode))" }
 
