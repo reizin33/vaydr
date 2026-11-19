@@ -268,6 +268,11 @@ float lum=dot(al,vec3(0.3,0.59,0.11));if(abs(nf.y)<0.3&&lum>0.2){float k2=1.0-sm
   float st=texture(uNoise,vec2(q.x*0.75,q.y*0.045)).r,um=texture(uNoise,q*0.05+3.7).r;
   float suj=smoothstep(0.48,0.86,st)*0.4+smoothstep(0.55,0.8,um)*0.2;al*=(1.0-suj*smoothstep(0.2,0.42,lum)*k2)*mix(1.0,0.8,smoothstep(0.45,0.8,lum));}
 #ifndef SKIN
+/* v10.8.5: o pé das paredes da cidade fica sujo (respingo da chuva e terra), mais escuro até 1,3 m da calçada, com a borda irregular */
+if(abs(nf.y)<0.3&&vInt<0.5&&vW.x>172.0&&vW.x<336.0&&vW.z>-84.0&&vW.z<94.0){float hb=vW.y-0.15;if(hb<1.6){float pe=1.0-smoothstep(0.0,1.3,hb+(texture(uNoise,vec2(q.x*0.6,0.37)).r-0.5)*0.6);
+  pe*=1.0-smoothstep(70.0,170.0,dd);al*=1.0-0.3*pe;al=mix(al,al*vec3(0.94,0.9,0.82),pe*0.6);}}
+#endif
+#ifndef SKIN
 /* Etapa 21 (gráficos Alto e Ultra): relevo pelo ruído (luz rasante mostra a textura), tijolo com argamassa, folha, casca e pedra */
 if(uDetail>1.5&&k>0.01&&!tab){float mx2=max(al.r,max(al.g,al.b)),sat2=mx2-min(al.r,min(al.g,al.b)),lm2=dot(al,vec3(0.3,0.59,0.11));
   bool tij=al.r>al.g*3.2&&al.r>al.b*5.0&&abs(nf.y)<0.4&&lm2<0.42,verde=al.g>al.r*1.05&&al.g>al.b*1.15,cinza=sat2<0.06&&lm2<0.5;

@@ -20,6 +20,7 @@
 const CA={ok:false,erro:null,info:null,casas:[],predios:[],ruas:[],largos:[],obbs:[],pontos:[],saques:[],chunks:[],rampas:[],telhaZ:[],postes:[],bancos:[],
   caixa:{x0:190,x1:330,z0:-240,z1:-84},plano:null,igreja:null,seed:67100,conferir:false};
 let CALTA_LIGADO=false;
+let CA_BONDE_MOVEL=false;   // v10.8.6: o bondinho anda (68j_bonde) e é desenhado lá, fora dos pedaços do bairro
 const CA_COR={fachada:[0xe0b84a,0x6fa8c8,0xd88a9a,0x7fb07a,0xa890c0,0xd8884a,0xe8e2d4,0xc8584a,0x5ab0a8,0xe8d8a8,0xb8c870,0xe8a0a0,0xd8c060,0x88b8d8],
   moldura:[0xf0ece0,0xe8e0c8,0xf4f0e8],janela:[0x2f5a3a,0x3d5a73,0x6b4a32,0x7a2a22,0x2a3a5a,0x5a6a3a],porta:[0x3a2a1a,0x2f5a3a,0x3d5a73,0x6b2a22,0x4a3424],
   telha:[0x9a4a2e,0x8a4428,0xa65838,0x7e3e26,0x94502e],cumeeira:0x6a3020,pedra:0x9a958a,pedraEsc:0x7d786e,vidro:0x15171a,ferro:0x1e2022,calcada:0xb8b2a4};
@@ -456,7 +457,7 @@ function caGeoPredio(p,R){const ch=caCh((p.x0+p.x1)/2,(p.z0+p.z1)/2),M=mat(p.ox,
   if(p.casa){const hr=1.5;add(ch.gL,roofTris(p.D+0.9,hr,p.W+0.8),mm(M,mat(p.W/2,p.yTopo,p.D/2,0,Math.PI/2,0)),lin((p.cores||CID_COR.casa)[3]));}}
 /* ---------- o plano inclinado: o bondinho, a bilheteria de baixo e a cobertura de cima ---------- */
 function caGeoPlano(R){const pl=CA.plano;if(!pl)return;const Rp=pl.R,c=pl.carro,ch=caCh(c.x,c.z);
-  {const M=mat(c.x,c.y+0.35,c.z,c.inc,0,0),cor=0xc8a428,cor2=0x2a5a8a;
+  if(!CA_BONDE_MOVEL){const M=mat(c.x,c.y+0.35,c.z,c.inc,0,0),cor=0xc8a428,cor2=0x2a5a8a;
     add(ch.gB,boxTris(c.W,0.3,c.L),mm(M,mat(0,0.15,0)),lin(0x3a3e40));
     for(let k=0;k<3;k++){const z0=-c.L/2+k*c.L/3,yk=0;add(ch.gB,boxTris(c.W,c.H,c.L/3-0.04),mm(M,mat(0,0.3+c.H/2+yk,z0+c.L/6)),lin(k===1?cor:cor),{j:0.04,rnd:R});
       for(const sd of[-1,1])add(ch.gD,boxTris(0.03,0.8,c.L/3-0.5),mm(M,mat(sd*(c.W/2+0.01),0.3+c.H*0.62+yk,z0+c.L/6)),lin(0x1a1e22));

@@ -29,8 +29,15 @@ function movVirar(b,bt,dt,sp){const M=MOV_PESO;
   if(sp>0.5)return angLerp(b,bt,1-Math.exp(-dt*M.vira));
   const lim=M.giroMax*dt;return b+clamp(angDiff(b,bt)*(1-Math.exp(-dt*M.viraParado)),-lim,lim);}
 
-/* velocidade: pouso amortecido e andar devagar */
-function movFatorVel(running){let f=1;
+/* rampa: subindo (ladeira, escadaria, morro) você vai mais devagar e cansa mais; descendo, um pouco mais rápido (v10.8.5).
+   Mede o chão 0,7 m à frente na direção em que você anda (o chão das escadas e rampas conta); buraco ou beirada à frente não conta. */
+let MOV_RAMPA=0;
+function movRampa(){if(!P.noChao||P.voo||!MOV_PESO.incl){MOV_RAMPA*=0.8;return 1;}const sp=Math.hypot(P.vx||0,P.vz||0);if(sp<0.5){MOV_RAMPA*=0.8;return 1;}
+  const fx=P.vx/sp,fz=P.vz/sp,y1=chaoEm(P.x+fx*0.7,P.z+fz*0.7,P.y+0.6);if(!isFinite(y1)||P.y-y1>1.0){MOV_RAMPA*=0.8;return 1;}
+  MOV_RAMPA+=(clamp((y1-P.y)/0.7,-1,1)-MOV_RAMPA)*0.2;
+  return MOV_RAMPA>0?1-Math.min(0.28,MOV_RAMPA*0.45):1+Math.min(0.06,-MOV_RAMPA*0.12);}
+/* velocidade: pouso amortecido, andar devagar e rampa */
+function movFatorVel(running){let f=movRampa();
   if(P.amortece>0)f*=1-0.5*clamp(P.amortece/0.3,0,1);
   if(P.devagar&&!running&&!P.agachado)f*=MOV_DEVAGAR/4.2;
   return f;}
@@ -52,7 +59,7 @@ function movInclinar(dt){const ch=P.ch,M=MOVI;if(!ch)return;
 
 {const _up=updatePlayer;updatePlayer=function(dt){movPesoAplicar();
   const r=_up.apply(this,arguments);
-  try{P.amortece=Math.max(0,(P.amortece||0)-dt);movInclinar(dt);}catch(e){console.error('movimento',e);}
+  try{P.amortece=Math.max(0,(P.amortece||0)-dt);movInclinar(dt);if(P.correndo&&MOV_RAMPA>0.12)P.energia=Math.max(0,P.energia-dt*MOV_RAMPA*5);}catch(e){console.error('movimento',e);}
   return r;};}
 
 /* pouso de lugar alto: o corpo amortece e perde velocidade por um instante (o pulo normal não conta) */

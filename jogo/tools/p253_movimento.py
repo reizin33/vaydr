@@ -45,6 +45,15 @@ s += [js("n.cfg.movimento='agil';P.yaw=P.body=window.__yaw0+Math.PI;P.energia=10
       ["up", "w"], ["up", "Shift"], ["gwait", 0.8],
       ev("agilParada", CORTA + "let i0=r.findIndex(q=>q[1]<6.6);if(i0<0)i0=0;const t0=r[i0][0];let tp=null;for(let i=i0;i<r.length;i++)if(tp===null&&r[i][1]<0.3)tp=r[i][0]-t0;return{tPara:tp===null?null:r2(tp)};"),
       js("n.cfg.movimento='realista';")]
+# 6b rampa: subir correndo a Escadaria do Sabiá (inclinação ~0,5) é mais devagar; descer, um pouco mais rápido
+s += [js("const E=X('MOR').escadas.find(q=>q.nome==='Escadaria do Sabiá');window.__E=E;vai(E.x,E.z0+1.5,E.yEm(E.z0+1.5)+0.02);P.yaw=P.body=0;P.energia=100;" + CORTA),
+      ["down", "Shift"], ["down", "w"], ["gwait", 2.0],
+      ev("subida", CORTA + "const q=r.slice(-12),dt=q[q.length-1][0]-q[0][0],d=Math.hypot(q[q.length-1][9]-q[0][9],q[q.length-1][10]-q[0][10]);return{vel:r2(d/Math.max(dt,0.01)),y:r2(P.y),rampa:r2(X('MOV_RAMPA')),energia:Math.round(P.energia)};"),
+      ["up", "w"], ["up", "Shift"], ["gwait", 0.6],
+      js("const E=window.__E;vai(E.x,E.z1-2.5,E.yEm(E.z1-2.5)+0.02);P.yaw=P.body=Math.PI;P.energia=100;" + CORTA),
+      ["down", "Shift"], ["down", "w"], ["gwait", 2.0],
+      ev("descida", CORTA + "const q=r.slice(-12),dt=q[q.length-1][0]-q[0][0],d=Math.hypot(q[q.length-1][9]-q[0][9],q[q.length-1][10]-q[0][10]);return{vel:r2(d/Math.max(dt,0.01)),y:r2(P.y),rampa:r2(X('MOV_RAMPA'))};"),
+      ["up", "w"], ["up", "Shift"], ["gwait", 0.8]]
 # 7 zumbis caçando
 s += [js("window.__cadaPasso=(dt)=>{const P=__nnc.P;P.fome=100;P.sede=100;P.vida=100;const R=window.__zrec;if(!R)return;for(const z of __nnc.Z){const a=R[z.id];if(a&&a.length<2000)a.push([__nnc.G.t,z.x,z.z,z.ch.yaw,z.ch.pitch,dt]);}};"
          "Z.length=0;P.invul=999;const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw),rx=-Math.cos(P.yaw),rz=Math.sin(P.yaw);window.__zrec={};"
