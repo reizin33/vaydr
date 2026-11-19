@@ -54,7 +54,8 @@ function comecarVoadora(){if(P.acao||P.cd>0||!P.alive||!P.noChao||P.energia<CB.v
   /* empurrão: marca quem foi empurrado (golpe logo depois derruba) */
   if(a.tipo==='empurrar'&&a.hit&&!a.pkMarcou){a.pkMarcou=true;for(const z of Z)if(z.vivo&&z.st==='atordoado'&&Math.hypot(z.x-P.x,z.z-P.z)<2.6)z.empT=G.t;}
   if(a.tipo==='voadora'&&!a.hit&&a.t>=0.16){const fx=Math.sin(a.mira),fz=Math.cos(a.mira);let n=0;
-    for(const z of Z){if(!z.vivo||z.lan||Math.abs(z.y-P.y)>1.6)continue;const dx=z.x-P.x,dz=z.z-P.z,dd=Math.hypot(dx,dz);
+    for(const z of Z){if(!z.vivo||(z.lan&&!(typeof LAN!=='undefined'&&LAN.on))||Math.abs(z.y-P.y)>1.6)continue;   // v10.7.1: na partida em rede o convidado acerta os bonecos (64e)
+      const dx=z.x-P.x,dz=z.z-P.z,dd=Math.hypot(dx,dz);
       if(dd<2.5&&(dx*fx+dz*fz)/(dd||1)>0.35){const l=dd||1;ZHIT={k:'voadora'};ferirZ(z,12,dx/l*0.8,dz/l*0.8,1);
         if(z.vivo&&!derrubarZ(z,dx/l*5.5,dz/l*5.5)){z.st='atordoado';z.t=Math.max(z.t||0,0.7);z.kx=dx/l*2.5;z.kz=dz/l*2.5;}n++;}}
     if(n){a.hit=true;sfx('impacto');P.shake=0.45;G.hitstop=Math.max(G.hitstop||0,0.09);P.vx*=0.35;P.vz*=0.35;}
