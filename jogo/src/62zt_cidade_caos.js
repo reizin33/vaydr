@@ -246,10 +246,10 @@ function caosChao(g){const R=rng(60606),N={manchas:0,rachaduras:0,crateras:0},qu
   for(const r of RUAS_EW)meioFio(r.z,CIDADE.x0+3,CIDADE.x1-3,r.a,true);for(const r of RUAS_NS)meioFio(r.x,CIDADE.z0+3,CIDADE.z1-3,r.a,false);
   for(let i=0;i<150;i++){const x=CIDADE.x0+3+R()*(CIDADE.x1-CIDADE.x0-6),z=CIDADE.z0+3+R()*(CIDADE.z1-CIDADE.z0-6),r=1.0+R()*1.9;if(!ok(x,z,r*0.6))continue;
     caosMancha(g,x,z,r,R()<0.25?queim[Math.floor(R()*3)]:terra[Math.floor(R()*terra.length)],{R,ax:0.7+R()*0.8,az:0.7+R()*0.8,rot:R()*3});N.manchas++;}
-  const rach=lin(0x0f0f0e);
+  const rach=lin(0x1e1d1b);   // v10.8.3: cinza-escuro (antes quase preto)
   for(let i=0;i<300;i++){let x=CIDADE.x0+R()*(CIDADE.x1-CIDADE.x0),z=CIDADE.z0+R()*(CIDADE.z1-CIDADE.z0);if(!asf(x,z))continue;let a=R()*6.283;const segs=3+Math.floor(R()*6);
-    for(let k=0;k<segs;k++){const L=0.6+R()*1.5;a+=(R()-0.5)*1.3;const x2=x+Math.cos(a)*L,z2=z+Math.sin(a)*L;if(!asf(x2,z2))break;
-      add(g,boxTris(0.05+R()*0.07,0.01,L+0.05),mat((x+x2)/2,0.046,(z+z2)/2,0,Math.atan2(x2-x,z2-z),0),rach);x=x2;z=z2;}N.rachaduras++;}
+    for(let k=0;k<segs*2;k++){const L=0.3+R()*0.75;a+=(R()-0.5)*1.6;const x2=x+Math.cos(a)*L,z2=z+Math.sin(a)*L;if(!asf(x2,z2))break;   // v10.8.3: finas e tortas (antes listras grossas)
+      add(g,boxTris(0.016+R()*0.022,0.01,L+0.03),mat((x+x2)/2,0.046,(z+z2)/2,0,Math.atan2(x2-x,z2-z),0),rach);x=x2;z=z2;}N.rachaduras++;}
   for(let i=0;i<80&&N.crateras<7;i++){const ew=R()<0.6,rr=ew?RUAS_EW[Math.floor(R()*3)]:RUAS_NS[Math.floor(R()*3)],t=(ew?CIDADE.x0:CIDADE.z0)+12+R()*((ew?CIDADE.x1-CIDADE.x0:CIDADE.z1-CIDADE.z0)-24),
       off=(R()-0.5)*(rr.a-2.2)*2,x=ew?t:(rr.x+off),z=ew?(rr.z+off):t;if(!asf(x,z)||Math.abs(z-8)<6.6||!caosLivre(x,z,2.8)||caosEvita(x,z,4))continue;
     caosMancha(g,x,z,2.8+R()*0.5,lin(0x1d1b19),{R,n:14});caosMancha(g,x,z,1.8+R()*0.5,lin(0x0c0b0a),{R,n:14,dy:0.004});   // a borda chamuscada e o buraco

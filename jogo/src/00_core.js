@@ -289,11 +289,14 @@ if(uDetail>1.5&&k>0.01&&!tab){float mx2=max(al.r,max(al.g,al.b)),sat2=mx2-min(al
 if(txt&&uUseTex<1.5){float mx3=max(al.r,max(al.g,al.b)),sat3=mx3-min(al.r,min(al.g,al.b)),lm3=dot(al,vec3(0.3,0.59,0.11));float mt=(1.0-smoothstep(0.03,0.08,sat3/max(mx3,0.02)*0.25+sat3))*smoothstep(0.012,0.05,lm3);spc=mix(0.05,0.32,mt);shn=mix(16.0,48.0,mt);}
 /* chuva: o que está ao ar livre molha (escurece e brilha), mais nas faces para cima */
 if(uWet>0.01&&vInt<0.5){float up=smoothstep(0.2,0.9,nf.y);al*=1.0-uWet*0.22*up;spc=max(spc,uWet*0.4*(0.35+0.65*up));shn=max(shn,48.0);n=normalize(mix(n,nf,uWet*0.85*up));}   /* a água enche o relevo: superfície molhada fica lisa */
+/* v10.8.3: poças na chuva (chão plano ao ar livre): mais escuras, lisas, com o brilho do sol e um pouco do céu refletido */
+float pd=0.0;if(uWet>0.05&&vInt<0.5&&nf.y>0.97){pd=smoothstep(0.56,0.72,texture(uNoise,vW.xz*0.05+vec2(5.3,1.7)).r)*smoothstep(0.97,0.995,nf.y)*smoothstep(0.05,0.6,uWet);
+  al=mix(al,al*0.3,pd);spc=max(spc,pd*1.1);shn=max(shn,mix(48.0,300.0,pd));n=normalize(mix(n,vec3(0.0,1.0,0.0),pd));}
 gInt=clamp(vInt,0.0,1.0);vec3 L=luz(vW,n);
 #ifdef SKIN
 L+=uRim*pow(1.0-abs(dot(n,normalize(uCam-vW))),3.0)*(1.0-gInt);
 #endif
-{vec3 Vv=normalize(uCam-vW),Hh=normalize(Vv+uDirD);float sp=pow(max(dot(n,Hh),0.0),shn)*spc*gSh*(1.0-gInt)*smoothstep(0.0,0.15,dot(n,uDirD));al*=1.0;o=acabar(al*L+uDirC*sp*(shn+8.0)/40.0+al*e*uEmis,vW,e);}}`;
+{vec3 Vv=normalize(uCam-vW),Hh=normalize(Vv+uDirD);float sp=pow(max(dot(n,Hh),0.0),shn)*spc*gSh*(1.0-gInt)*smoothstep(0.0,0.15,dot(n,uDirD));al*=1.0;o=acabar(al*L+uDirC*sp*(shn+8.0)/40.0+al*e*uEmis+(uFog*0.45+vec3(0.006,0.008,0.012))*pd*0.3*pow(1.0-max(dot(n,Vv),0.0),4.0),vW,e);}}`;
 /* terreno: normais suaves e texturas procedurais (grama, terra, asfalto com faixa, concreto, rocha nas encostas) */
 const TER_VS=`layout(location=0) in vec3 aPos;layout(location=1) in vec3 aNrm;layout(location=2) in vec4 aCol;
 uniform mat4 uViewProj;out vec3 vW,vN;out vec4 vC;
