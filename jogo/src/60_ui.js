@@ -165,7 +165,7 @@ function fabDetalhe(){const el=$('fab-info'),r=RECIPES[fabSel];if(!r){el.innerHT
    h+='<span class="rot-grade">Resultado</span>'+statsItem(qs!==null&&(d.tipo==='roupa'||d.qual)?{id:r.faz,q:qs,dur:durMaxDe({id:r.faz,q:qs})}:null,d)+'<p class="det-nota">'+svgUse('i-relogio')+'<span>Tempo: na hora'+(qs!==null&&(d.tipo==='roupa'||d.qual)?' · qualidade esperada: '+QUAL_NOME[qs].toLowerCase()+' (usa o seu melhor material)':'')+'</span></p>';}
   if(r.ferramenta){const ok=ferramentaOk(r);h+='<div class="req '+(ok?'ok':'falta')+'">'+svgUse('i-faca')+'<span>Precisa de lâmina</span><b class="n">'+(ok?'Sim':'Não')+'</b></div>';}
   const pode=podeFabricar(r);
-  if(pode)h+='<div class="fab-qtd"><span class="rot">Quantidade</span><button type="button" data-qtd="-1" aria-label="Menos"'+(fabQtd<=1?' disabled':'')+'>−</button><span class="n">'+fabQtd+'</span>'+
+  if(pode)h+='<div class="fab-qtd"><span class="rot" title="Quantidade">Qtd.</span><button type="button" data-qtd="-1" aria-label="Menos"'+(fabQtd<=1?' disabled':'')+'>−</button><span class="n">'+fabQtd+'</span>'+
     '<button type="button" data-qtd="1" aria-label="Mais"'+(fabQtd>=qMax?' disabled':'')+'>+</button><button type="button" class="max" data-qtd="max"'+(fabQtd>=qMax?' disabled':'')+'>Máx · '+qMax+'</button></div>';
   h+='<button class="btn prim grande" type="button" data-fab="'+fabSel+'"'+(pode?'':' disabled')+'>Fabricar'+(pode&&fabQtd>1?' × '+fabQtd:'')+'</button>';
   if(!pode&&st!=='travada'){const m=motivoFalta(r);if(m)h+='<p class="msg-falta">'+m+'</p>';}

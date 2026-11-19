@@ -734,6 +734,8 @@ input[type=range]{width:100%;accent-color:var(--ember)}
 .tile>.ico3d{width:46px;height:46px}
 .req .ico3d{width:24px;height:24px}
 .det-ico small{position:absolute;left:8px;bottom:6px;font:700 10px/1 var(--f-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--ash)}
+/* telas baixas (720p, 768p): ícone menor e menos espaço, para o botão Fabricar caber sem rolar (v10.4.1; abaixo de 520 px valem as regras de lá) */
+@media (max-height:820px){.detalhe{gap:8px}.det-ico{height:64px}.det-ico .ico{width:40px;height:40px}.det-ico .ico3d{width:58px;height:58px}}
 .detalhe h4{margin:12px 0 0;font:800 17px/1.1 var(--f-ui)}
 .detalhe p{margin:0;font:600 13.5px/1.4 var(--f-ui);color:var(--ash)}
 .detalhe .msg-falta{color:#ff9b7a;font-weight:700}
@@ -755,9 +757,10 @@ input[type=range]{width:100%;accent-color:var(--ember)}
 .chip-e.e1{color:var(--moss);border-color:rgba(151,199,110,.5)}.chip-e.e2{color:var(--grain);border-color:rgba(232,171,67,.5)}.chip-e.e3{color:var(--ember);border-color:rgba(255,138,61,.55)}
 .chip-e.nova{background:var(--moss-wash);color:var(--moss);border-color:rgba(151,199,110,.5)}
 .reqs{display:grid;gap:5px}
-.fab-qtd{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 4px}
-/* "Quantidade" numa linha e os botões embaixo (v10.4.1): na coluna de 250 px a linha inteira não cabia e empurrava o painel, cortando o texto da direita */
-.fab-qtd .rot{flex:1 0 100%;min-width:0;margin-bottom:2px;font:800 11px/1 var(--f-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--bone);opacity:.75}
+.fab-qtd{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:12px 0 4px}
+/* v10.4.1: "Qtd." no lugar de "Quantidade": na coluna de 250 px a linha inteira não cabia e alargava o painel, cortando o texto da
+   direita (descrição, materiais). Se o "Máx" tiver número grande, ele desce de linha em vez de alargar */
+.fab-qtd .rot{flex:1 1 0;font:800 11px/1 var(--f-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--bone);opacity:.75}
 .fab-qtd button{min-width:34px;height:32px;padding:0 8px;border-radius:8px;border:1px solid rgba(236,228,210,.22);background:rgba(236,228,210,.06);color:var(--bone);font:800 16px/1 var(--f-ui);cursor:pointer}
 .fab-qtd button.max{font-size:12px}
 .fab-qtd button:hover:not(:disabled){background:rgba(236,228,210,.14)}
