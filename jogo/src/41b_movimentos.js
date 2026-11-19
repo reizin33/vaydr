@@ -31,7 +31,7 @@ function alvoMuro(){if(!P.alive||CARRO.ativo||P.escala||P.muro||P.rola||!P.noCha
     // espaço livre em cima para ficar de pé, sem teto baixo
     const xs=P.x+fx*(d+0.35),zs=P.z+fz*(d+0.35),hs=chaoEm(xs,zs,h+0.1);const yTop=Math.abs(hs-h)<0.25?hs:h,px=Math.abs(hs-h)<0.25?xs:x,pz=Math.abs(hs-h)<0.25?zs:z;
     if(bloqueadoAlto(px,pz,0.26,yTop+0.06))continue;
-    if(emPredios(px,pz,2)){const teto=tetoEm(px,yTop+0.3,pz);if(teto!==null&&teto-yTop<1.75)continue;}
+    if(emPredios(px,pz,2)){const teto=tetoEm(px,yTop+0.3,pz);if(teto!==null&&teto>yTop+0.05&&teto-yTop<1.75)continue;}   // v10.5.1: em cima da laje, o forro de baixo não é teto
     return{x:px,z:pz,y:yTop,dh:yTop-P.y,yaw};}
   return null;}
 function comecarMuro(a,nome){nome=nome||(a.dh>1.75?'pendurado':'subirTopo');const C=MURO_CLIP[nome],clip=nome==='chegada'?'subirTopo':nome;

@@ -20,7 +20,7 @@ function pkBeirada(yaw,min,max,dists){const fx=Math.sin(yaw),fz=Math.cos(yaw);
     const xs=P.x+fx*(d+0.35),zs=P.z+fz*(d+0.35),hs=chaoEm(xs,zs,h+0.1),em=Math.abs(hs-h)<0.25;
     const yTop=em?hs:h,px=em?xs:x,pz=em?zs:z;
     if(bloqueadoAlto(px,pz,0.26,yTop+0.06))continue;
-    if(emPredios(px,pz,2)){const teto=tetoEm(px,yTop+0.3,pz);if(teto!==null&&teto-yTop<1.75)continue;}
+    if(emPredios(px,pz,2)){const teto=tetoEm(px,yTop+0.3,pz);if(teto!==null&&teto>yTop+0.05&&teto-yTop<1.75)continue;}
     return{x:px,z:pz,y:yTop,dh:yTop-P.y,yaw};}
   return null;}
 const pkLivre=()=>P.alive&&!CARRO.ativo&&!P.escala&&!P.muro&&!P.rola&&!P.nada&&!P.montado&&!P.balao&&!P.trilho&&!P.voo&&!P.dorme&&!(typeof OBRA!=='undefined'&&OBRA.ativo)&&P.y>-20;

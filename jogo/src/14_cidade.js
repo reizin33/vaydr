@@ -623,7 +623,7 @@ function salaEm(x,y,z){if(y<-20){const s=salaSubEm(x,y,z);if(s)return s;}if(!den
   if(y<-1){for(const s of CID.metro.partes)if(x>=s.x0&&x<=s.x1&&z>=s.z0&&z<=s.z1&&y<s.teto)return s;
     for(const a of CID.poroes){const s=a.sala,p=a.p;if(x<p.x0-0.5||x>p.x1+0.5||z<p.z0-0.5||z>p.z1+0.5)continue;const l=plc(p,x,z);if(l[0]>=s.u0-0.2&&l[0]<=s.u1+0.2&&l[1]>=s.v0-0.2&&l[1]<=s.v1+0.2)return s;}
     return null;}
-  for(const p of CID.predios){if(x<p.x0-1.4||x>p.x1+1.4||z<p.z0-1.4||z>p.z1+1.4)continue;const l=plc(p,x,z),n=p.salas.length-1;
+  for(const p of CID.predios){if(x<p.x0-1.4||x>p.x1+1.4||z<p.z0-1.4||z>p.z1+1.4)continue;if(p.lajeTopo&&y>p.yTopo-0.1)continue;const l=plc(p,x,z),n=p.salas.length-1;   // v10.5.1: em cima da laje (64c) é rua
     if(p.porao&&y<p.y0-0.5){const s=p.porao.sala;if(l[0]>=s.u0-0.2&&l[0]<=s.u1+0.2&&l[1]>=s.v0-0.2&&l[1]<=s.v1+0.2)return s;}
     const f=clamp(Math.floor((y-p.y0+0.6)/p.H),0,n),ls=p.salas[f]||[];let best=null,bd=1e9;
     for(const s of ls){if(l[0]>=s.u0-0.1&&l[0]<=s.u1+0.1&&l[1]>=s.v0-0.1&&l[1]<=s.v1+0.1)return s;const d=Math.max(s.u0-l[0],l[0]-s.u1,0)+Math.max(s.v0-l[1],l[1]-s.v1,0);if(d<bd){bd=d;best=s;}}
