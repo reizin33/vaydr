@@ -68,7 +68,7 @@ function salvarAntes() {
      maior; para o jogador continua 2,5 s (um jogo travado fecha logo) */
   return Promise.race([
     win.webContents.executeJavaScript(js, true).catch((e) => 'erro: ' + e.message),
-    new Promise((r) => setTimeout(() => r('tempo esgotado'), SMOKE ? 25000 : 2500)),
+    new Promise((r) => setTimeout(() => r('tempo esgotado'), SMOKE ? 90000 : 2500)),   // 10.5.1: 25 s não bastava (0,1 quadro por segundo)
   ]);
 }
 
