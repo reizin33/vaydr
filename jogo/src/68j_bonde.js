@@ -15,7 +15,7 @@ const BONDE={ok:false,R:null,col:null,loot:null,malha:null,estat:null,v:0,vMax:2
 const BONDE_CUSTO={fusivel:1,oleoMotor:1,fio:1};
 ATIV_TIPOS.conserto={nome:'Conserto',cor:'#c8e06a',l:'F'};
 function bondeD(){const D=ativD();if(!D.bonde||typeof D.bonde!=='object')D.bonde={ligado:false,t:null,alvo:null};const S=D.bonde;
-  if(BONDE.R&&!isFinite(S.t))S.t=BONDE.R.L*0.55;if(S.alvo!=null&&!isFinite(S.alvo))S.alvo=null;return S;}
+  if(BONDE.R&&!Number.isFinite(S.t))S.t=BONDE.R.L*0.55;if(S.alvo!=null&&!Number.isFinite(S.alvo))S.alvo=null;return S;}
 function bondePose(t){const R=BONDE.R,c=R.pt(t);return{x:c[0]+BONDE.xOff,z:c[1],y:R.yEm(t),inc:Math.atan2(R.yEm(t+2.4)-R.yEm(t-2.4),4.8)};}
 /* ponto do carro (local: x para a escadaria, y para cima, z para baixo da encosta) no mundo */
 function bondeW(q,lx,ly,lz){const c=Math.cos(q.inc),s=Math.sin(q.inc);return[q.x+lx,q.y+0.35+ly*c-lz*s,q.z+ly*s+lz*c];}

@@ -9,10 +9,10 @@ s = inicio("X('FAUNA_POP').ativosMax=0;")
 s += [js("vivo();X('BICHOS').length=0;Z.length=0;G.hora=10;window.__semZ=true;window.__cadaPasso=()=>{const n=__nnc;n.P.fome=100;n.P.sede=100;n.P.vida=Math.max(n.P.vida,80);if(window.__semZ)n.Z.length=0;};")]
 TX = "const a=X('interAtual')(),t=a&&X('INTER_K')[a.k]?X('INTER_K')[a.k].texto(a.o):null;"
 # 1 atividades por perto
-s += [js("const A=X('ABRIGOS').find(q=>q.id==='cais');vai(A.x+30,A.z,X('chaoEm')(A.x+30,A.z,A.y+3));"), ["gwait", 1.5],
+s += [js("const A=X('ABRIGOS').find(q=>q.id==='cais');vai(A.x+85,A.z,X('chaoEm')(A.x+85,A.z,A.y+3));"), ["gwait", 1.5],
       ev("pertoLonge", "const L=X('ATIV_PERTO').ids.map(q=>q.a.id);return{ids:L,visto:!!(X('ativD')().vistas||{})['abrigo-cais']};"),
       js("const A=X('ABRIGOS').find(q=>q.id==='cais');vai(A.x+8,A.z,X('chaoEm')(A.x+8,A.z,A.y+3));"), ["gwait", 2.0],
-      ev("pertoPerto", "const L=X('ATIV_PERTO').ids.map(q=>q.a.id),T=[...document.querySelectorAll('.toast p')].map(p=>p.textContent).filter(t=>/Abrigo do Cais/.test(t));"
+      ev("pertoPerto", "const L=X('ATIV_PERTO').ids.map(q=>q.a.id),T=[...document.querySelectorAll('.toast p')].map(p=>p.textContent).concat(X('toastFila').map(q=>q[1])).filter(t=>/Abrigo do Cais/.test(t));"
          "return{ids:L,visto:!!(X('ativD')().vistas||{})['abrigo-cais'],conhecida:X('ativConhecida')(X('ativTodas')().find(a=>a.id==='abrigo-cais')),toasts:T.length,txt:(T[0]||'').slice(0,140),bus:document.querySelectorAll('.bus-at').length};")]
 # 2 bondinho: montado e o conserto
 s += [ev("bondeMontado", "const B=X('BONDE'),S=X('bondeD')(),q=X('bondePose')(S.t),n0=X('COLL').filter(c=>c.calta&&c.t===1&&Math.abs(c.hw-1.1)<0.01&&Math.abs(c.hd-2.6)<0.01).length;"
@@ -40,7 +40,7 @@ s += [js("const S=X('bondeD')(),q=X('bondePose')(S.t),w=X('bondeW')(q,1.55,0,0.6
 s += [js("vai(272,-134.5,X('chaoEm')(272,-134.5,40));window.__semZ=false;Z.length=0;const B=X('BONDE'),c=B.R.pt(B.tMin+9),x=c[0]+B.xOff,y=B.R.yEm(B.tMin+9);"
          "const q=ZZ('walker',x,c[1],{y:y+0.1});if(q){q.st='vaga';window.__zb=q;}X('bondeIr')(B.tMax);"), ["gwait", 7],
       ev("empurrou", "const q=window.__zb,B=X('BONDE');return q?{x:r2(q.x),xTrilho:r2(B.R.P0[0]+B.xOff),hp:r2(q.hp),vivo:q.vivo,st:q.st}:{semZumbi:true};"),
-      js("window.__semZ=true;Z.length=0;"), ["gwait", 8],
+      js("window.__semZ=true;Z.length=0;"), ["gwait", 12],
       ev("emCima", "const S=X('bondeD')();return{t:r2(S.t),est:X('bondeEstacao')(S.t)};"),
       js("X('bondeIr')(X('BONDE').tMin);"), ["gwait", 20],
       js("const B=X('BONDE'),c=B.R.pt(B.tMax),x=B.R.P0[0]+1.5,z=c[1]-1.6;vai(x+0.6,z,X('chaoEm')(x+0.6,z,B.R.yEm(B.tMax)+2));P.yaw=-Math.PI/2;P.body=P.yaw;"), ["gwait", 0.6],

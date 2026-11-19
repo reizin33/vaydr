@@ -13,9 +13,9 @@ ITEMS.botijaoGas.acao='Pôr no chão';ITEMS.botijaoGas.acaoExtra=true;
 ITEMS.botijaoGas.desc='Botijão de gás, cheio. Alimenta o maçarico do balão (uns 3 minutos de chama cada) e vira armadilha: posto no chão, um tiro faz explodir.';
 function botiD(){const D=ativD();if(!D.botijoes||typeof D.botijoes!=='object')D.botijoes={st:{},soltos:[]};const S=D.botijoes;if(!S.st||typeof S.st!=='object')S.st={};if(!Array.isArray(S.soltos))S.soltos=[];return S;}
 /* os da cidade (fixos, com estado salvo) e os que o jogador pôs no chão */
-function botiTodos(){const S=botiD(),L=[];for(const b of BOTI.lista)if(!S.st[b.id])L.push(b);for(const b of S.soltos)if(b&&isFinite(b.x))L.push(b);return L;}
+function botiTodos(){const S=botiD(),L=[];for(const b of BOTI.lista)if(!S.st[b.id])L.push(b);for(const b of S.soltos)if(b&&Number.isFinite(b.x))L.push(b);return L;}
 function botiMontar(){if(BOTI.ok)return;BOTI.ok=true;const R=rng(55331),L=BOTI.lista;
-  const poe=(x,z,yRef)=>{if(!isFinite(x)||!isFinite(z)||pointBlocked(x,z,0.3))return false;const y=chaoEm(x,z,(yRef??ground(x,z))+1.2);if(!isFinite(y))return false;
+  const poe=(x,z,yRef)=>{if(!isFinite(x)||!isFinite(z)||pointBlocked(x,z,0.3))return false;const y=chaoEm(x,z,(yRef??ground(x,z))+1.2);if(!Number.isFinite(y))return false;
     if(L.some(b=>d2(b.x,b.z,x,z)<0.8*0.8))return false;L.push({id:'b'+L.length,x,z,y,yaw:R()*6.28,ci:Math.floor(R()*BOTI_COR.length),mundo:true});return true;};
   /* fundos e lados dos prédios de comida (no sistema do prédio: v < 0 é a frente) */
   if(typeof CID!=='undefined'&&CID.predios)for(const p of CID.predios){if(p.rural||!/padaria|mercado|conveniencia/.test(p.tipo||'')||!isFinite(p.W)||!isFinite(p.D))continue;
@@ -24,7 +24,7 @@ function botiMontar(){if(BOTI.ok)return;BOTI.ok=true;const R=rng(55331),L=BOTI.l
       const uv=lado===0?[a,p.D+f]:lado===1?[-f,Math.min(a,p.D-0.6)]:[p.W+f,Math.min(a,p.D-0.6)],w=pw(p,uv[0],uv[1]);
       if(typeof quadraEm==='function'&&!quadraEm(w[0],w[1]))continue;if(poe(w[0],w[1],QUADRA_Y)){k++;if(R()<0.4&&poe(w[0]+(R()-0.5)*0.9,w[1]+(R()-0.5)*0.9,QUADRA_Y))k++;}}}
   /* atrás de algumas barracas da Feira */
-  if(typeof FEIRA!=='undefined'&&FEIRA.barracas)for(const b of FEIRA.barracas){if(R()>0.22)continue;poe(b.cx+b.lado*(b.d/2+0.32),b.cz+(R()-0.5)*(b.w-0.7),b.y0);}
+  if(typeof FEIRA!=='undefined'&&FEIRA.barracas)for(const b of FEIRA.barracas){if(R()>0.36)continue;poe(b.cx+b.lado*(b.d/2+0.32),b.cz+(R()-0.5)*(b.w-0.7),b.y0);}
   /* bar da Vila São José: na lateral */
   if(typeof VILA!=='undefined'){const bar=Object.values(VILA).find(p=>p&&/Bar/.test(p.nome||''));if(bar&&isFinite(bar.x0)){for(let t=0;t<12;t++){const x=R()<0.5?bar.x0-0.4:bar.x1+0.4,z=bar.z0+0.6+R()*Math.max(0.2,bar.z1-bar.z0-1.2);if(poe(x,z))break;}}}}
 {const _bw=buildWorld;buildWorld=function(){const r=_bw.apply(this,arguments);try{botiMontar();}catch(e){console.error('botijões',e);}return r;};}
@@ -84,7 +84,7 @@ INTER_K.botijao={texto:b=>b.vaza!=null?{t:'Botijão vazando!',s:'saia de perto'}
     b.foi=true;ganhar('botijaoGas',1);if(typeof invRender==='function')invRender();}};
 UTIL_ACOES.botijaoGas=(i)=>{const S=botiD();if(P.bonde||CARRO.ativo||P.balao){feed('Aqui não dá',true);return false;}if(S.soltos.length>=8){feed('Já tem 8 botijões no chão',true);return false;}
   const a=P.body,x=P.x+Math.sin(a)*0.95,z=P.z+Math.cos(a)*0.95;if(pointBlocked(x,z,0.25)){feed('Sem lugar na sua frente',true);return false;}
-  const y=chaoEm(x,z,P.y+0.8);if(!isFinite(y)||Math.abs(y-P.y)>1.2){feed('Sem lugar na sua frente',true);return false;}
+  const y=chaoEm(x,z,P.y+0.8);if(!Number.isFinite(y)||Math.abs(y-P.y)>1.2){feed('Sem lugar na sua frente',true);return false;}
   const b={id:'s'+((G.t*1000)|0)+'_'+Math.floor(Math.random()*1e4),x,z,y,yaw:Math.random()*6.28,ci:Math.floor(Math.random()*BOTI_COR.length)};S.soltos.push(b);
   gastarUm(i);sfx('madeira',x,z,0.6);feed('Botijão no chão: um tiro nele e ele explode');if(typeof invRender==='function')invRender();};
 /* ---------- ligações, tarefa do rádio e jogo novo ---------- */

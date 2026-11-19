@@ -14,7 +14,7 @@ PASSOS.push(function ativPertoPasso(dt){if(G.modo!=='jogo'||!P.alive)return;ATIV
   const L=ativPertoLista();ATIV_PERTO.ids=L;if(CORR.ativa||(typeof RES!=='undefined'&&RES.ativo))return;
   const V=ativVistas();
   for(const{a,d}of L){if(V[a.id]||d>ATIV_PERTO.aviso||!ativConhecida(a))continue;V[a.id]=1;const T=ATIV_TIPOS[a.tipo]||ATIV_TIPOS.evento;
-    toast('ativ',T.nome+': '+a.nome+(a.falta?' — '+a.falta:'')+(a.premio?'. Prêmio: '+a.premio:'')+'. No mapa (M), "O que fazer" rastreia.');break;}});
+    toast('ativ',T.nome+' a '+Math.round(d)+' m ('+ativRumo(a.x-P.x,a.z-P.z)+'): '+a.nome+(a.falta?' — '+a.falta:'')+(a.premio?'. Prêmio: '+a.premio:'')+'. No mapa (M), "O que fazer" rastreia.');break;}});
 function ativPertoMarca(a){const key='ap-'+a.id;let m=BUSM[key];const T=ATIV_TIPOS[a.tipo]||ATIV_TIPOS.evento,con=ativConhecida(a),l=con?T.l:'?',cor=con?T.cor:'#3a3f3a';
   if(!m){const el=document.createElement('span');el.className='bus-m bus-at';el.innerHTML='<i></i><b></b>';busFita.append(el);m=BUSM[key]={el,b:el.querySelector('b'),i:el.querySelector('i'),v:null};}
   if(m.l!==l||m.c!==cor){m.l=l;m.c=cor;m.i.textContent=l;m.i.style.background=cor;m.i.style.color=con?'#101410':'#d8dcd8';}return m;}
