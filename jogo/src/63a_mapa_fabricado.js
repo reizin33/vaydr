@@ -59,6 +59,9 @@ MANUAL_EXTRA.push(()=>[{id:'x:mapa',sec:'exploracao',nome:'Mapa da região',icon
     'Na bancada, fabrique o Mapa da região. Ele não ocupa a mochila e não se perde quando você cai.',
     'Pronto: a tecla '+teclaMapaNome()+' abre o mapa grande e o minimapa aparece no canto.'],
   res:null,obs:'Quem já jogava antes desta versão continua com o mapa. No modo criativo ele já vem.',tipo:'Guia'}]);
+/* caiu sem mapa: a mochila largada aparece na bússola (o minimapa ainda não existe) */
+{const _mm=mostrarMorte;mostrarMorte=function(){const r=_mm.apply(this,arguments);if(!temMapa()){const t=$('morte-t');
+  if(t&&t.textContent.includes('marcada em verde no minimapa'))t.textContent=t.textContent.replace('marcada em verde no minimapa','marcada em verde na bússola');}return r;};}
 /* o modo criativo liga e desliga quando quiser: confere de vez em quando */
 setInterval(()=>{if(G.modo!=='menu')mapaSemAviso();},1000);
 /* um lembrete, uma vez, depois dos primeiros minutos de um jogo novo sem mapa */
