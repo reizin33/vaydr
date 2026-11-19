@@ -298,11 +298,13 @@ async function fumaca() {
     await dormir(1500);
     const auto = arquivoSave(s1.salvoEm);
     passo('cópia automática no computador', auto);
+    // 10.5.1: a conexão espera até 60 s (no Windows da nuvem o jogo roda a 0,1 quadro por segundo e o aviso de que conectou chegava
+    // depois dos 8 s de antes: o teste falhava sem a rede ter falhado)
     // 10.4.3: partida em rede como o amigo faria: abre o servidor, testa a porta (aberta e fechada) e a página conecta por um IP
     // da rede (não 127.0.0.1); e a regra do Firewall (o Windows do GitHub roda como administrador: cria sem o aviso e apaga depois)
     const lanR = await js("(async()=>{const P=window.vaydrPC;const r=await P.lanHospedar(47811);if(!r||!r.ok)return{abriu:false,r};const ip=(r.ips||[]).map(q=>q.ip).find(x=>x&&x!=='127.0.0.1')||'127.0.0.1';"
       + "const aberta=await P.lanTestar(ip,r.porta),fechada=await P.lanTestar('127.0.0.1',47899);"
-      + "const ws=await new Promise(res=>{let w;try{w=new WebSocket('ws://'+ip+':'+r.porta);}catch(e){return res({erro:String(e)});}const tm=setTimeout(()=>{try{w.close();}catch(_){}res({tempo:true});},8000);"
+      + "const ws=await new Promise(res=>{let w;try{w=new WebSocket('ws://'+ip+':'+r.porta);}catch(e){return res({erro:String(e)});}const tm=setTimeout(()=>{try{w.close();}catch(_){}res({tempo:true});},60000);"
       + "w.onopen=()=>{clearTimeout(tm);try{w.close();}catch(_){}res({abriu:true});};w.onerror=()=>{};w.onclose=()=>{clearTimeout(tm);res({fechou:true});};});"
       + "await P.lanParar();return{abriu:true,ip,porta:r.porta,aberta,fechada,ws};})()");
     const lanOk = !!(lanR && lanR.abriu && lanR.aberta && lanR.aberta.ok && lanR.fechada && lanR.fechada.codigo === 'ECONNREFUSED' && lanR.ws && lanR.ws.abriu);
