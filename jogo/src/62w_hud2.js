@@ -63,7 +63,7 @@ function hud2ItemNome(){const el=$('item-nome');if(!el||OBRA.ativo)return;const 
   if(!d){const t=maosVaziasTxt(),i=t.indexOf(' · ');el.innerHTML='<span class="in-n vazio">'+(i<0?t:t.slice(0,i))+'</span>'+(i<0?'':'<span class="in-s">'+t.slice(i+3)+'</span>');return;}
   let info='';
   if(d.fogo)info='<span>'+s.mun+' no pente · '+invCount(d.municao)+' na mochila</span>';
-  else if(d.durMax){const f=clamp(s.dur/d.durMax,0,1),n=Math.ceil(f*5-1e-6);let tr='';for(let k=0;k<5;k++)tr+='<i'+(k<n?' class="on"':'')+'></i>';
+  else if(d.durMax){const f=clamp(s.dur/Math.max(1,durMaxDe(s)),0,1),n=Math.ceil(f*5-1e-6);let tr='';for(let k=0;k<5;k++)tr+='<i'+(k<n?' class="on"':'')+'></i>';
     info='<span class="in-d'+(f<0.15?' critico':f<0.35?' baixo':'')+'">'+tr+'</span><span>'+Math.round(f*100)+'%</span>';}
   else if(d.cantil)info='<span>'+cantilGoles(s)+' de '+d.cantil+' goles</span>';
   else if(s.n>1||d.max>1)info='<span>'+s.n+(d.max>1?' de '+d.max:'')+'</span>';

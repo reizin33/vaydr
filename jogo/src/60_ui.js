@@ -32,7 +32,7 @@ function flashDano(){const d=$('dano');d.style.opacity='1';setTimeout(()=>d.styl
 /* ---------- barra rápida ---------- */
 const slotsEl=$('slots');
 function slotHTML(s,i,key){if(!s)return'<span class="k so-pc">'+(key?i+1:'')+'</span>';const d=ITEMS[s.id];let q='';
-  if(d.fogo)q='<span class="q">'+s.mun+'/'+invCount(d.municao)+'</span>';else if(d.cantil)q='<span class="q'+(s.mun&&s.dur>0?' suja':'')+'">'+cantilGoles(s)+'/'+d.cantil+'</span>';else if(d.durMax)q='<span class="dur"><i style="width:'+Math.round(100*s.dur/d.durMax)+'%"></i></span>';else if(s.n>1||d.max>1)q='<span class="q">'+s.n+'</span>';
+  if(d.fogo)q='<span class="q">'+s.mun+'/'+invCount(d.municao)+'</span>';else if(d.cantil)q='<span class="q'+(s.mun&&s.dur>0?' suja':'')+'">'+cantilGoles(s)+'/'+d.cantil+'</span>';else if(d.durMax)q='<span class="dur"><i style="width:'+Math.round(100*s.dur/Math.max(1,durMaxDe(s)))+'%"></i></span>';else if(s.n>1||d.max>1)q='<span class="q">'+s.n+'</span>';
   return(key?'<span class="k so-pc">'+(i+1)+'</span>':'')+icoItem(s.id)+q;}
 function hudBarra(){let h='';for(let i=0;i<BAR_N;i++){const s=P.inv[i];h+='<button class="slot'+(s?'':' vazio')+'" type="button" data-i="'+i+'" aria-pressed="'+(P.sel===i)+'" aria-label="'+(s?ITEMS[s.id].nome:'Vazio')+'">'+slotHTML(s,i,true)+'</button>';}
   slotsEl.innerHTML=h;const d=selDef();if(OBRA.ativo)hudObras();else $('item-nome').textContent=d?d.nome:maosVaziasTxt();
@@ -348,8 +348,8 @@ function hudArma(){const el=$('arma'),s=selItem(),d=s?ITEMS[s.id]:null;if(!d||d.
   $('arma-i').setAttribute('href','#'+d.icon);$('arma-n').textContent=d.nome;const b=$('arma-b');
   if(d.fogo){$('arma-v').innerHTML=s.mun+'<small> / '+invCount(d.municao)+'</small>';b.hidden=true;}
   else if(d.arremesso){$('arma-v').textContent=s.n+'×';b.hidden=true;}
-  else if(d.arco){$('arma-v').innerHTML=invCount('flecha')+'<small> flechas</small>';b.hidden=false;const f=s.dur/d.durMax;b.firstChild.style.width=Math.round(f*100)+'%';b.firstChild.style.background=f<0.25?'var(--blood)':'var(--moss)';}
-  else{$('arma-v').textContent=d.durMax?Math.round(100*s.dur/d.durMax)+'%':'';b.hidden=!d.durMax;if(d.durMax){const f=s.dur/d.durMax;b.firstChild.style.width=Math.round(f*100)+'%';b.firstChild.style.background=f<0.25?'var(--blood)':'var(--moss)';}}}
+  else if(d.arco){$('arma-v').innerHTML=invCount('flecha')+'<small> flechas</small>';b.hidden=false;const f=s.dur/Math.max(1,durMaxDe(s));b.firstChild.style.width=Math.round(f*100)+'%';b.firstChild.style.background=f<0.25?'var(--blood)':'var(--moss)';}
+  else{$('arma-v').textContent=d.durMax?Math.round(100*s.dur/Math.max(1,durMaxDe(s)))+'%':'';b.hidden=!d.durMax;if(d.durMax){const f=s.dur/Math.max(1,durMaxDe(s));b.firstChild.style.width=Math.round(f*100)+'%';b.firstChild.style.background=f<0.25?'var(--blood)':'var(--moss)';}}}
 function hudChefe(){const el=$('chefe');if(!el)return;const b=G.modo==='jogo'&&P.alive?chefeVivo():null;if(!b){if(!el.hidden)el.hidden=true;return;}el.hidden=false;{const nm=b.nomeChefe||'O Colosso';if(el.dataset.n!==nm){el.dataset.n=nm;el.querySelector('.chefe-n').textContent=nm;el.setAttribute('aria-label','Vida de '+nm);}}$('chefe-v').style.width=Math.max(0,100*b.hp/b.hpMax).toFixed(1)+'%';}
 function hudTarefa(){const el=$('missao-tar');if(!el)return;const t=tarefaTop();if(!t){el.hidden=true;return;}const T=tarefaDef(t.id);el.hidden=false;el.textContent='Tarefa: '+T.txt(t.meta)+' · '+t.n+'/'+t.meta;}
 const marcaEl=$('marca');

@@ -392,7 +392,7 @@ DESENHO.opaco.push(function morroDesenho(Pg){if(!MOR.ok)return;const cx=cam.pos[
 DESENHO.sombra.push(function morroSombra(Pg,perto){if(!MOR.ok)return;for(const c of MOR.chunks){if(!c.mB)continue;const d=Math.hypot(Math.max(c.x0-P.x,0,P.x-c.x1),Math.max(c.z0-P.z,0,P.z-c.z1));if(d>(perto?60:140))continue;drawStat(Pg,c.mB,ID);}});
 
 /* ================= mapa: o morro, as escadas, o Largo, as casas e a caixa-d'água ================= */
-MAPA_DESENHOS.push(function mapaMorro(g,X,Y,k,n,range){if(!MOR.ok)return;
+MAPA_DESENHOS.push(function mapaMorro(g,X,Y,k,n,range){if(!MOR.ok||(range<1e3&&morDist()>range*1.5+10))return;   // minimapa: só quando o morro aparece nele
   g.fillStyle=n>0.5?'#1b2118':'#2c3324';g.beginPath();g.moveTo(X(MORRO.x0),Y(ANEL.z1-8));for(let x=MORRO.x0;x<=MORRO.x1+0.1;x+=4)g.lineTo(X(x),Y(morroTopo(x)));g.lineTo(X(MORRO.x1),Y(ANEL.z1-8));g.closePath();g.fill();
   g.strokeStyle=n>0.5?'#3a3834':'#b0aa9c';g.lineCap='butt';for(const E of MOR.escadas){g.lineWidth=Math.max(1,E.w*k);g.beginPath();g.moveTo(X(E.x),Y(E.z0));g.lineTo(X(E.x),Y(E.z1));g.stroke();}
   {const L=MOR.largo;g.fillStyle=n>0.5?'#2e2d2a':'#8a877e';g.fillRect(X(L.x0),Y(L.z0),(L.x1-L.x0)*k,(L.z1-L.z0)*k);}
