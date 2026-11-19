@@ -10,7 +10,7 @@
    · quem já jogava (jogo salvo de antes desta versão) continua com o mapa; no modo criativo ele já vem;
    · nos testes automáticos o jogo novo já vem com o mapa, como antes (window.__semMapa testa sem). */
 ITEMS.mapa={nome:'Mapa da região',icon:'i-mapa',max:1,tipo:'util',
-  desc:'Desenhado à mão num pedaço de tecido, com a ponta de um graveto queimado: estradas, rios, lugares e a cidade. Fabricou, aprendeu: a tecla M abre o mapa e o minimapa aparece no canto.'};
+  desc:'Desenhado à mão num pedaço de tecido, com a ponta de um graveto queimado. Ele mostra o que você já viu e vai se completando conforme você explora. Fabricou, aprendeu: a tecla M abre o mapa e o minimapa aparece no canto.'};
 RECIPES.push({faz:'mapa',n:1,custo:{pano:2,graveto:1},alt:{pano:['couro',1]},cat:'ferramentas',etapa:1,est:1,desb:{item:'pano'}});
 KIND.mapa=['Mapa','#c9b07a','i-mapa'];
 function teclaMapaNome(){try{const n=nomeTecla(teclaDe('mapa'));return n&&n!=='—'?n:'M';}catch(e){return'M';}}   // a tecla que o jogador escolheu nos controles
@@ -27,7 +27,7 @@ V8.carregar.mapa=v=>{G.temMapa=v===undefined?true:!!v;mapaSemAviso();};   // jog
 /* fabricou (ou ganhou de outro jeito): vira conhecimento, não item na mochila */
 {const _ia=invAdd;invAdd=function(id,n){if(id!=='mapa')return _ia.apply(this,arguments);if(!(n>0))return 0;
   const novo=!G.temMapa;G.temMapa=true;mapaSemAviso();marcarVisto('mapa');
-  if(novo&&G.modo!=='menu'){sfx('missao');toast('mapa','Mapa pronto! Aperte '+teclaMapaNome()+' para abrir o mapa grande. O minimapa já está no canto.');}
+  if(novo&&G.modo!=='menu'){sfx('missao');toast('mapa','Mapa pronto! Aperte '+teclaMapaNome()+' para abrir o mapa grande. Ele mostra o que você já viu e vai se completando conforme você explora. O minimapa já está no canto.');}
   return 0;};}
 /* depois de feito, a receita some da lista da bancada */
 {const _rv=receitaVisivel;receitaVisivel=function(r){if(r&&r.faz==='mapa'&&G.temMapa)return false;return _rv.apply(this,arguments);};}
@@ -57,8 +57,9 @@ MANUAL_EXTRA.push(()=>[{id:'x:mapa',sec:'exploracao',nome:'Mapa da região',icon
   ing:{},est:{nome:'Bancada (2 tecidos e 1 graveto, ou 1 couro e 1 graveto)',icon:'i-mapa',onde:''},ferr:['Nenhuma'],
   proc:['Tecido se acha nas casas, nos mercados, nas caçambas, nas caixas de suprimentos da mata e às vezes revistando zumbi; pegou o primeiro, a receita aparece na bancada da clareira.',
     'Na bancada, fabrique o Mapa da região. Ele não ocupa a mochila e não se perde quando você cai.',
-    'Pronto: a tecla '+teclaMapaNome()+' abre o mapa grande e o minimapa aparece no canto.'],
-  res:null,obs:'Quem já jogava antes desta versão continua com o mapa. No modo criativo ele já vem.',tipo:'Guia'}]);
+    'Pronto: a tecla '+teclaMapaNome()+' abre o mapa grande e o minimapa aparece no canto.',
+    'O mapa mostra só o que você já viu: por onde você anda, uns 45 m em volta entram nele (conta desde o começo do jogo, mesmo antes de fabricar). De cima de um telhado, de uma torre, do mirante ou do balão você vê bem mais longe. O que falta fica escuro e o título mostra quanto você já explorou.'],
+  res:null,obs:'Quem já jogava antes da versão 10.4.1 continua com o mapa, com os lugares que o diário já tinha como descobertos. No modo criativo ele já vem inteiro.',tipo:'Guia'}]);
 /* caiu sem mapa: a mochila largada aparece na bússola (o minimapa ainda não existe) */
 {const _mm=mostrarMorte;mostrarMorte=function(){const r=_mm.apply(this,arguments);if(!temMapa()){const t=$('morte-t');
   if(t&&t.textContent.includes('marcada em verde no minimapa'))t.textContent=t.textContent.replace('marcada em verde no minimapa','marcada em verde na bússola');}return r;};}
