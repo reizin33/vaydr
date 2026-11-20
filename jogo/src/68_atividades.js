@@ -121,7 +121,7 @@ const MEDALHAS=['bronze','prata','ouro'],MEDALHA_NOME={bronze:'bronze',prata:'pr
 function corridaMedalha(C,t){return t<=C.tempos.ouro?'ouro':t<=C.tempos.prata?'prata':t<=C.tempos.bronze?'bronze':null;}
 ativFonte(()=>CORRIDAS.filter(C=>!C.ok||C.ok()).map(C=>{const S=corridaD(C.id);
   return{id:'corrida-'+C.id,tipo:'corrida',nome:C.nome,x:C.ini.x,z:C.ini.z,r:20,feito:S.medalha==='ouro',
-    falta:S.melhor?'seu melhor: '+ativTempo(S.melhor)+(S.medalha?' ('+MEDALHA_NOME[S.medalha]+')':''):'comece na placa',
+    falta:S.melhor?'seu melhor: '+ativTempo(S.melhor)+(S.medalha?' ('+MEDALHA_NOME[S.medalha]+')':''):(C.comeco||'comece na placa'),
     premio:'ouro '+ativTempo(C.tempos.ouro)+': '+ativPremio(C.premios.ouro)};}));
 INTERS.push(tryIt=>{if(CORR.ativa)return;for(const C of CORRIDAS){if(C.ok&&!C.ok())continue;const q=C.ini;if(Math.abs(P.x-q.x)>3||Math.abs(P.z-q.z)>3||Math.abs(P.y-q.y)>1.4)continue;tryIt({k:'corridaIni',o:C},q.x,q.z,2.6,2.6,-1,q.y);}});
 INTER_K.corridaIni={texto:C=>{const S=corridaD(C.id);return{t:'Começar a corrida: '+C.nome,s:(S.melhor?'seu melhor '+ativTempo(S.melhor)+' · ':'')+'ouro '+ativTempo(C.tempos.ouro)+' · prata '+ativTempo(C.tempos.prata)+' · bronze '+ativTempo(C.tempos.bronze)};},
