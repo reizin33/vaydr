@@ -65,7 +65,7 @@ function quarHud(S){let el=QUAR.hud;if(!S){if(el)el.hidden=true;return;}
 function quarGeo(){const g=new GB(1<<13,8),R=rng(88101);
   for(const{d,nx,nz}of QUAR.portas){const yaw=Math.atan2(nx,nz),c=Math.cos(yaw),s=Math.sin(yaw),M=(u,y,v,rz)=>mat(d.x+c*u+s*v,d.y+y,d.z-s*u+c*v,0,yaw,rz||0),L=d.larg||1.2,H=L>1.3?2.4:2.15;
     const ang=Math.atan2(H,L+0.3);for(const a of[ang,-ang])add(g,boxTris(Math.hypot(L+0.3,H)*0.92,0.16,0.04),M(0,H/2,0.18,a),lin(0x8a6a45),{j:0.08,rnd:R});
-    add(g,boxTris(1.1,0.38,0.02),M(0,H*0.62,0.215),lin(0xb3261e));textoBlocos(g,M(-0.45,H*0.62+0.06,0.228),'QUARENTENA',0.016,0xf4f0e8);
+    add(g,boxTris(1.36,0.42,0.02),M(0,H*0.62,0.215),lin(0xb3261e));textoBlocos(g,M(-0.6,H*0.62-0.07,0.228),'QUARENTENA',0.02,0xf4f0e8);
     for(const yy of[0.85,1.55]){for(let k=0;k<6;k++){const u=-L/2-0.1+(L+0.2)*(k+0.5)/6;add(g,boxTris((L+0.2)/6,0.07,0.012),M(u,yy+(k%2?0.01:-0.01),0.235),lin(k%2?0x1a1a1a:0xe0b81e));}}}
   return g.data();}
 function quarCaixaGeo(){const g=new GB(1<<10,8),R=rng(88102);add(g,boxTris(1.0,0.55,0.6),mat(0,0.275,0),lin(0x3d5a3a),{j:0.04,rnd:R});add(g,boxTris(1.04,0.06,0.64),mat(0,0.58,0),lin(0x2f4a2e));
