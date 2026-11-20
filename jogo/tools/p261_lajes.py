@@ -10,9 +10,9 @@ from vt import *
 L = "const L=X('LAJ'),C=L.C,K=X('CORR'),S=()=>X('corridaD')('lajes');"
 PASSO = ("window.__cadaPasso=(dt)=>{const n=__nnc,P=n.P,IN=n.ev('IN');n.Z.length=0;if(!window.__livre){P.vida=100;}P.fome=100;P.sede=100;"
          "const B=window.__bot;if(B&&!B.fim){const C=n.ev('CORR');B.t+=dt;"
-         "if(!C.ativa){B.fim={t:+B.t.toFixed(2),wp:B.i,de:B.wp.length,x:+P.x.toFixed(2),z:+P.z.toFixed(2),y:+P.y.toFixed(2),alto:+(P.y-n.ev('ground')(P.x,P.z)).toFixed(2)};IN.mz=0;IN.run=false;}"
-         "else if(C.t>0){P.energia=100;let w=B.wp[B.i];while(w&&Math.hypot(w.x-P.x,w.z-P.z)<w.r){B.log.push([B.i,+B.t.toFixed(2),+P.y.toFixed(2)]);B.i++;w=B.wp[B.i];}"
-         "if(w){const dx=w.x-P.x,dz=w.z-P.z,d=Math.hypot(dx,dz),fx=dx/d,fz=dz/d;P.yaw=Math.atan2(dx,dz);P.body=P.yaw;IN.mx=0;IN.mz=1;IN.run=true;"
+         "if(!C.ativa&&!B.vista){}else if(!C.ativa){B.fim={t:+B.t.toFixed(2),wp:B.i,de:B.wp.length,x:+P.x.toFixed(2),z:+P.z.toFixed(2),y:+P.y.toFixed(2),alto:+(P.y-n.ev('ground')(P.x,P.z)).toFixed(2)};IN.mz=0;IN.run=false;}"
+         "else if((B.vista=true)&&C.t>0){P.energia=100;let w=B.wp[B.i];while(w&&Math.hypot(w.x-P.x,w.z-P.z)<w.r){B.log.push([B.i,+B.t.toFixed(2),+P.y.toFixed(2)]);B.i++;w=B.wp[B.i];}"
+         "if(w){let tx=w.x,tz=w.z;if(w.linha){const ax=w.linha[0],az=w.linha[1],lx=w.x-ax,lz=w.z-az,ll=Math.hypot(lx,lz)||1,ux=lx/ll,uz=lz/ll,t=Math.min(ll,(P.x-ax)*ux+(P.z-az)*uz+1.0);tx=ax+ux*t;tz=az+uz*t;}const dx=tx-P.x,dz=tz-P.z,d=Math.hypot(dx,dz)||1e-6,fx=dx/d,fz=dz/d;P.yaw=Math.atan2(dx,dz);P.body=P.yaw;IN.mx=0;IN.mz=1;IN.run=true;"
          "if(!P.muro&&!P.escala&&P.noChao){B.pulo-=dt;B.dt+=dt;if(B.dt>0.3){const m=Math.hypot(P.x-B.ult[0],P.z-B.ult[1]);B.dt=0;B.ult=[P.x,P.z];if(m<0.3&&B.pulo<=0){n.ev('pular')();B.pulo=0.5;B.pulos++;}}"
          "if(w.tipo&&['salto','escala','descida'].includes(w.tipo)&&B.pulo<=0){const la=w.tipo==='escala'?0.3:0.7,g=n.ev('chaoEm')(P.x+fx*la,P.z+fz*la,P.y+0.3);if(P.y-g>1.0){n.ev('pular')();B.pulo=0.7;B.saltos++;}}}}}}"
          "const T=window.__tele;if(T){const C=n.ev('CORR');if(C.ativa&&C.t>0){const p=C.ativa.pts[C.i];if(p){P.x=p.x;P.z=p.z;P.y=p.y+0.02;P.vy=0;P.noChao=true;}}}};")
@@ -27,7 +27,7 @@ s += [ev("montada", L + "if(!L.ok)return{ok:false,montado:!!X('MOR').ok};const g
          "malha:!!L.malha,pich:!!L.pich,oQueFazer:a?{nome:a.nome,falta:a.falta,premio:a.premio}:null};")]
 # 2: o robô corre de verdade
 s += [js(L + "const q=L.ini,p=L.pts[0];vai(q.x,q.z,q.y+0.02);P.yaw=P.body=Math.atan2(p.x-q.x,p.z-q.z);P.energia=100;"
-         "const tipos=L.R.edges.map(e=>e.t),wp=[];let k=0;for(const p of L.pts){if(p.tabua){wp.push({x:p.de[0],z:p.de[1],y:p.y,r:0.5},{x:p.para[0],z:p.para[1],y:p.y,r:0.5});}else{wp.push({x:p.x,z:p.z,y:p.y,r:1.0,tipo:tipos[k]});k++;}}"
+         "const tipos=L.R.edges.map(e=>e.t),wp=[];let k=0;for(const p of L.pts){if(p.tabua){wp.push({x:p.de[0],z:p.de[1],y:p.y,r:0.35},{x:p.para[0],z:p.para[1],y:p.y,r:0.5,linha:[p.de[0],p.de[1]]});}else{wp.push({x:p.x,z:p.z,y:p.y,r:1.0,tipo:tipos[k]});k++;}}"
          "window.__bot={wp,i:0,t:0,ult:[P.x,P.z],dt:0,pulo:0,pulos:0,saltos:0,log:[],fim:null};"), ["gwait", 0.3],
       ev("comecar", L + "const a=X('interAtual')(),t=a&&X('INTER_K')[a.k]?X('INTER_K')[a.k].texto(a.o):null;if(a&&a.k==='corridaIni')X('INTER_K').corridaIni.usar(a.o);const pelaPlaca=!!K.ativa;if(!K.ativa)X('corridaComecar')(C);return{k:a&&a.k,t:t&&(t.t+' | '+t.s),pelaPlaca,ativa:!!K.ativa};"),
       ["gwait", 45],
@@ -39,7 +39,7 @@ s += [js(L + "window.__bot=null;Z.length=0;const q=L.ini;vai(q.x,q.z,q.y+0.02);w
       js(L + "const h=L.R.path[0],e=h.escada,b=X('morroPw')(h,e.u,h.D/2+0.85);vai(b[0],b[1],X('ground')(b[0],b[1])+0.02);"), ["gwait", 0.4],
       ev("chao", L + "return{ativa:!!K.ativa,melhorIgual:S().melhor===window.__m,alto:r2(P.y-X('ground')(P.x,P.z))};")]
 # 4: de ponto em ponto
-s += [js(L + "const q=L.ini;vai(q.x,q.z,q.y+0.02);window.__tn=conta('tenisCorrida');X('corridaComecar')(C);"), ["gwait", 3.3],
+s += [js(L + "const q=L.ini;vai(q.x,q.z,q.y+0.02);window.__tn=conta('tenisCorrida');const s0=S();s0.melhor=null;s0.medalha=null;X('corridaComecar')(C);"), ["gwait", 3.3],
       js("window.__tele=true;"), ["gwait", 2.0],
       ev("teleporte", L + "window.__tele=false;const c=(X('G').conq||{});return{ativa:!!K.ativa,medalha:S().medalha,melhor:S().melhor,tenis:conta('tenisCorrida')-window.__tn,item:X('ITEMS').tenisCorrida&&X('ITEMS').tenisCorrida.nome,conq:X('CONQ').some(d=>d.id==='lajesOuro')};")]
 # 5: o tênis
