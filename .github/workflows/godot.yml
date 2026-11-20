@@ -1,0 +1,118 @@
+# VAYDR no Godot (protótipo): importa o projeto da pasta godot/, roda o teste automático sem tela, tira as fotos de
+# conferência num Linux sem placa de vídeo (OpenGL por software) e monta o .exe do Windows.
+# - Roda sozinho a cada envio que mexe em godot/ no ramo correcoes-10-2-2 (só monta, testa e fotografa).
+# - Rodar à mão com uma versão (ex.: 0.1.0) também publica o .exe como pré-lançamento "godot-v0.1.0".
+# Segurança: as ações ficam presas a um commit; a montagem só lê o repositório; só o job de publicar escreve.
+name: VAYDR Godot (protótipo)
+
+on:
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versão do protótipo para publicar (ex.: 0.1.0). Vazio = só monta e testa"
+        required: false
+        default: ""
+  push:
+    branches: [correcoes-10-2-2]
+    paths: ["godot/**", ".github/workflows/godot.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godot-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VER: "4.7.2"
+
+jobs:
+  montar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Godot e modelos de exportação
+        run: |
+          set -e
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils libxcursor1 libxinerama1 libxrandr2 libxi6 libfontconfig1 > /dev/null
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable"
+          curl -sSfL -o godot.zip "$base/Godot_v${GODOT_VER}-stable_linux.x86_64.zip"
+          curl -sSfL -o modelos.tpz "$base/Godot_v${GODOT_VER}-stable_export_templates.tpz"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VER}-stable_linux.x86_64" godot-bin
+          chmod +x godot-bin
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VER}.stable"
+          mkdir -p "$dest"
+          unzip -q -j modelos.tpz "templates/windows_release_x86_64.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d "$dest"
+          ls -la "$dest"
+
+      - name: Importar o projeto
+        run: |
+          ./godot-bin --headless --path godot --import 2>&1 | tee importar.log | tail -40
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR: Failed" importar.log; then echo "erros na importação"; fi
+
+      - name: Teste sem tela
+        run: |
+          set +e
+          timeout 600 ./godot-bin --headless --path godot -- --teste 2>&1 | tee teste.log
+          grep -q "TESTE OK" teste.log
+
+      - name: Fotos (OpenGL por software)
+        if: always()
+        run: |
+          set +e
+          export LIBGL_ALWAYS_SOFTWARE=1
+          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | tail -60
+          ls -la godot/fotos || true
+
+      - name: Exportar para Windows
+        if: always()
+        run: |
+          set +e
+          mkdir -p out
+          ./godot-bin --headless --path godot --export-release "Windows Desktop" ../out/VAYDR-prototipo.exe 2>&1 | tee exportar.log | tail -30
+          ls -la out
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: godot-prototipo
+          path: |
+            out/
+            godot/fotos/
+            importar.log
+            teste.log
+            fotos.log
+            exportar.log
+          retention-days: 14
+
+  publicar:
+    needs: montar
+    if: ${{ inputs.versao != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: godot-prototipo
+      - name: Publicar pré-lançamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSAO: ${{ inputs.versao }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.sha }}
+        run: |
+          set -e
+          if ! [[ "$VERSAO" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "versão inválida"; exit 1; fi
+          cp out/VAYDR-prototipo.exe "VAYDR-Godot-$VERSAO.exe"
+          gh release create "godot-v$VERSAO" "VAYDR-Godot-$VERSAO.exe" -R "$REPO" --target "$REF" --prerelease \
+            --title "VAYDR no Godot $VERSAO (protótipo)" --notes "Protótipo do VAYDR refeito no Godot: baixe o .exe e rode (não instala nada)."

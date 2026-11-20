@@ -1,0 +1,31 @@
+; VAYDR no Godot (protótipo 0.1): o mundo é montado pelos scripts (scripts/main.gd).
+config_version=5
+
+[application]
+
+config/name="VAYDR"
+config/description="Sobrevivência com zumbis: colete, fabrique, construa e defenda."
+run/main_scene="res://cenas/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/vsync/vsync_mode=1
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+anti_aliasing/quality/msaa_3d=2
+textures/default_filters/anisotropic_filtering_level=3
+environment/defaults/default_clear_color=Color(0.55, 0.66, 0.78, 1)
