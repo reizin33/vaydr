@@ -2,7 +2,8 @@
 1 os 12 lugares: no chão de verdade (chaoEm igual à altura do papel), sem nada em cima, cada um com o seu texto
 2 ler: a tela de documento abre com o texto, a coleção conta; ler de novo não conta duas vezes
 3 prêmios: o 4º recado dá kit médico e 2 bandagens
-4 O que fazer: a coleção aparece com a região do recado mais perto que falta"""
+4 O que fazer: a coleção aparece com a região do recado mais perto que falta
+5 fachadas da cidade (v10.8.7): grades no térreo e ar-condicionado nas janelas de cima"""
 import sys, os; sys.path.insert(0, os.path.dirname(__file__))
 from vt import *
 s = inicio("X('FAUNA_POP').ativosMax=0;")
@@ -22,4 +23,5 @@ s += [js("const r=X('REC').lista[0];window.__r0=r;vai(r.x+0.9,r.z,X('chaoEm')(r.
 s += [js("const L=X('REC').lista;for(let i=1;i<4;i++){if(!L[i])continue;X('recLer')(L[i]);X('fecharDoc')();}"), ["gwait", 0.8],
       ev("quatro", "return{achados:X('recAchados')(),kit:X('invCount')('kit')-window.__k0,bandagem:X('invCount')('bandagem')-window.__b0,modo:G.modo};"),
       ev("oQueFazer", "X('ativLimpa')();const a=X('ativTodas')().find(q=>q.id==='recados');return a?{nome:a.nome,falta:a.falta,premio:a.premio,feito:a.feito,r:a.r}:{semAtividade:true};")]
+s += [ev("fachadas", "const F=X('FACH');return{malha:!!F.malha,grades:F.n,ar:F.ac,janelas:X('CID').janelas.length};")]
 salvar('tools/p259_recados.json', s)
