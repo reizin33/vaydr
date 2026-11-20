@@ -182,7 +182,8 @@ function luzes(){let n=0;PLv.fill(0);PCv.fill(0);const nMax=Math.min(4,GF().luze
   let best=null,bd=1e9;for(const f of FIRES){const d=d2(f.x,f.z,P.x,P.z);if(d<bd){bd=d;best=f;}}
   if(best){if(best.branca)put(best.x,best.y-0.15,best.z,19,scl([0.9,0.95,1],lerp(1.6,5.2,E.n)));else if(best.eletrica)put(best.x,best.y-0.12,best.z,17,scl([1,0.86,0.62],lerp(1.4,4.4,E.n)));else if(best.lamp)put(best.x,best.y+0.35,best.z,11,scl([1,0.62,0.28],lerp(1.4,3.6,E.n)));else put(best.x,best.y+0.6,best.z,18,scl([1,0.45,0.15],lerp(3,7,E.n)*E.flick));}
   if(G.ev&&G.ev.ativo)put(G.ev.x,G.ev.y+1.2,G.ev.z,10,scl([1,0.15,0.08],2.5+Math.sin(G.t*9)));
-  {let ch=null,cd=1e9;for(const c of CHAMAS){const d=d2(c.x,c.z,P.x,P.z);if(d<cd&&(c.k||0)>0.05){cd=d;ch=c;}}if(ch&&cd<70*70)put(ch.x,ch.y+(ch.mata?3.2:0.8),ch.z,ch.mata?22:14,scl([1,0.45,0.15],(3.5+Math.sin(G.t*13)*0.6)*(ch.k||0)*(ch.mata?1.6:1)));}   // v10.2.2: árvore em chamas ilumina mais alto e mais longeluzesCidade(put);
+  {let ch=null,cd=1e9;for(const c of CHAMAS){const d=d2(c.x,c.z,P.x,P.z);if(d<cd&&(c.k||0)>0.05){cd=d;ch=c;}}if(ch&&cd<70*70)put(ch.x,ch.y+(ch.mata?3.2:0.8),ch.z,ch.mata?22:14,scl([1,0.45,0.15],(3.5+Math.sin(G.t*13)*0.6)*(ch.k||0)*(ch.mata?1.6:1)));}   // v10.2.2: árvore em chamas ilumina mais alto e mais longe
+  luzesCidade(put);   // v10.8.6: a chamada tinha ficado dentro do comentário acima desde a v10.2.2 (a luz das salas do Hospital com o gerador ligado sumiu)
   /* a segunda lâmpada elétrica mais perto também ilumina, se sobrar vaga */
   {let b2=null,dd=45*45;for(const f of FIRES){if(f===best||!f.eletrica)continue;const d=d2(f.x,f.z,P.x,P.z);if(d<dd){dd=d;b2=f;}}if(b2)put(b2.x,b2.y-0.15,b2.z,16,b2.branca?scl([0.9,0.95,1],lerp(1.4,4.6,E.n)):scl([1,0.86,0.62],lerp(1.2,4,E.n)));}
   NPL=n;}
