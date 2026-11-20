@@ -76,7 +76,7 @@ function abrigoD(id){const D=ativD();if(!D.abrigos[id])D.abrigos[id]={limpo:fals
 function abrigoZumbis(A){let n=0;for(const z of Z)if(z.vivo&&z.st!=='morrendo'&&z.st!=='morto'&&z.st!=='sumindo'&&!z.lan&&Math.hypot(z.x-A.x,z.z-A.z)<A.r&&Math.abs(z.y-(A.y??z.y))<14)n++;return n;}
 function abrigoPronto(A){return!A.ok||A.ok();}
 ativFonte(()=>ABRIGOS.filter(abrigoPronto).map(A=>{const S=abrigoD(A.id),n=S.limpo?0:abrigoZumbis(A);
-  return{id:'abrigo-'+A.id,tipo:'abrigo',nome:A.nome,x:A.x,z:A.z,r:A.r,feito:S.ligado,falta:!S.limpo?(n?'limpe a área: '+n+' zumbi'+(n>1?'s':''):'chegue perto para limpar a área'):'religue a luz: '+ativCusto(A.custo),premio:'Cama, baú, bancada e lugar para voltar'};}));
+  return{id:'abrigo-'+A.id,tipo:'abrigo',nome:A.nome,x:A.x,z:A.z,r:A.r,feito:S.ligado,falta:!S.limpo?(n?'limpe a área: '+n+' zumbi'+(n>1?'s':''):'chegue perto para limpar a área'):'religue a luz: '+ativCusto(A.custo),premio:'Cama, o baú dos abrigos (o mesmo em todos), bancada e a viagem entre abrigos'};}));
 let abT=0;
 PASSOS.push(function abrigosPasso(dt){abT-=dt;if(abT>0)return;abT=0.5;if(G.modo!=='jogo')return;
   for(const A of ABRIGOS){if(!abrigoPronto(A))continue;const S=abrigoD(A.id),d=Math.hypot(P.x-A.x,P.z-A.z);

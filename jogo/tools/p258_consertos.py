@@ -45,4 +45,9 @@ s += [ev("bombaMontada", "const B=X('BOMBA'),T=X('MOR').torre;return B.ok?{p:[r2
 # 3 hospital: sala acesa com o gerador ligado
 s += [ev("hospital", "const p=X('CID').predios.find(q=>q.gerador);if(!p)return{semGerador:true};const g=p.gerador;vai(g.x,g.z,g.y+0.05);const c=X('G').cid;const e0=c.energia;c.energia=0;X('luzes')();const n0=X('NPL');"
          "c.energia=1;X('luzes')();const n1=X('NPL');c.energia=e0;return{nome:p.nome,semEnergia:n0,comEnergia:n1};")]
+# 4 baú dos abrigos: um só para a rede (o que estava no baú do Sabiá passa para o baú da rede; abrir na Matriz mostra o mesmo)
+s += [js("for(const id of['matriz','sabia']){const S=X('abrigoD')(id);S.ligado=true;S.limpo=true;}const Ss=X('abrigoD')('sabia');Ss.bau=new Array(16).fill(null);Ss.bau[0]={id:'pregos',n:5};Ss.bau[1]={id:'pano',n:2};"
+         "const A=X('ABRIGOS').find(q=>q.id==='matriz');X('INTER_K').abrigoBau.usar(A);"), ["gwait", 0.3],
+      ev("bauRede", "const b=X('bauAberto'),B=X('bauRede')();return{aberto:!!b,nome:b&&b.nome,mesmo:!!b&&b.itens===B,n:B.length,itens:B.filter(Boolean).map(s=>s.id+'x'+s.n),sabiaBau:X('abrigoD')('sabia').bau,texto:X('INTER_K').abrigoBau.texto(X('ABRIGOS').find(q=>q.id==='cais')).s};"),
+      js("if(X('fecharMochila'))X('fecharMochila')();")]
 salvar('tools/p258_consertos.json', s)
