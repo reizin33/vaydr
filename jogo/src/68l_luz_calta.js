@@ -37,9 +37,8 @@ DESENHO.aditivo.push(function luzcaBrilho(){if(!LUZCA.ok)return;const c=LUZCA.ca
   if(d2(c.x,c.z,cam.pos[0],cam.pos[2])<90*90){if(S.ligado)bb(c.x+0.55,c.g+1.75,c.z+0.56,0.08,0.35,1,0.4,0.85);else bb(c.x+0.55,c.g+1.75,c.z+0.56,0.07,1,0.25,0.15,0.45+0.25*Math.sin((G.t||0)*5));}
   if(!luzcaAcesa())return;const n=E.n||0,k=smooth(0.3,0.6,n);
   for(const L of LUZCA.lamps){const dd=d2(L.x,L.z,cam.pos[0],cam.pos[2]);if(dd>170*170)continue;bb(L.x,L.y,L.z,0.95,1,0.8,0.5,0.42*k);bb(L.x,L.y,L.z,0.32,1,0.92,0.75,0.85*k);}});
-/* a luz de verdade: o poste aceso mais perto (até 30 m) ilumina em volta */
-{const _lc=luzesCidade;luzesCidade=function(put){try{_lc.apply(this,arguments);}catch(e){}try{if(!luzcaAcesa())return;let b=null,bd=30*30;for(const L of LUZCA.lamps){const d=d2(L.x,L.z,P.x,P.z);if(d<bd){bd=d;b=L;}}
-    if(b)put(b.x,b.y-0.25,b.z,13,scl([1,0.84,0.6],lerp(1.3,3.6,E.n||0)));}catch(e){}};}
+/* a luz de verdade: os dois postes acesos mais perto (até 32 m) iluminam em volta */
+{const _lc=luzesCidade;luzesCidade=function(put){try{_lc.apply(this,arguments);}catch(e){}try{if(!luzcaAcesa())return;const L=[];for(const q of LUZCA.lamps){const d=d2(q.x,q.z,P.x,P.z);if(d<32*32)L.push([d,q]);}L.sort((p,q)=>p[0]-q[0]);for(const[,b]of L.slice(0,2))put(b.x,b.y-0.25,b.z,12,scl([1,0.82,0.55],lerp(1.6,6.0,E.n||0)));}catch(e){}};}   // os 2 postes mais perto (até 32 m), se sobrar vaga de luz
 /* zumbi não entra na luz do poste (fica na beira); se não enxerga você, quem caçava vai para o escuro */
 PASSOS.push(function luzcaZumbis(dt){if(G.modo!=='jogo'||!luzcaAcesa())return;if(typeof caDist==='function'&&caDist()>120)return;const R=LUZCA.r;
   const perto=LUZCA.lamps.filter(L=>Math.abs(L.x-P.x)<90&&Math.abs(L.z-P.z)<90);if(!perto.length)return;
