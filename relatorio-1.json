@@ -1,0 +1,165 @@
+{
+ "modo": "1",
+ "versao": "10.8.9",
+ "electron": "44.9.2",
+ "chrome": "152.0.7977.167",
+ "passos": [
+  {
+   "nome": "tela de carregamento",
+   "s": 9,
+   "ok": true,
+   "pct": 34,
+   "etapa": "cidade",
+   "status": "Carregando o mundo",
+   "dica": "Dá para jogar com controle de Xbox ou PlayStation."
+  },
+  {
+   "nome": "menu apareceu",
+   "s": 260,
+   "ok": true,
+   "gl": {
+    "webgl2": true,
+    "placa": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "falha3D": false,
+    "fonte": [
+     "Sofia Sans Condensed 400 800",
+     "Stardos Stencil 700"
+    ],
+    "tela": [
+     1008,
+     681
+    ]
+   },
+   "versaoNoMenu": "Versão 10.8.9 · PC ",
+   "botaoSair": true
+  },
+  {
+   "nome": "novo jogo",
+   "s": 344,
+   "ok": true
+  },
+  {
+   "nome": "quadros por segundo",
+   "s": 397,
+   "fps": 0.1
+  },
+  {
+   "nome": "salvar",
+   "s": 412,
+   "retorno": true,
+   "tem": true,
+   "tamanho": 24554,
+   "salvoEm": 1795214049366
+  },
+  {
+   "nome": "cópia do save em arquivo",
+   "s": 439,
+   "ok": true,
+   "dl": {
+    "nome": "vaydr-jogo-dia1-2026-11-20.json",
+    "estado": "completed",
+    "tam": 24571,
+    "pasta": "D:\\a\\vaydr\\vaydr\\teste"
+   }
+  },
+  {
+   "nome": "cópia automática no computador",
+   "s": 441,
+   "ok": true,
+   "pasta": "C:\\Users\\runneradmin\\Documents\\VAYDR\\Jogos salvos",
+   "bytes": 24569,
+   "salvoEm": 1795214074515,
+   "esperado": 1795214049366,
+   "lista": [
+    "nnc_cfg_v1",
+    "nnc_jogo_v1",
+    "vaydr_perfis_v1"
+   ]
+  },
+  {
+   "nome": "partida em rede: porta e conexão por IP da rede",
+   "s": 452,
+   "ok": true,
+   "abriu": true,
+   "ip": "10.1.0.93",
+   "porta": 47811,
+   "aberta": {
+    "ok": true
+   },
+   "fechada": {
+    "ok": false,
+    "codigo": "ECONNREFUSED"
+   },
+   "ws": {
+    "abriu": true
+   }
+  },
+  {
+   "nome": "Firewall: regra da partida em rede (informativo)",
+   "s": 460,
+   "antes": {
+    "ok": false,
+    "windows": true
+   },
+   "liberar": {
+    "ok": true,
+    "windows": true,
+    "cancelado": false,
+    "codigo": 0,
+    "saida": "\r\nNo rules match the specified criteria.\r\n\r\nOk.\r\n\r\n"
+   },
+   "depois": {
+    "ok": true,
+    "windows": true
+   },
+   "apagar": {
+    "ok": true,
+    "saida": "\r\nDeleted 1 rule(s).\r\nOk.\r\n\r\n"
+   },
+   "fim": {
+    "ok": false,
+    "windows": true
+   }
+  },
+  {
+   "nome": "fechando a janela como o jogador (o jogo deve salvar sozinho)",
+   "s": 460,
+   "errosNaPagina": 0
+  }
+ ],
+ "gpu": {
+  "2d_canvas": "enabled",
+  "direct_rendering_display_compositor": "disabled_off_ok",
+  "gpu_compositing": "enabled",
+  "multiple_raster_threads": "enabled_on",
+  "opengl": "enabled_on",
+  "rasterization": "enabled",
+  "raw_draw": "disabled_off_ok",
+  "skia_graphite": "disabled_off",
+  "trees_in_viz": "disabled_off",
+  "video_decode": "enabled",
+  "video_encode": "enabled",
+  "webgl": "enabled",
+  "webgpu": "unavailable_software",
+  "webnn": "disabled_off"
+ },
+ "eventos": [],
+ "downloads": [
+  {
+   "nome": "vaydr-jogo-dia1-2026-11-20.json",
+   "estado": "completed",
+   "tam": 24571,
+   "pasta": "D:\\a\\vaydr\\vaydr\\teste"
+  }
+ ],
+ "videoCarga": {
+  "quadros": 41,
+  "segundos": 128.9
+ },
+ "marca": {
+  "fome": 33.3,
+  "salvoEmAntes": 1795214049366
+ },
+ "ok": true,
+ "salvouAoFechar": true
+}

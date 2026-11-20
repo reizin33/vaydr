@@ -1,0 +1,98 @@
+{
+ "modo": "2",
+ "versao": "10.8.9",
+ "electron": "44.9.2",
+ "chrome": "152.0.7977.167",
+ "passos": [
+  {
+   "nome": "tela de carregamento",
+   "s": 8,
+   "ok": true,
+   "pct": 40,
+   "etapa": "mata",
+   "status": "Carregando o mundo",
+   "dica": "Aperte M para o mapa, F para a lanterna e V para trocar entre primeira e terceira pessoa."
+  },
+  {
+   "nome": "menu apareceu",
+   "s": 208,
+   "ok": true,
+   "gl": {
+    "webgl2": true,
+    "placa": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "falha3D": false,
+    "fonte": [
+     "Sofia Sans Condensed 400 800",
+     "Stardos Stencil 700"
+    ],
+    "tela": [
+     1008,
+     681
+    ]
+   },
+   "versaoNoMenu": "Versão 10.8.9 · PC ",
+   "botaoSair": true
+  },
+  {
+   "nome": "save depois de reabrir",
+   "s": 209,
+   "save": {
+    "salvoEm": 1795214097548,
+    "fome": 33.3,
+    "dia": 1
+   },
+   "botaoContinuar": true,
+   "salvouAoFechar": true
+  },
+  {
+   "nome": "cópia automática atualizada ao fechar",
+   "s": 209,
+   "ok": true,
+   "pasta": "C:\\Users\\runneradmin\\Documents\\VAYDR\\Jogos salvos",
+   "bytes": 32010,
+   "salvoEm": 1795214097548,
+   "esperado": 1795214097548,
+   "lista": [
+    "nnc_cfg_v1",
+    "nnc_jogo_v1",
+    "vaydr_perfis_v1"
+   ]
+  },
+  {
+   "nome": "continuou o jogo salvo",
+   "s": 264,
+   "ok": true,
+   "fome": 33.3,
+   "dia": 1
+  },
+  {
+   "nome": "menu com o botão Sair do jogo",
+   "s": 265,
+   "ok": true
+  }
+ ],
+ "gpu": {
+  "2d_canvas": "enabled",
+  "direct_rendering_display_compositor": "disabled_off_ok",
+  "gpu_compositing": "enabled",
+  "multiple_raster_threads": "enabled_on",
+  "opengl": "enabled_on",
+  "rasterization": "enabled",
+  "raw_draw": "disabled_off_ok",
+  "skia_graphite": "disabled_off",
+  "trees_in_viz": "disabled_off",
+  "video_decode": "enabled",
+  "video_encode": "enabled",
+  "webgl": "enabled",
+  "webgpu": "unavailable_software",
+  "webnn": "disabled_off"
+ },
+ "eventos": [],
+ "downloads": [],
+ "videoCarga": null,
+ "ok": true,
+ "cliqueSair": 1795214379477,
+ "pedidoDeFecharEm_s": 0.015,
+ "salvouAoFechar": null,
+ "fechouEm_s": 0.077
+}

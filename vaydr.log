@@ -1,0 +1,25 @@
+2026-11-20T22:27:17.787Z VAYDR 10.8.9 abrindo {"electron":"44.9.2","smoke":"1"}
+2026-11-20T22:27:17.834Z atualização automática desligada {"empacotado":true,"ligada":true,"smoke":"1"}
+2026-11-20T22:27:26.512Z [teste] tela de carregamento {"ok":true,"pct":34,"etapa":"cidade","status":"Carregando o mundo","dica":"Dá para jogar com controle de Xbox ou PlayStation."}
+2026-11-20T22:31:37.603Z [teste] menu apareceu {"ok":true,"gl":{"webgl2":true,"placa":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","falha3D":false,"fonte":["Sofia Sans Condensed 400 800","Stardos Stencil 700"],"tela":[1008,681]},"versaoNoMenu":"Versão 10.8.9 · PC ","botaoSair":true}
+2026-11-20T22:33:02.073Z [teste] novo jogo {"ok":true}
+2026-11-20T22:33:55.134Z [teste] quadros por segundo {"fps":0.1}
+2026-11-20T22:34:09.593Z [teste] salvar {"retorno":true,"tem":true,"tamanho":24554,"salvoEm":1795214049366}
+2026-11-20T22:34:36.580Z download vaydr-jogo-dia1-2026-11-20.json completed 24571
+2026-11-20T22:34:37.103Z [teste] cópia do save em arquivo {"ok":true,"dl":{"nome":"vaydr-jogo-dia1-2026-11-20.json","estado":"completed","tam":24571,"pasta":"D:\\a\\vaydr\\vaydr\\teste"}}
+2026-11-20T22:34:38.656Z [teste] cópia automática no computador {"ok":true,"pasta":"C:\\Users\\runneradmin\\Documents\\VAYDR\\Jogos salvos","bytes":24569,"salvoEm":1795214074515,"esperado":1795214049366,"lista":["nnc_cfg_v1","nnc_jogo_v1","vaydr_perfis_v1"]}
+2026-11-20T22:34:48.622Z lan: servidor na porta 47811
+2026-11-20T22:34:49.361Z lan: partida fechada
+2026-11-20T22:34:49.371Z [teste] partida em rede: porta e conexão por IP da rede {"ok":true,"abriu":true,"ip":"10.1.0.93","porta":47811,"aberta":{"ok":true},"fechada":{"ok":false,"codigo":"ECONNREFUSED"},"ws":{"abriu":true}}
+2026-11-20T22:34:57.510Z [teste] Firewall: regra da partida em rede (informativo) {"antes":{"ok":false,"windows":true},"liberar":{"ok":true,"windows":true,"cancelado":false,"codigo":0,"saida":"\r\nNo rules match the specified criteria.\r\n\r\nOk.\r\n\r\n"},"depois":{"ok":true,"windows":true},"apagar":{"ok":true,"saida":"\r\nDeleted 1 rule(s).\r\nOk.\r\n\r\n"},"fim":{"ok":false,"windows":true}}
+2026-11-20T22:34:57.517Z [teste] fechando a janela como o jogador (o jogo deve salvar sozinho) {"errosNaPagina":0}
+2026-11-20T22:34:57.540Z salvou ao fechar: true
+2026-11-20T22:35:14.169Z VAYDR 10.8.9 abrindo {"electron":"44.9.2","smoke":"2"}
+2026-11-20T22:35:14.205Z atualização automática desligada {"empacotado":true,"ligada":true,"smoke":"2"}
+2026-11-20T22:35:21.747Z [teste] tela de carregamento {"ok":true,"pct":40,"etapa":"mata","status":"Carregando o mundo","dica":"Aperte M para o mapa, F para a lanterna e V para trocar entre primeira e terceira pessoa."}
+2026-11-20T22:38:42.491Z [teste] menu apareceu {"ok":true,"gl":{"webgl2":true,"placa":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","falha3D":false,"fonte":["Sofia Sans Condensed 400 800","Stardos Stencil 700"],"tela":[1008,681]},"versaoNoMenu":"Versão 10.8.9 · PC ","botaoSair":true}
+2026-11-20T22:38:43.018Z [teste] save depois de reabrir {"save":{"salvoEm":1795214097548,"fome":33.3,"dia":1},"botaoContinuar":true,"salvouAoFechar":true}
+2026-11-20T22:38:43.024Z [teste] cópia automática atualizada ao fechar {"ok":true,"pasta":"C:\\Users\\runneradmin\\Documents\\VAYDR\\Jogos salvos","bytes":32010,"salvoEm":1795214097548,"esperado":1795214097548,"lista":["nnc_cfg_v1","nnc_jogo_v1","vaydr_perfis_v1"]}
+2026-11-20T22:39:37.784Z [teste] continuou o jogo salvo {"ok":true,"fome":33.3,"dia":1}
+2026-11-20T22:39:39.471Z [teste] menu com o botão Sair do jogo {"ok":true}
+2026-11-20T22:39:39.502Z salvou ao fechar: null
