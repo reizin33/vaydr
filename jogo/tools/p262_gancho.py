@@ -6,7 +6,7 @@ import sys, os; sys.path.insert(0, os.path.dirname(__file__))
 from vt import *
 CAM = ("const olha=(tx,ty,tz)=>{const n=__nnc,c=n.ev('cam'),e=[P.x,P.y+1.6,P.z],d=[tx-e[0],ty-e[1],tz-e[2]],l=Math.hypot(...d);c.pos=e;c.fwd=d.map(v=>v/l);"
        "P.yaw=Math.atan2(d[0],d[2]);P.body=P.yaw;};")
-POS = ("const h=X('LAJ').R.path[0],e=h.escada,u=e.u>0?e.u-1.6:e.u+1.6,pw=X('morroPw'),st=pw(h,u,h.D/2+2.2),alvo=pw(h,u,h.D/2);")
+POS = ("const h=X('LAJ').R.path[0],e=h.escada,u=Math.abs(e.u+1.6)<h.W/2-0.6?e.u+1.6:e.u-1.6,pw=X('morroPw'),st=pw(h,u,h.D/2+2.2),alvo=pw(h,u,h.D/2);")
 s = inicio("X('FAUNA_POP').ativosMax=0;n.cfg.cam='1';")
 s += [js("vivo();X('BICHOS').length=0;Z.length=0;G.hora=10;window.__cadaPasso=()=>{const n=__nnc;n.Z.length=0;n.P.vida=100;n.P.fome=100;n.P.sede=100;};")]
 s += [ev("item", "const I=X('ITEMS').ganchoEscalada,R=X('RECIPES').find(r=>r.faz==='ganchoEscalada'),L=X('LIGA_EXTRA');"

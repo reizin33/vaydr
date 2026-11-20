@@ -21,8 +21,7 @@ function ganchoAlvo(){if(!P.alive||CARRO.ativo||P.nada||P.escala||P.muro||P.ganc
     top={x:qx,z:qz,y};break;}
   if(!top)return null;
   /* a borda: voltando do alto na direção de quem mira, até o piso cair */
-  let ex=0,ez=0,ok=false;for(let s=0.1;s<=2.6;s+=0.1){const x=top.x-fx*s,z=top.z-fz*s;if(chaoEm(x,z,top.y+0.3)<top.y-0.6){ex=x+fx*0.05;ez=z+fz*0.05;ok=true;break;}}
-  if(!ok)return null;
+  let ex=H[0]-fx*0.05,ez=H[2]-fz*0.05;for(let s=0.1;s<=1.0;s+=0.1){const x=top.x-fx*s,z=top.z-fz*s;if(chaoEm(x,z,top.y+0.3)<top.y-0.6){ex=x+fx*0.05;ez=z+fz*0.05;break;}}   // sem queda perto (tábua, marquise): a borda fica onde a mira bateu
   /* onde fica de pé (meio metro para dentro da borda, se couber) e onde o corpo fica pendurado antes de passar por cima */
   let lx=ex+fx*0.5,lz=ez+fz*0.5,ly=chaoEm(lx,lz,top.y+0.3);if(Math.abs(ly-top.y)>0.3||bloqueadoAlto(lx,lz,0.26,ly+0.06)){lx=top.x;lz=top.z;ly=top.y;}
   const bx=ex-fx*0.42,bz=ez-fz*0.42,by=ly-1.25;if(by<P.y-0.3)return null;
@@ -60,7 +59,7 @@ function ganchoHud(a){let el=GANCHO.hud;if(a===null){if(el)el.hidden=true;return
 /* com o gancho na mão a mira aparece (também na terceira pessoa) e fica verde quando pega uma beirada */
 HUDS.push(function ganchoMiraHud(){const m=document.getElementById('mira');if(!m)return;const on=G.modo==='jogo'&&P.alive&&!CARRO.ativo&&ganchoNaMao()&&!P.gancho;
   if(!GANCHO.css){GANCHO.css=true;const st=document.createElement('style');st.textContent='#mira.gancho-ok{filter:drop-shadow(0 0 2px #6be06a) drop-shadow(0 0 5px #6be06a)}';document.head.appendChild(st);}
-  if(on)m.classList.remove('escondido');m.classList.toggle('gancho-ok',on&&!!GANCHO.alvo);});
+  if(on){m.classList.remove('escondido');if(G.dicas)dica('gancho','corpo','Gancho de escalada na mão: mire numa beirada até 15 m (laje, muro, telhado, contêiner). Quando a mira ficar verde, clique: a corda puxa você lá para cima. Zumbi não sobe atrás.');}m.classList.toggle('gancho-ok',on&&!!GANCHO.alvo);});
 /* a beirada que a mira pega brilha; no voo e no puxão, a corda vai da mão até o gancho */
 DESENHO.aditivo.push(function ganchoBrilho(){const a=GANCHO.alvo;if(a&&!P.gancho){const p=0.75+0.25*Math.sin((G.t||0)*7);bb(a.ex,a.ey+0.05,a.ez,0.32,0.6,1,0.55,0.55*p);bb(a.ex,a.ey+0.05,a.ez,0.12,0.9,1,0.85,0.8*p);}});
 etapaMalha('fim','gancho',1,()=>{try{const g=new GB(256,8);add(g,boxTris(0.022,0.022,1),mat(0,0,0.5),lin(0x8a7350));
