@@ -53,7 +53,7 @@ etapaMalha('fim','recados',1,()=>{try{REC.malha=litMesh(recGeo());}catch(e){cons
 const REC_M=new Float32Array(16);
 DESENHO.opaco.push(function recadosDesenho(Pg){if(!REC.malha)return;const A=recD().achados;for(const r of REC.lista){if(A[r.id]||d2(r.x,r.z,cam.pos[0],cam.pos[2])>45*45)continue;drawStat(Pg,REC.malha,trs(REC_M,r.x,r.y+0.005,r.z,0,r.yaw,0,1,1,1));}});
 DESENHO.aditivo.push(function recadosBrilho(){const A=recD().achados,pul=0.55+0.45*Math.sin((G.t||0)*3.2);for(const r of REC.lista){if(A[r.id])continue;const dd=d2(r.x,r.z,P.x,P.z);if(dd>14*14)continue;
-  const k=1-Math.sqrt(dd)/14;bb(r.x,r.y+0.12,r.z,0.16+0.1*pul,1,0.95,0.75,(0.25+0.35*pul)*k);}});
+  const d=Math.sqrt(dd),k=(1-d/14)*Math.min(1,d/3);bb(r.x,r.y+0.1,r.z,0.12+0.07*pul,1,0.95,0.75,(0.22+0.3*pul)*k);}});   // de perto apaga: o papel aparece
 /* ler: a tela de documento (a mesma dos papéis do subsolo); a coleção e os prêmios */
 function recLer(r){const T=REC_TEXTOS[r.id];if(!T||G.modo!=='jogo')return;const D=recD(),novo=!D.achados[r.id];D.achados[r.id]=true;const n=recAchados();
   G.modo='doc';tela('t-doc');$('doc-tit').textContent=T[0];$('doc-txt').innerHTML=T[1]+'<br><br><small>Recados do bairro: '+n+' de 12</small>';if(document.pointerLockElement)document.exitPointerLock();sfx('clique');
