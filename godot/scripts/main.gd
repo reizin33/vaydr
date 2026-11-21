@@ -585,7 +585,7 @@ func _teste() -> void:
 	_confere(jogador.global_position.y > -0.3 and jogador.global_position.y < 0.8 and jogador.vivo, "rua da cidade segura (y %.2f)" % jogador.global_position.y)
 	_por_em(Vector3(216.1, 3.47 + 0.6, 28.2))
 	await _quadros(45)
-	_confere(absf(jogador.global_position.y - 3.47) < 0.4, "1º andar do Edifício Aurora segura (y %.2f, piso 3,47)" % jogador.global_position.y)
+	_confere(jogador.global_position.y > 3.3 and jogador.global_position.y < 4.6, "1º andar do Edifício Aurora segura (y %.2f, piso 3,47; móvel até 4,5)" % jogador.global_position.y)
 	# coleta de verdade: o jogador vai até a árvore mais perto do começo e bate com a mão
 	var arv: Dictionary = {}
 	var dmin := 1e9

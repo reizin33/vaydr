@@ -1,7 +1,8 @@
 """Converte as malhas exportadas do VAYDR antigo (vértices de 11 floats: posição, cor linear, brilho, interior, normal)
-em blocos compactos que o Godot monta sem laço por vértice:
-  posição float32 x3 | cor sRGB 8 bits + interior (CUSTOM0, RGBA8 unorm) | normal + brilho (CUSTOM1, RGBA8 snorm)
-  | UV float32 x2 (só nas que têm textura) | índices uint32
+em blocos compactos que o Godot monta sem laço por vértice, só com atributos comuns (os do tipo CUSTOM com 8 bits
+saíam errados no renderizador de compatibilidade):
+  posição float32 x3 | cor sRGB 8 bits + interior (COLOR) | normal float32 x3 (NORMAL)
+  | UV float32 x2 (só nas que têm textura) | brilho float32 x2 (UV2, só nas que acendem) | índices uint32
 Vértices repetidos viram um só (índice). Cada malha vai comprimida (deflate) e o índice JSON diz onde está.
 Uso: python3 -I malhas_converter.py <saida_sem_extensao> <arquivo.json> [mais.json ...]"""
 import base64, json, os, sys, zlib
@@ -21,18 +22,22 @@ def converter(rec):
     c0 = np.empty((n, 4), np.uint8)
     c0[:, 0:3] = srgb8(f[:, 3:6])
     c0[:, 3] = np.clip(np.round(f[:, 7] * 255), 0, 255).astype(np.uint8)
-    nr = f[:, 8:11]
+    nr = f[:, 8:11].astype(np.float64)
     ln = np.linalg.norm(nr, axis=1, keepdims=True)
     ln[ln < 1e-6] = 1
-    nr = nr / ln
-    c1 = np.empty((n, 4), np.int8)
-    c1[:, 0:3] = np.clip(np.round(nr * 127), -127, 127).astype(np.int8)
-    c1[:, 3] = np.clip(np.round(f[:, 6] * 40), 0, 127).astype(np.int8)
-    partes = [pos.view(np.uint8).reshape(n, 12), c0, c1.view(np.uint8)]
+    nr = (nr / ln).astype('<f4')
+    # a normal vai arredondada (3 casas) só na chave de juntar vértices iguais
+    nq = np.round(nr * 1000).astype('<i2')
+    partes = [pos.view(np.uint8).reshape(n, 12), c0, nq.view(np.uint8).reshape(n, 6)]
     uv = None
     if rec.get('uv'):
         uv = np.frombuffer(base64.b64decode(rec['uv']), dtype='<f4').reshape(-1, 2).astype('<f4')
         partes.append(uv.view(np.uint8).reshape(n, 8))
+    br = None
+    if float(np.abs(f[:, 6]).max()) > 1e-4:
+        br = np.zeros((n, 2), '<f4')
+        br[:, 0] = f[:, 6]
+        partes.append(br.view(np.uint8).reshape(n, 8))
     chave = np.ascontiguousarray(np.concatenate(partes, axis=1))
     vista = chave.view(np.dtype((np.void, chave.shape[1]))).ravel()
     _, primeiro, inverso = np.unique(vista, return_index=True, return_inverse=True)
@@ -45,14 +50,16 @@ def converter(rec):
     # o WebGL usa triângulo anti-horário como frente; o Godot, horário: inverte a ordem de cada triângulo
     idx = idx.reshape(-1, 3)[:, [0, 2, 1]].ravel()
     nu = len(sel)
-    blocos = [pos[sel].tobytes(), c0[sel].tobytes(), c1[sel].tobytes()]
+    blocos = [pos[sel].tobytes(), c0[sel].tobytes(), nr[sel].tobytes()]
     if uv is not None:
         blocos.append(uv[sel].tobytes())
+    if br is not None:
+        blocos.append(br[sel].tobytes())
     blocos.append(idx.tobytes())
     bruto = b''.join(blocos)
     lo = pos.min(axis=0).tolist()
     hi = pos.max(axis=0).tolist()
-    return bruto, nu, len(idx), lo, hi, uv is not None
+    return bruto, nu, len(idx), lo, hi, uv is not None, br is not None
 
 
 def main():
@@ -70,10 +77,10 @@ def main():
             for rec in recs:
                 if not rec or not rec.get('n'):
                     continue
-                bruto, nu, ni, lo, hi, tem_uv = converter(rec)
+                bruto, nu, ni, lo, hi, tem_uv, tem_br = converter(rec)
                 z = zlib.compress(bruto, 6)
                 info = {k: v for k, v in rec.items() if k not in ('d', 'uv')}
-                info.update({'off': out.tell(), 'tz': len(z), 't': len(bruto), 'nu': nu, 'ni': ni, 'lo': lo, 'hi': hi, 'uv': tem_uv})
+                info.update({'off': out.tell(), 'tz': len(z), 't': len(bruto), 'nu': nu, 'ni': ni, 'lo': lo, 'hi': hi, 'uv': tem_uv, 'br': tem_br})
                 out.write(z)
                 indice.append(info)
                 total_v += rec['n']

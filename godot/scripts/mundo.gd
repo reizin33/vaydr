@@ -11,9 +11,10 @@ extends Node3D
 ## foto da própria espécie (tirada quando o jogo abre). As placas de um pedaço vão todas num desenho só.
 
 const PEDACO := 40.0
+const PEDACO_ARV := 32.0
 # distâncias das três versões da árvore (gráfico Alto; o Médio e o Baixo multiplicam por "mata" das opções)
-const ARV_PERTO := 70.0
-const ARV_MEIO := 180.0
+const ARV_PERTO := 55.0
+const ARV_MEIO := 130.0
 var terreno: Terreno
 var rng := RandomNumberGenerator.new()
 var malhas := {}          # chave -> Mesh
@@ -32,6 +33,7 @@ var loot := {}            # tabelas do jogo antigo: [item, min, max, chance]
 var loot_cid := {}        # tabelas da cidade: [item, chance, min, max]
 var mat_placa: ShaderMaterial
 var fotos_prontas := false
+var _folha_orig := {}     # material de folha novo -> o material do modelo (para a foto da espécie)
 var _voltando := []       # recursos que acabaram e esperam voltar (índices)
 var _vazias := []         # móveis já revistados (índices)
 
@@ -73,11 +75,53 @@ func malha(caminho: String, tinta := Color(1, 1, 1), tinta_folha := Color(1, 1, 
 			var mt := m.surface_get_material(s) as BaseMaterial3D
 			if mt == null:
 				continue
-			var novo := mt.duplicate() as BaseMaterial3D
-			var folha := novo.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED
-			novo.albedo_color = novo.albedo_color * (tinta_folha if folha else tinta)
-			(m as ArrayMesh).surface_set_material(s, novo)
+			var folha := mt.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED
+			if folha:
+				# folha: o shader de folhagem (luz dos dois lados, como um volume, e um balanço leve de vento)
+				var mf := _mat_folha(mt, tinta_folha)
+				_folha_orig[mf] = mt
+				(m as ArrayMesh).surface_set_material(s, mf)
+			else:
+				var novo := mt.duplicate() as BaseMaterial3D
+				novo.albedo_color = novo.albedo_color * tinta
+				(m as ArrayMesh).surface_set_material(s, novo)
 	malhas[caminho] = m
+	return m
+
+
+## folhagem: a textura da folha com recorte; a luz pega a folha dos dois lados (metade a normal dela, metade para cima,
+## como numa copa) e as folhas balançam um pouco com o vento (mais na ponta dos galhos)
+func _mat_folha(base: BaseMaterial3D, tinta: Color) -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode cull_disabled, diffuse_burley, specular_disabled;
+uniform sampler2D tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec4 cor : source_color = vec4(1.0);
+uniform float corte = 0.45;
+
+void vertex() {
+	vec3 w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float ponta = clamp(VERTEX.y * 0.25, 0.0, 1.0);
+	VERTEX.x += sin(TIME * 1.3 + w.x * 0.21 + w.z * 0.13) * 0.035 * ponta;
+	VERTEX.z += cos(TIME * 1.1 + w.z * 0.17 + w.x * 0.07) * 0.03 * ponta;
+}
+
+void fragment() {
+	vec4 c = texture(tex, UV) * cor;
+	ALBEDO = c.rgb;
+	ALPHA = c.a;
+	ALPHA_SCISSOR_THRESHOLD = corte;
+	ROUGHNESS = 0.92;
+	vec3 n = FRONT_FACING ? NORMAL : -NORMAL;
+	NORMAL = normalize(mix(n, (VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz, 0.55));
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("tex", base.albedo_texture)
+	m.set_shader_parameter("cor", base.albedo_color * tinta)
+	m.set_shader_parameter("corte", base.alpha_scissor_threshold if base.alpha_scissor_threshold > 0.05 else 0.45)
 	return m
 
 
@@ -260,9 +304,9 @@ func _tres_versoes(e: Dictionary, pos: Vector3, giro: float, s: float, longe: fl
 	var xf := _xf_arvore(e, pos, giro, s)
 	var id: String = e["id"]
 	return [
-		_instancia("arv:%s:0" % id, xf, 0.0, ARV_PERTO * longe, true, PEDACO, Color(0, 0, 0, 0), pos),
-		_instancia("arv:%s:1" % id, xf, ARV_PERTO * longe, ARV_MEIO * longe, true, PEDACO, Color(0, 0, 0, 0), pos),
-		_instancia("placa", _xf_placa(e, pos, s), ARV_MEIO * longe, 0.0, false, PEDACO, Color(float(e["cela"]), 0, 0, 0), pos),
+		_instancia("arv:%s:0" % id, xf, 0.0, ARV_PERTO * longe, true, PEDACO_ARV, Color(0, 0, 0, 0), pos),
+		_instancia("arv:%s:1" % id, xf, ARV_PERTO * longe, ARV_MEIO * longe, false, PEDACO_ARV, Color(0, 0, 0, 0), pos),
+		_instancia("placa", _xf_placa(e, pos, s), ARV_MEIO * longe, 0.0, false, PEDACO_ARV, Color(float(e["cela"]), 0, 0, 0), pos),
 	]
 
 
@@ -284,15 +328,19 @@ func _corpo_arvore(p: Vector3, raio: float) -> StaticBody3D:
 	return corpo
 
 
-## versão de meia distância: tronco e galhos inteiros e 1/4 das folhas (cada folha que fica, 60% maior)
+## versão de meia distância: o tronco inteiro, sem os galhos finos (ficam dentro da copa), e 35% das folhas (cada folha
+## que fica, 40% maior)
 func _meia_distancia(m0: Mesh) -> ArrayMesh:
 	var m1 := ArrayMesh.new()
 	for s in m0.get_surface_count():
 		var mat := m0.surface_get_material(s)
+		var folha := mat is ShaderMaterial or (mat is BaseMaterial3D and (mat as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED)
+		var nome := (m0 as ArrayMesh).surface_get_name(s) + " " + (mat.resource_name if mat else "")
+		if not folha and nome.to_lower().contains("branch"):
+			continue
 		var arr := m0.surface_get_arrays(s)
-		var folha := mat is BaseMaterial3D and (mat as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED
 		if folha:
-			arr = _desbastar(arr, 0.25, 1.6)
+			arr = _desbastar(arr, 0.35, 1.4)
 		m1.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		m1.surface_set_material(m1.get_surface_count() - 1, mat)
 	return m1
@@ -400,8 +448,8 @@ void vertex() {
 void fragment() {
 	vec2 uv = vec2((UV.x + cela) / celas, UV.y);
 	vec4 c = texture(fotos, uv);
-	// o miolo de baixo da copa é mais escuro (a luz não entra)
-	ALBEDO = c.rgb * mix(1.0, 0.72, alto);
+	// a foto é a cor sem luz: de longe a copa tem sombra dentro dela, então fica mais escura; o miolo de baixo mais ainda
+	ALBEDO = c.rgb * 0.62 * mix(1.0, 0.75, alto);
 	ALPHA = c.a;
 	ALPHA_SCISSOR_THRESHOLD = 0.4;
 	ROUGHNESS = 0.95;
@@ -431,11 +479,14 @@ func tirar_fotos() -> void:
 		var m0: Mesh = e["m0"]
 		mi.mesh = m0
 		for s in m0.get_surface_count():
-			var mt := m0.surface_get_material(s) as BaseMaterial3D
+			var ms := m0.surface_get_material(s)
+			var mt: BaseMaterial3D = _folha_orig.get(ms, ms as BaseMaterial3D)
 			if mt == null:
 				continue
 			var plano := mt.duplicate() as BaseMaterial3D
 			plano.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			if _folha_orig.has(ms):
+				plano.albedo_color = (ms as ShaderMaterial).get_shader_parameter("cor")
 			mi.set_surface_override_material(s, plano)
 		vp.add_child(mi)
 		var a: AABB = e["aabb"]
@@ -502,6 +553,11 @@ func _pedras(lista: Array) -> void:
 
 
 func _plantas(v: Dictionary) -> void:
+	# as folhas das moitas e samambaias com o shader de folhagem (como as das árvores)
+	for mb in MOITAS:
+		malha(mb[0], Color(0.85, 0.82, 0.78), Color(0.88, 1.0, 0.86))
+	for ms in SAMAMBAIAS:
+		malha(ms, Color(1, 1, 1), Color(0.9, 1.0, 0.88))
 	# moitas: dão fibra; as que têm fruto dão frutinha
 	for b in v["bushes"]:
 		var bp := Vector3(float(b[0]), float(b[1]), float(b[2]))

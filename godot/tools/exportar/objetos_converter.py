@@ -43,12 +43,12 @@ def gravar(saida, recs, texs):
         for rec in recs:
             if not rec.get('n'):
                 continue
-            bruto, nu, ni, lo, hi, tem_uv = converter(rec)
+            bruto, nu, ni, lo, hi, tem_uv, tem_br = converter(rec)
             z = zlib.compress(bruto, 6)
             info = {k: v for k, v in rec.items() if k not in ('d', 'uv')}
             if info.get('tex'):
                 info['tex'] = texs.get(info['tex'], '')
-            info.update({'off': out.tell(), 'tz': len(z), 't': len(bruto), 'nu': nu, 'ni': ni, 'lo': lo, 'hi': hi, 'uv': tem_uv})
+            info.update({'off': out.tell(), 'tz': len(z), 't': len(bruto), 'nu': nu, 'ni': ni, 'lo': lo, 'hi': hi, 'uv': tem_uv, 'br': tem_br})
             out.write(z)
             indice.append(info)
     json.dump(indice, open(saida + '.json', 'w', encoding='utf-8'), ensure_ascii=False)
@@ -61,16 +61,28 @@ kit = ler('n_kit.json')
 inst = ler('o_inst.json')
 # carcaças de ônibus, caminhões e ambulância (feitas peça por peça no jogo antigo: vêm só com a cor de cada peça)
 carc = ler('p_carc.json') if os.path.exists(os.path.join(ent, 'p_carc.json')) else {'modelos': [], 'texturas': {}}
+# o resto do que é fixo no mapa, capturado do que o jogo antigo desenha (porto, navio, contêineres, naufrágios, praia,
+# detalhes das ruas, a cidade em caos, fachadas, feira, lajes, fundo do mar, acampamento da clareira, abrigos, quarentena,
+# Sabiá, botijões, recados, placas do bloqueio...). O que já vem nas malhas fixas (ferrovia, trem, ponte e cais do lago)
+# fica de fora para não dobrar.
+fixos = ler('t_fixos.json') if os.path.exists(os.path.join(ent, 't_fixos.json')) else {'modelos': [], 'texturas': {}, 'inst': []}
+JA_TEM = {('ferroDesenhar#6', 34776), ('ferroDesenhar#6', 6732), ('#2', 1476), ('#2', 1503)}
+pula = {m['modelo'] for m in fixos['modelos'] if (m['camada'], m['n']) in JA_TEM}
+fixos['modelos'] = [m for m in fixos['modelos'] if m['modelo'] not in pula]
+fixos['inst'] = [i for i in fixos['inst'] if i['m'] not in pula]
+# até onde cada parte aparece (as distâncias do jogo antigo) e se faz sombra
+DIST = {'ruasDetalhe': (260, False), 'caosDesenho': (300, True), 'fachadasDesenho': (200, True), 'feiraDesenho': (220, True),
+        'portoDesenho': (450, True), '#27': (300, False), 'lajDesenho': (190, True), 'ferroDesenhar': (220, True)}
 
 texs = {}
-for fonte in (props, lug, kit):
+for fonte in (props, lug, kit, fixos):
     for nome, url in fonte['texturas'].items():
         if url:
             texs[nome] = salvar_tex(nome, url)
 print('texturas:', len(texs))
 
 malhas = os.path.join(godot, 'dados', 'mapa', 'malhas')
-gravar(os.path.join(malhas, 'modelos'), props['modelos'] + lug['modelos'] + carc['modelos'], texs)
+gravar(os.path.join(malhas, 'modelos'), props['modelos'] + lug['modelos'] + carc['modelos'] + fixos['modelos'], texs)
 gravar(os.path.join(malhas, 'kit'), kit['modelos'], texs)
 
 # matrizes: base (3 colunas) e origem, 12 números
@@ -87,7 +99,16 @@ for cat, lista in inst.items():
         L.append(q)
         usados.add(o['m'])
     saida[cat] = L
+L = []
+for o in fixos['inst']:
+    M = o['M']
+    camada = o['camada'].split('#')[0] or o['camada']
+    dist, sombra = DIST.get(camada, DIST.get(o['camada'], (160, True)))
+    L.append({'m': o['m'], 'xf': [M[0], M[1], M[2], M[4], M[5], M[6], M[8], M[9], M[10], M[12], M[13], M[14]], 'dist': dist, 'sombra': sombra,
+              'camada': o['camada']})
+    usados.add(o['m'])
+saida['fixo'] = L
 saida['creditos'] = {'lugares': lug.get('creditos', {}), 'kit': kit.get('credito', '')}
 json.dump(saida, open(os.path.join(godot, 'dados', 'mapa', 'objetos3d.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
-modelos = {r['modelo'] for r in props['modelos'] + lug['modelos'] + carc['modelos']}
+modelos = {r['modelo'] for r in props['modelos'] + lug['modelos'] + carc['modelos'] + fixos['modelos']}
 print('objetos:', {k: len(v) for k, v in saida.items() if isinstance(v, list)}, '| modelos usados sem malha:', sorted(usados - modelos))

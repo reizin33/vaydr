@@ -5,7 +5,9 @@ extends Node3D
 ## · os objetos da rua (postes, lixeiras, bancos, barreiras, hidrantes, carcaças de carro, ônibus, caminhão e ambulância,
 ##   sacos de lixo, pneus...) e do acampamento da clareira;
 ## · os lugares escaneados (galpão de trens, bunker, casa abandonada, prédios destruído e abandonado, ruína na mata,
-##   carros destruídos, Base Militar com garagens, helicóptero, blindado, sacos de areia e barreiras, o posto da torre...).
+##   carros destruídos, Base Militar com garagens, helicóptero, blindado, sacos de areia e barreiras, o posto da torre...);
+## · o resto do que é fixo no mapa (porto, navio cargueiro, contêineres, naufrágios, praia, detalhes das ruas, a cidade em
+##   caos, fachadas, feira, lajes, fundo do mar, acampamento da clareira, abrigos, quarentena, botijões, recados...).
 ## Os modelos (dados/mapa/malhas/modelos) são os do jogo antigo, com as texturas deles (assets/mapa). Cada modelo vai em
 ## lotes (MultiMesh) por pedaço de 64 m, e cada tipo some na distância que sumia lá: móveis de dentro a 40 m, tralha da rua a
 ## 40-60 m, postes e carros a 150 m, os lugares a 150-320 m.
@@ -21,7 +23,7 @@ var _pend := {}
 func montar() -> void:
 	_modelos()
 	var o: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(PASTA + "objetos3d.json"))
-	for cat in ["interior", "rua", "mundo", "lugar"]:
+	for cat in ["interior", "rua", "mundo", "lugar", "fixo"]:
 		for q in o.get(cat, []):
 			_objeto(cat, q)
 	_fechar()
@@ -59,6 +61,9 @@ func _objeto(cat: String, q: Dictionary) -> void:
 		"lugar":
 			fim = float(q.get("dist", 150.0))
 			sombra = true
+		"fixo":
+			fim = float(q.get("dist", 160.0))
+			sombra = bool(q.get("sombra", true))
 		_:
 			var r := float(q.get("r", 0.6))
 			var L := float(q.get("L", 0.0))

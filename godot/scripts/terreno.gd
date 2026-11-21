@@ -399,34 +399,50 @@ func _agua_doce() -> void:
 	add_child(mi)
 
 
-## o mar: um plano grande a leste (até o horizonte) que sobe e desce com a maré
+## o mar: um plano grande a leste (até o horizonte) que sobe e desce com a maré; dentro do mapa ele só aparece onde o
+## mapa diz que é mar (no rio, no lago e embaixo da terra ele some)
 func _mar() -> void:
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(1400, 1600)
-	pm.subdivide_width = 70
-	pm.subdivide_depth = 80
+	pm.size = Vector2(6000, 6000)
+	pm.subdivide_width = 120
+	pm.subdivide_depth = 120
 	mar = MeshInstance3D.new()
 	mar.name = "Mar"
 	mar.mesh = pm
-	mar.position = Vector3(250.0 + 700.0, mar_base, 0.0)
-	mar.material_override = _mat_agua(Color(0.05, 0.16, 0.2), 0.9)
+	mar.position = Vector3(180.0 + 3000.0, mar_base, 0.0)
+	var m := _mat_agua(Color(0.05, 0.16, 0.2), 0.9, true)
+	var tipos := agua_tipo.duplicate()
+	for k in tipos.size():
+		tipos[k] = 255 if tipos[k] == 2 else 0
+	m.set_shader_parameter("so_mar", ImageTexture.create_from_image(Image.create_from_data(W, H, false, Image.FORMAT_L8, tipos)))
+	m.set_shader_parameter("mapa_ret", Vector4(X0 - 0.5 * P, Z0 - 0.5 * P, W * P, H * P))
+	mar.material_override = m
 	mar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mar)
 
 
-func _mat_agua(cor: Color, alfa: float) -> ShaderMaterial:
+func _mat_agua(cor: Color, alfa: float, mar := false) -> ShaderMaterial:
 	var sh := Shader.new()
 	sh.code = """
 shader_type spatial;
 render_mode blend_mix, depth_draw_always, cull_disabled, specular_schlick_ggx;
 uniform vec3 cor : source_color = vec3(0.08, 0.18, 0.2);
 uniform float alfa = 0.85;
+uniform sampler2D so_mar : filter_nearest, repeat_disable;
+uniform vec4 mapa_ret = vec4(0.0);
+uniform bool e_mar = false;
 varying vec3 wp;
 void vertex() {
 	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	VERTEX.y += sin(wp.x * 0.11 + wp.z * 0.03 - TIME * 1.1) * 0.06 + sin(wp.x * 0.05 - wp.z * 0.07 - TIME * 0.7) * 0.05;
 }
 void fragment() {
+	if (e_mar) {
+		vec2 um = (wp.xz - mapa_ret.xy) / mapa_ret.zw;
+		if (um.x > 0.0 && um.y > 0.0 && um.x < 1.0 && um.y < 1.0 && texture(so_mar, um).r < 0.5) {
+			discard;
+		}
+	}
 	float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
 	float r = sin(wp.x * 1.7 + TIME * 1.3) * sin(wp.z * 1.9 - TIME * 1.1);
 	NORMAL_MAP = normalize(vec3(0.5 + 0.06 * r, 0.5 + 0.06 * cos(wp.x * 1.3 - TIME), 1.0));
@@ -441,6 +457,7 @@ void fragment() {
 	m.shader = sh
 	m.set_shader_parameter("cor", cor)
 	m.set_shader_parameter("alfa", alfa)
+	m.set_shader_parameter("e_mar", mar)
 	return m
 
 

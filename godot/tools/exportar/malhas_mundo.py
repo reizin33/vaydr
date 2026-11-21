@@ -15,7 +15,7 @@ def _ler(pasta, nome, pular_longe=True):
         bruto = zlib.decompress(f.read(r['tz']))
         nu, ni = r['nu'], r['ni']
         pos = np.frombuffer(bruto, '<f4', nu * 3, 0).reshape(nu, 3).astype(np.float64)
-        o = nu * 12 + nu * 8 + (nu * 8 if r['uv'] else 0)
+        o = nu * 12 + nu * 4 + nu * 12 + (nu * 8 if r['uv'] else 0) + (nu * 8 if r.get('br') else 0)
         ids = np.frombuffer(bruto, '<u4', ni, o).reshape(-1, 3)
         yield r, pos, ids
 
@@ -40,7 +40,7 @@ def triangulos_do_mundo(pasta, objetos=True):
     for r, pos, ids in _ler(pasta, 'modelos', False):
         modelos.setdefault(r['modelo'], []).append(pos[ids])
     inst = json.load(open(arq, encoding='utf-8'))
-    for cat in ('interior', 'rua', 'mundo', 'lugar'):
+    for cat in ('interior', 'rua', 'mundo', 'lugar', 'fixo'):
         for o in inst.get(cat, []):
             partes = modelos.get(o['m'])
             if not partes:

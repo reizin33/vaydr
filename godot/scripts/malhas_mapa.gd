@@ -9,7 +9,6 @@ extends Node3D
 ## perto (com o lado de dentro) e longe (só a casca).
 
 const PASTA := "res://dados/mapa/malhas/"
-const FLAGS := (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (Mesh.ARRAY_CUSTOM_RGBA8_SNORM << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
 var mat: ShaderMaterial
 var nos := []          # {mi, grupo, lod, alc}
 var n_vertices := 0
@@ -23,7 +22,7 @@ func montar() -> void:
 		_grupo(g)
 
 
-## lê uma malha do arquivo (posição, cor + lado de dentro, normal + brilho, UV quando tem, índices)
+## lê uma malha do arquivo (posição, cor + lado de dentro, normal, UV quando tem, brilho quando acende, índices)
 static func ler_malha(f: FileAccess, r: Dictionary) -> ArrayMesh:
 	f.seek(int(r["off"]))
 	var z := f.get_buffer(int(r["tz"]))
@@ -35,21 +34,24 @@ static func ler_malha(f: FileAccess, r: Dictionary) -> ArrayMesh:
 	arr.resize(Mesh.ARRAY_MAX)
 	arr[Mesh.ARRAY_VERTEX] = _como(TYPE_PACKED_VECTOR3_ARRAY, bruto.slice(o, o + nu * 12), 12)
 	o += nu * 12
-	arr[Mesh.ARRAY_CUSTOM0] = bruto.slice(o, o + nu * 4)
+	arr[Mesh.ARRAY_COLOR] = _cores(bruto.slice(o, o + nu * 4), nu)
 	o += nu * 4
-	arr[Mesh.ARRAY_CUSTOM1] = bruto.slice(o, o + nu * 4)
-	o += nu * 4
+	arr[Mesh.ARRAY_NORMAL] = _como(TYPE_PACKED_VECTOR3_ARRAY, bruto.slice(o, o + nu * 12), 12)
+	o += nu * 12
 	if bool(r["uv"]):
 		arr[Mesh.ARRAY_TEX_UV] = _como(TYPE_PACKED_VECTOR2_ARRAY, bruto.slice(o, o + nu * 8), 8)
 		o += nu * 8
+	if bool(r.get("br", false)):
+		arr[Mesh.ARRAY_TEX_UV2] = _como(TYPE_PACKED_VECTOR2_ARRAY, bruto.slice(o, o + nu * 8), 8)
+		o += nu * 8
 	arr[Mesh.ARRAY_INDEX] = bruto.slice(o, o + ni * 4).to_int32_array()
 	var m := ArrayMesh.new()
-	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], {}, FLAGS)
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	return m
 
 
-## bytes crus (float32) viram PackedVector3Array/PackedVector2Array sem laço: monta o cabeçalho do formato do Godot
-## (tipo + quantidade) e decodifica
+## bytes crus (float32) viram PackedVector3Array/PackedVector2Array/PackedColorArray sem laço: monta o cabeçalho do
+## formato do Godot (tipo + quantidade) e decodifica
 static func _como(tipo: int, dados: PackedByteArray, tam: int) -> Variant:
 	var cab := PackedByteArray()
 	cab.resize(8)
@@ -57,6 +59,17 @@ static func _como(tipo: int, dados: PackedByteArray, tam: int) -> Variant:
 	cab.encode_u32(4, dados.size() / tam)
 	cab.append_array(dados)
 	return bytes_to_var(cab)
+
+
+## cores de 8 bits (RGBA) viram PackedColorArray sem laço: uma imagem RGBA8 convertida para RGBA em float
+static func _cores(b: PackedByteArray, n: int) -> Variant:
+	var w := mini(n, 4096)
+	var h := (n + w - 1) / w
+	if b.size() < w * h * 4:
+		b.resize(w * h * 4)
+	var img := Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, b)
+	img.convert(Image.FORMAT_RGBAF)
+	return _como(TYPE_PACKED_COLOR_ARRAY, img.get_data().slice(0, n * 16), 16)
 
 
 func _grupo(nome: String) -> void:
@@ -142,11 +155,9 @@ vec3 srgb_lin(vec3 c) {
 }
 
 void vertex() {
-	NORMAL = normalize(CUSTOM1.xyz);
-	brilho = max(CUSTOM1.w, 0.0) * 127.0 / 40.0 + brilho_extra;
-	interior = CUSTOM0.a;
+	brilho = UV2.x + brilho_extra;
+	interior = COLOR.a;
 	%s
-	COLOR = vec4(CUSTOM0.rgb, 1.0);
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
