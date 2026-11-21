@@ -110,6 +110,7 @@ func _ready() -> void:
 	var ponto := ColorRect.new()
 	ponto.color = Color(1, 1, 1, 0.85)
 	ponto.size = Vector2(4, 4)
+	ponto.mouse_filter = Control.MOUSE_FILTER_IGNORE   # no meio da tela: não pode segurar o movimento do mouse
 	_ancorar(ponto, Control.PRESET_CENTER, Rect2(-2, -2, 4, 4))
 	raiz.add_child(ponto)
 	mira_lbl = _lbl("", 17)

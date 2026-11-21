@@ -658,9 +658,42 @@ func _beira(centro: Vector2) -> Dictionary:
 	return melhor
 
 
+## o pedaço da tela (visível, que segura o mouse) que cobre este ponto ("" = nenhum)
+func _segura_ponto(no: Node, p: Vector2) -> String:
+	for f in no.get_children():
+		var r := _segura_ponto(f, p)
+		if r != "":
+			return r
+	if no is Control:
+		var c := no as Control
+		if c.is_visible_in_tree() and c.mouse_filter == Control.MOUSE_FILTER_STOP and c.get_global_rect().has_point(p):
+			return "%s (%s)" % [c.name, c.get_class()]
+	return ""
+
+
 func _teste() -> void:
 	print("TESTE VAYDR Godot: começo")
 	await _quadros(5)
+	# o mouse vira a câmera para os lados e para cima e para baixo: com o mouse preso o movimento chega no meio da tela, e
+	# nada da tela do jogo pode ficar ali segurando o mouse (na 0.2.0 o pontinho da mira segurava e a câmera não virava)
+	var meio := get_viewport().get_visible_rect().size / 2.0
+	var segura := _segura_ponto(ui, meio)
+	_confere(segura == "", "nada da tela segura o mouse no meio da tela%s" % ("" if segura == "" else ": " + segura))
+	jogador.mouse_preso_teste = true
+	var giro0 := jogador.rotation.y
+	var olhar0 := jogador.cabeca.rotation.x
+	for k in 4:
+		var mm := InputEventMouseMotion.new()
+		mm.position = meio
+		mm.global_position = meio
+		mm.relative = Vector2(40, 12)
+		get_viewport().push_input(mm)
+	await _quadros(2)
+	jogador.mouse_preso_teste = false
+	_confere(absf(angle_difference(giro0, jogador.rotation.y)) > 0.2 and jogador.cabeca.rotation.x < olhar0 - 0.05,
+		"o mouse vira a câmera para o lado (%.0f°) e para baixo (%.0f°)" % [rad_to_deg(angle_difference(giro0, jogador.rotation.y)), rad_to_deg(jogador.cabeca.rotation.x - olhar0)])
+	jogador.rotation.y = giro0
+	jogador.cabeca.rotation.x = olhar0
 	var F := Construcao.FUND
 	# o mapa do jogo antigo
 	_confere(terreno.W >= 801 and terreno.H >= 681 and terreno.alturas.size() == terreno.W * terreno.H, "relevo do jogo antigo: %d x %d m (com a Serra Velha)" % [terreno.W, terreno.H])
@@ -1124,6 +1157,12 @@ func _teste() -> void:
 	jogador.sede = 40.0
 	jogador.usar()
 	_confere(jogador.sede > 60.0, "beber no %s (sede %d)" % [mundo.aguas[1]["nome"], int(jogador.sede)])
+	jogador.inv.por("garrafa", 2)
+	var ag0 := jogador.inv.conta("agua")
+	_na_mao("garrafa")
+	jogador.usar()
+	_confere(jogador.inv.conta("garrafa") == 0 and jogador.inv.conta("agua") >= ag0 + 2,
+		"garrafa na mão no poço: encheu as vazias (%d garrafas d'água)" % jogador.inv.conta("agua"))
 	_confere(jogador.fome < 100.0 and jogador.sede < 100.0, "fome e sede caem com o tempo")
 	# zumbis da vila: aparecem quando você chega perto e somem quando vai embora
 	_por_em(Vector3(40, terreno.h(40, -40) + 0.3, -40))
@@ -1321,13 +1360,14 @@ func _fotos() -> void:
 	await _foto("13_machado_na_mao")
 	jogador.inv.tirar("machado", 1)
 	# uma base pequena montada pelo próprio sistema de construção, num lugar livre perto da clareira
-	for e in [["madeira", 200], ["pedra", 200], ["tabuas", 300], ["pregos", 200], ["corda", 30], ["graveto", 60], ["fibra", 60],
-			["sucata", 40], ["pano", 30], ["mochilaExpedicao", 1]]:
-		jogador.inv.por(e[0], e[1])
+	jogador.inv.por("mochilaExpedicao", 1)
 	for i in jogador.inv.limite:
 		var sm = jogador.inv.slots[i]
 		if sm != null and sm["id"] == "mochilaExpedicao":
 			jogador.inv.vestir(i)
+	for e in [["madeira", 120], ["pedra", 120], ["tabuas", 240], ["pregos", 160], ["corda", 30], ["graveto", 40], ["fibra", 40],
+			["sucata", 40], ["pano", 30]]:
+		jogador.inv.por(e[0], e[1])
 	jogador.inv.por("plano", 1)
 	_na_mao("plano")
 	_por_em(Vector3(livre.x, livre.y + 0.3, livre.z + 1.0))

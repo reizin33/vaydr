@@ -26,6 +26,8 @@ var sede := 100.0
 var vivo := true
 var agachado := false
 var sens := 0.0022
+var inverter_y := false
+var mouse_preso_teste := false   # o teste sem tela não prende o mouse: finge que está preso
 var cd := 0.0
 var balanco := 0.0
 var golpe := 0.0
@@ -92,12 +94,20 @@ func _visto(id: String) -> void:
 	vistos[id] = true
 
 
+## o mouse vira a câmera aqui, antes da tela (interface): com o mouse preso o Windows informa o movimento no meio da tela,
+## e qualquer pedaço da interface que esteja no meio (a mira) engolia o movimento antes de chegar ao jogador
+func _input(ev: InputEvent) -> void:
+	if not vivo or preso:
+		return
+	if ev is InputEventMouseMotion and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or mouse_preso_teste):
+		var r: Vector2 = ev.relative
+		rotate_y(-r.x * sens)
+		cabeca.rotation.x = clampf(cabeca.rotation.x - r.y * sens * (-1.0 if inverter_y else 1.0), -1.45, 1.45)
+
+
 func _unhandled_input(ev: InputEvent) -> void:
 	if not vivo or preso:
 		return
-	if ev is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-ev.relative.x * sens)
-		cabeca.rotation.x = clampf(cabeca.rotation.x - ev.relative.y * sens, -1.45, 1.45)
 	if ev is InputEventMouseButton and ev.pressed:
 		if ev.button_index == MOUSE_BUTTON_WHEEL_UP:
 			selecionar((sel + Inventario.BARRA - 1) % Inventario.BARRA)
@@ -420,10 +430,11 @@ func usar() -> void:
 		return
 
 
-## água: com garrafas vazias na mochila, enche todas (limpa no poço e no barril, suja no rio e no lago); sem garrafa, bebe ali
+## água: com a garrafa vazia na mão, enche todas as vazias da mochila (limpa no poço e no barril, suja no rio e no lago);
+## sem ela na mão, bebe ali mesmo
 func _agua(limpa: bool, onde: String) -> void:
 	var vazias := inv.conta("garrafa")
-	if vazias > 0:
+	if vazias > 0 and str(item_mao().get("id", "")) == "garrafa":
 		inv.tirar("garrafa", vazias)
 		_ganhar("agua" if limpa else "aguaSuja", vazias)
 		main.ui.aviso("Encheu %d garrafa%s (%s)" % [vazias, "s" if vazias > 1 else "", "água limpa" if limpa else "água suja: ferva na fogueira"])

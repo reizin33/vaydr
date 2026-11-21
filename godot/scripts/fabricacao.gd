@@ -45,6 +45,14 @@ static func falta_estacao(r: Dictionary, j) -> String:
 	return "Precisa estar perto de: " + Dados.nome_estacao(e)
 
 
+## "ferramenta" no jogo antigo: true ou "lamina" pede uma lâmina na mochila; false ou nada, não
+static func precisa_lamina(r: Dictionary) -> bool:
+	var f = r.get("ferramenta")
+	if f is bool:
+		return f
+	return f != null and str(f) != ""
+
+
 static func tem_lamina(inv: Inventario) -> bool:
 	for l in LAMINAS:
 		if inv.conta(l) > 0:
@@ -76,7 +84,7 @@ static func pode(r: Dictionary, j) -> String:
 	m = falta_estacao(r, j)
 	if m != "":
 		return m
-	if r.has("ferramenta") and r["ferramenta"] != false and not tem_lamina(j.inv):
+	if precisa_lamina(r) and not tem_lamina(j.inv):
 		return "Precisa de uma lâmina na mochila (faca, facão ou machado)"
 	var c := custo_real(r, j.inv)
 	if not j.inv.tem(c):
