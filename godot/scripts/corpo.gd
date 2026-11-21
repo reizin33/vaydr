@@ -323,7 +323,7 @@ func _trocar_corpo(gg: String) -> void:
 		mi.extra_cull_margin = 0.6   # a pose anda longe da de repouso (pulo, queda): a caixa da malha não pode cortar o desenho
 	mat_pele = StandardMaterial3D.new()
 	mat_pele.roughness = 0.62
-	mat_pele.specular = 0.4
+	mat_pele.metallic_specular = 0.4
 	for nome in nos:
 		var mi: MeshInstance3D = nos[nome]
 		if str(nome).begins_with("corpo_"):
@@ -372,7 +372,7 @@ func _mat_peca(chave: String, caminho: String, rug: float) -> StandardMaterial3D
 	mt.alpha_scissor_threshold = 0.4
 	mt.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mt.roughness = rug
-	mt.specular = 0.3
+	mt.metallic_specular = 0.3
 	_mats[chave] = mt
 	return mt
 

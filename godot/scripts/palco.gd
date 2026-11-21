@@ -7,7 +7,7 @@ extends Node3D
 
 const PONTO := Vector2(3.25, 3.25)   # perto da fogueira da clareira (que fica no meio dela)
 const YAW := 1.31                    # para onde ele olha (o ângulo do jogo antigo: frente = (sen, cos))
-const HORA := 19.15
+const HORA := 18.2                   # o fim da tarde (no jogo antigo era 19h15, que lá ainda tinha o céu laranja)
 const FOV := 0.6                     # altura do quadro, em radianos (34°)
 
 var main

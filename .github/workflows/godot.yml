@@ -86,8 +86,6 @@ jobs:
           set +e
           if [ ! -f jogo_abriu ]; then echo "o jogo nem abriu no teste (erro de script?): sem fotos"; exit 0; fi
           export LIBGL_ALWAYS_SOFTWARE=1
-          # um fio só no llvmpipe: com vários, às vezes a metade de baixo de um quadro saía deslocada para o lado (na tela e na textura)
-          export LP_NUM_THREADS=1
           timeout 2700 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
           ls -la godot/fotos || true
 

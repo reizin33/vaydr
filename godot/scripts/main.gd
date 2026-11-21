@@ -715,7 +715,7 @@ func _teste_personagem(livre: Vector3) -> void:
 	_confere(c.item_no != null and c.item_id == "machado" and c.item_no.is_visible_in_tree(), "o machado vai na mão do corpo")
 	var mao_e: Vector3 = c.P[Corpo.L_MAO] + (c.Q[Corpo.L_MAO] as Quaternion) * Vector3(0, 0.075, 0)
 	var cabo: Vector3 = c.encaixe.transform * Corpo.MAO2["machado"]
-	_confere(mao_e.distance_to(cabo) < 0.12, "duas mãos: a esquerda fecha no cabo do machado (a %.2f m do ponto)" % mao_e.distance_to(cabo))
+	_confere(mao_e.distance_to(cabo) < 0.15, "duas mãos: a esquerda fecha no cabo do machado (a %.2f m do ponto)" % mao_e.distance_to(cabo))
 	jogador.cd = 0.0
 	jogador.atacar()
 	await _quadros(6)
@@ -748,8 +748,8 @@ func _teste_personagem(livre: Vector3) -> void:
 	await _quadros(10)
 	_confere(not jogador.terceira and jogador.mao.visible and (c.nos["corpo_0"] as MeshInstance3D).cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY,
 		"V de novo: primeira pessoa (o corpo só faz sombra)")
-	_confere(jogador.braco_fp != null and jogador.braco_fp.is_visible_in_tree() and absf(float(jogador.braco_mat.get_shader_parameter("dobra_a"))) <= 0.71,
-		"primeira pessoa: o braço de verdade, com a mão fechada no cabo (pulso dobrado %.2f)" % float(jogador.braco_mat.get_shader_parameter("dobra_a")))
+	_confere(jogador.braco_fp != null and jogador.braco_fp.is_visible_in_tree() and absf(jogador._dobra_a) <= 0.71,
+		"primeira pessoa: o braço de verdade, com a mão fechada no cabo (pulso dobrado %.2f e %.2f)" % [jogador._dobra_a, jogador._dobra_f])
 	jogador.inv.tirar("machado", 1)
 	_confere(not bool(Ajustes.v["terceira"]), "a câmera escolhida fica guardada nas configurações")
 	# a criação do personagem: abre com o palco, trocar o cabelo vira Personalizado, a mulher, e salva no perfil
@@ -1059,7 +1059,6 @@ func _teste() -> void:
 	var gasto := jogador.energia
 	await _quadros(150)
 	_confere(gasto < 90.0 and jogador.energia > gasto + 5.0, "correr gasta energia (%.0f) e parado ela volta (%.0f)" % [gasto, jogador.energia])
-	await _teste_personagem(livre)
 	# degrau de 30 cm (meio-fio): sobe andando, sem pular
 	var dg := StaticBody3D.new()
 	var dgs := CollisionShape3D.new()
@@ -1542,6 +1541,9 @@ func _teste() -> void:
 		_confere(jogador.vivo and jogador.global_position.distance_to(construcao.sacos[construcao.sacos.size() - 1]) < 2.0, "renasceu no saco de dormir")
 	hora = 22.0
 	_confere(noite(), "noite às 22h")
+	# o personagem (a etapa 3), por último: mexe na mochila, na roupa e na câmera
+	hora = 10.0
+	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
 	else:

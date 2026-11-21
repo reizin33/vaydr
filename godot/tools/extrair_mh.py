@@ -114,9 +114,9 @@ class Corpo(X.GLB):
             filhos = [c2 for c2 in range(nb) if s.pai[c2] == b]
             if filhos:
                 s.j['nodes'][b]['children'] = filhos
-        inv = np.zeros((nb, 16), np.float32)
-        for b in range(nb):
-            inv[b] = np.linalg.inv(X.qmat(s.qb[b], s.Pr[b])).T.reshape(16)
+        # as matrizes de ligação do próprio corpo (o MakeHuman foi ligado em pose A, com os braços a 45°: não é a pose de repouso
+        # do esqueleto, que é a T). Já vêm em coluna-maior, como o glTF pede
+        inv = np.frombuffer(base64.b64decode(c['inv']), '<f4').reshape(nb, 16).astype(np.float32)
         s.j['skins'] = [{'inverseBindMatrices': s.acc(inv, 5126, 'MAT4'), 'joints': list(range(nb)), 'skeleton': 0}]
         s.malhas = []
         s.mats = {}

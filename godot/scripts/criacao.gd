@@ -33,6 +33,7 @@ var vistas := {}
 var bt_girar: Button
 var bt_zoom: Button
 var dica: Label
+var _ui_antes := false
 
 
 func _init(t) -> void:
@@ -449,6 +450,9 @@ func abrir(f := Callable(), de := "lobby") -> void:
 	nome.text = str(ap["nome"])
 	bt_ok.text = "CONFIRMAR E INICIAR" if f.is_valid() else "SALVAR PERSONAGEM"
 	main.get_viewport().disable_3d = false
+	# o HUD do jogo (se tiver um mundo aberto atrás) não aparece na criação
+	_ui_antes = main.ui.visible
+	main.ui.visible = false
 	main.palco.abrir(ap)
 	retrato.texture = main.palco.retrato_vp.get_texture()
 	_ir_aba("rosto")
@@ -456,6 +460,7 @@ func abrir(f := Callable(), de := "lobby") -> void:
 
 func fechar() -> void:
 	main.palco.fechar()
+	main.ui.visible = _ui_antes
 	if not main.em_jogo:
 		main.get_viewport().disable_3d = true
 

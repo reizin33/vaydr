@@ -65,6 +65,8 @@ var golpe_t := -1.0      # o golpe no corpo (terceira pessoa): tempo desde o cli
 var golpe_dur := 0.4
 var uso_t := -1.0        # comendo ou bebendo: a mão vai à boca
 var _roupa_t := 0.0
+var _dobra_a := 0.0      # o pulso da mão da primeira pessoa (para o lado do mindinho ou do polegar)
+var _dobra_f := 0.0      # (para a frente ou para trás)
 
 
 func _init(m: Node) -> void:
@@ -88,7 +90,6 @@ func _ready() -> void:
 	cam.far = 900.0
 	cabeca.add_child(cam)
 	mao = Node3D.new()
-	mao.position = Vector3(0.34, -0.42, -0.55)
 	cam.add_child(mao)
 	# lanterna: um facho de luz que sai da câmera quando ela está na mão
 	luz_mao = SpotLight3D.new()
@@ -103,10 +104,8 @@ func _ready() -> void:
 	# a lanterna sai de dentro da cabeça: o corpo não pode fazer sombra dela
 	luz_mao.shadow_caster_mask = 0xFFFFF & ~Corpo.CAMADA
 	cam.add_child(luz_mao)
+	# o item vem no espaço da mão do jogo antigo (cabo ao longo de +z, lâmina para -y); onde ele fica na tela é o _view_model
 	mao_item = Node3D.new()
-	# o item vem no espaço da mão do jogo antigo: cabo ao longo de +z, lâmina para -y
-	mao_item.rotation = Vector3(deg_to_rad(-70), deg_to_rad(10), deg_to_rad(0))
-	mao_item.scale = Vector3.ONE * 0.9
 	mao.add_child(mao_item)
 	corpo = Corpo.new(self)
 	add_child(corpo)
@@ -335,10 +334,75 @@ func _dobrar_braco(dt: float) -> void:
 	var fy := maxf(1e-6, f.dot(y))
 	var fz := f.dot(z)
 	var k := 1.0 - exp(-dt * 14.0)
-	var da: float = lerpf(float(braco_mat.get_shader_parameter("dobra_a")), clampf(atan2(fx, fy), -0.35, 0.7), k)
-	var df: float = lerpf(float(braco_mat.get_shader_parameter("dobra_f")), clampf(atan2(fz, fy), -0.9, 0.9), k)
-	braco_mat.set_shader_parameter("dobra_a", da)
-	braco_mat.set_shader_parameter("dobra_f", df)
+	_dobra_a = lerpf(_dobra_a, clampf(atan2(fx, fy), -0.35, 0.7), k)
+	_dobra_f = lerpf(_dobra_f, clampf(atan2(fz, fy), -0.9, 0.9), k)
+	braco_mat.set_shader_parameter("dobra_a", _dobra_a)
+	braco_mat.set_shader_parameter("dobra_f", _dobra_f)
+
+
+## onde o item e a mão ficam na tela da primeira pessoa (o viewModel do jogo antigo): na mão, o cabo para cima e para a frente
+## e a lâmina para a frente; de mãos vazias, o punho embaixo à direita. O golpe de cima (machado, picareta) sobe a mão para trás
+## do ombro no preparo e cruza para o meio da tela, para baixo e para a frente, na descida; o soco sobe e avança para dentro da
+## tela; a pistola e a lanterna ficam na frente; comendo, a mão vai para a boca
+const VM_MAO := [0.29, -0.24, -0.52, -2.499, 0.062, 3.833]
+const VM_VAZIA := [0.33, -0.46, -0.62, -2.45, 0.25, PI]
+const GOLPE_FP := {"k": -0.85, "kd": 0.0, "sobe": [0.12, 0.08, 0.05, -0.293, 0.049, 0.188], "desce": [-0.18, -0.14, -0.18, 0.207, 0.149, 0.188]}
+const GOLPE_FP_VAZIA := {"k": -0.85, "kd": 0.0, "sobe": [0.08, 0.3, 0.15, 0.4, 0.0, 0.0], "desce": [-0.22, 0.08, -0.08, 0.9, 0.1, 0.0]}
+
+
+func _view_model() -> void:
+	var id := ferramenta_id
+	var d := Dados.item(id) if id != "" and id != "-" else {}
+	var com_item := ferramenta_no != null
+	var fogo := bool(d.get("fogo", false)) or id == "lanterna"
+	var g0: Dictionary = GOLPE_FP if com_item else GOLPE_FP_VAZIA
+	var b0: Array = VM_MAO if com_item else VM_VAZIA
+	var sx := 0.0
+	var sy := 0.0
+	var kick := 0.0
+	var gx := 0.0
+	var gy := 0.0
+	var gz := 0.0
+	var gr := 0.0
+	var a := minf(1.0, Vector2(velocity.x, velocity.z).length() / 4.0) if is_on_floor() else 0.0
+	var bob := sin(balanco * 2.0) * 0.012 * a
+	var bobx := cos(balanco) * 0.012 * a
+	var soco := str(d.get("tipo", "")) != "arma"
+	var s := clampf(golpe_t / golpe_dur, 0.0, 1.0) if golpe_t >= 0.0 else -1.0
+	if s >= 0.0:
+		var w := -Corpo._ease_io(s / 0.4) * 0.9 if s < 0.4 else lerpf(-0.9, 1.2, Corpo._ease_out(minf(1.0, (s - 0.4) / 0.25))) * (1.0 - smoothstep(0.7, 1.0, s))
+		var vertical := bool(d.get("vertical", false)) or id == "pedra"
+		if vertical:
+			sx = w * (1.0 if soco else (float(g0["k"]) if w < 0.0 else float(g0["kd"])))
+		else:
+			sy = -w * 1.2
+		if vertical and not soco:
+			var sobe := Corpo._ease_io(s / 0.4) if s < 0.4 else 1.0 - Corpo._ease_out(minf(1.0, (s - 0.4) / 0.2))
+			var desce := 0.0 if s < 0.4 else Corpo._ease_out(minf(1.0, (s - 0.4) / 0.2)) * (1.0 - smoothstep(0.68, 1.0, s))
+			var ga: Array = g0["sobe"]
+			var gb: Array = g0["desce"]
+			gx = ga[0] * sobe + gb[0] * desce
+			gy = ga[1] * sobe + gb[1] * desce
+			gz = ga[2] * sobe + gb[2] * desce
+			gr = ga[3] * sobe + gb[3] * desce
+			sx += ga[4] * sobe + gb[4] * desce
+			sy += ga[5] * sobe + gb[5] * desce
+	if uso_t >= 0.0:
+		kick = -0.5 * minf(1.0, minf(uso_t / 0.2, (0.9 - uso_t) / 0.2))
+	var px: float = (0.17 if fogo else float(b0[0])) + bobx
+	var py: float = (-0.17 if fogo else float(b0[1])) + bob
+	var pz: float = -0.42 if fogo else float(b0[2])
+	# soco de mãos vazias: o punho sobe e avança para dentro da tela
+	if not fogo and s >= 0.0 and soco and id != "pedra":
+		var k := sin(s * PI)
+		px -= 0.13 * k
+		py += 0.27 * k
+		pz -= 0.16 * k
+	if fogo:
+		mao_item.transform = Transform3D(Basis.from_euler(Vector3(-PI / 2.0 + kick, PI, 0.0)), Vector3(px, py, pz))
+	else:
+		mao_item.transform = Transform3D(Basis.from_euler(Vector3(float(b0[3]) + sx + kick, float(b0[4]) + sy, float(b0[5]) + gr)).scaled(Vector3.ONE * 0.85),
+			Vector3(px + gx, py + gy, pz + gz))
 
 
 ## a lanterna acende com ela na mão ou ligada pelo F (estando na mochila), enquanto tiver pilha
@@ -463,11 +527,7 @@ func _physics_process(dt: float) -> void:
 		_bob += Vector3(randf() - 0.5, randf() - 0.5, 0) * tremor * 0.15
 	if not terceira:
 		cam.position = _bob
-	# mão: balanço do golpe
 	golpe = maxf(0.0, golpe - dt * 3.2)
-	var g := sin(golpe * PI) if golpe > 0.0 else 0.0
-	mao.rotation = Vector3(-g * 1.2, g * 0.4, g * 0.3)
-	mao.position = Vector3(0.34 - g * 0.12, -0.42 + _bob.y * 0.5, -0.55 - g * 0.15)
 	if global_position.y < -30.0:
 		ferir(999.0, false)
 
@@ -475,6 +535,7 @@ func _physics_process(dt: float) -> void:
 func _process(dt: float) -> void:
 	_camera(dt)
 	_animar_corpo(dt)
+	_view_model()
 	_dobrar_braco(dt)
 	if not vivo or preso:
 		return
