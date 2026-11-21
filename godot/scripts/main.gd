@@ -5,6 +5,7 @@ extends Node3D
 
 var terreno: Terreno
 var mundo: Mundo
+var grama: Grama
 var construcao: Construcao
 var sons: Sons
 var efeitos: Efeitos
@@ -14,15 +15,18 @@ var sol: DirectionalLight3D
 var lua: DirectionalLight3D
 var amb: Environment
 var ceu: ProceduralSkyMaterial
-var hora := 9.0
+var hora := 8.0
 var dia := 1
 var zumbis: Array = []
 var spawn_t := 3.0
+var modo_teste := false   # nos testes da nuvem: não mexe no mouse nem na janela
 const SPAWN := Vector3(0, 0, 6)
-const SEG_POR_HORA := 30.0
+const SEG_POR_HORA := 50.0
 
 
 func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	modo_teste = "--teste" in args or "--fotos" in args
 	_teclas()
 	_ambiente()
 	terreno = Terreno.new()
@@ -31,6 +35,8 @@ func _ready() -> void:
 	mundo = Mundo.new(terreno)
 	add_child(mundo)
 	mundo.montar()
+	grama = Grama.new(terreno)
+	add_child(grama)
 	sons = Sons.new()
 	add_child(sons)
 	efeitos = Efeitos.new()
@@ -45,12 +51,11 @@ func _ready() -> void:
 	add_child(ui)
 	# começo: mão vazia (nada de item de graça); tudo sai de coleta, caixa e fabricação
 	_zumbis_vila()
-	var args := OS.get_cmdline_user_args()
 	if "--teste" in args:
 		_vigia(240.0, "TESTE")
 		_teste.call_deferred()
 	elif "--fotos" in args:
-		_vigia(780.0, "FOTOS")
+		_vigia(800.0, "FOTOS")
 		_fotos.call_deferred()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -61,7 +66,7 @@ func _teclas() -> void:
 	var mapa := {
 		"frente": [KEY_W], "tras": [KEY_S], "esquerda": [KEY_A], "direita": [KEY_D], "pular": [KEY_SPACE], "correr": [KEY_SHIFT],
 		"agachar": [KEY_CTRL, KEY_C], "usar": [KEY_E], "mochila": [KEY_TAB, KEY_I], "girar": [KEY_R], "sair": [KEY_ESCAPE],
-		"barra1": [KEY_1], "barra2": [KEY_2], "barra3": [KEY_3], "barra4": [KEY_4], "barra5": [KEY_5], "barra6": [KEY_6]}
+		"barra1": [KEY_1], "barra2": [KEY_2], "barra3": [KEY_3], "barra4": [KEY_4], "barra5": [KEY_5], "barra6": [KEY_6], "tela_cheia": [KEY_F11]}
 	for a in mapa:
 		if not InputMap.has_action(a):
 			InputMap.add_action(a)
@@ -81,8 +86,8 @@ func _ambiente() -> void:
 	var we := WorldEnvironment.new()
 	amb = Environment.new()
 	ceu = ProceduralSkyMaterial.new()
-	ceu.sky_top_color = Color(0.32, 0.47, 0.68)
-	ceu.sky_horizon_color = Color(0.68, 0.74, 0.78)
+	ceu.sky_top_color = Color(0.2, 0.38, 0.68)
+	ceu.sky_horizon_color = Color(0.6, 0.7, 0.8)
 	ceu.ground_horizon_color = Color(0.5, 0.52, 0.5)
 	ceu.ground_bottom_color = Color(0.2, 0.2, 0.18)
 	ceu.sun_angle_max = 30.0
@@ -92,19 +97,20 @@ func _ambiente() -> void:
 	amb.background_mode = Environment.BG_SKY
 	amb.sky = sky
 	amb.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	amb.ambient_light_energy = 0.75
+	amb.ambient_light_energy = 0.5
 	amb.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	amb.tonemap_exposure = 1.0
+	amb.tonemap_white = 6.0
 	amb.fog_enabled = true
-	amb.fog_light_color = Color(0.62, 0.68, 0.72)
+	amb.fog_light_color = Color(0.52, 0.6, 0.68)
 	amb.fog_density = 0.0055
-	amb.fog_sky_affect = 0.35
+	amb.fog_sky_affect = 0.3
 	amb.glow_enabled = true
 	amb.glow_intensity = 0.35
 	amb.glow_bloom = 0.04
 	amb.adjustment_enabled = true
-	amb.adjustment_saturation = 0.92
-	amb.adjustment_contrast = 1.06
+	amb.adjustment_saturation = 1.08
+	amb.adjustment_contrast = 1.08
 	we.environment = amb
 	add_child(we)
 	sol = DirectionalLight3D.new()
@@ -136,20 +142,21 @@ func _ciclo() -> void:
 	var alt := sin(a)
 	sol.rotation = Vector3(-a, deg_to_rad(-35), 0)
 	var dia_k := clampf(alt * 3.0, 0.0, 1.0)
-	sol.light_energy = 1.3 * dia_k
+	sol.light_energy = 1.15 * dia_k
 	sol.visible = dia_k > 0.01
 	var por := clampf(1.0 - absf(alt) * 4.0, 0.0, 1.0) * (1.0 if alt > -0.1 else 0.0)
 	sol.light_color = Color(1.0, 0.95, 0.86).lerp(Color(1.0, 0.62, 0.38), por)
 	lua.light_energy = 0.16 * (1.0 - dia_k)
 	var noite_k := 1.0 - clampf((alt + 0.15) * 4.0, 0.0, 1.0)
-	ceu.sky_top_color = Color(0.32, 0.47, 0.68).lerp(Color(0.02, 0.03, 0.07), noite_k)
-	ceu.sky_horizon_color = Color(0.68, 0.74, 0.78).lerp(Color(0.95, 0.6, 0.4), por * 0.7).lerp(Color(0.05, 0.06, 0.1), noite_k)
-	amb.fog_light_color = Color(0.62, 0.68, 0.72).lerp(Color(0.8, 0.55, 0.4), por * 0.5).lerp(Color(0.03, 0.04, 0.07), noite_k)
-	amb.ambient_light_energy = lerpf(0.75, 0.12, noite_k)
+	ceu.sky_top_color = Color(0.2, 0.38, 0.68).lerp(Color(0.02, 0.03, 0.07), noite_k)
+	ceu.sky_horizon_color = Color(0.6, 0.7, 0.8).lerp(Color(0.95, 0.6, 0.4), por * 0.7).lerp(Color(0.05, 0.06, 0.1), noite_k)
+	amb.fog_light_color = Color(0.52, 0.6, 0.68).lerp(Color(0.75, 0.52, 0.4), por * 0.5).lerp(Color(0.03, 0.04, 0.07), noite_k)
+	amb.ambient_light_energy = lerpf(0.5, 0.1, noite_k)
 
 
 func _process(dt: float) -> void:
-	hora += dt / SEG_POR_HORA
+	# o dia passa devagar (50 s por hora) e a noite mais rápido (25 s por hora): ~11 min de dia e ~5 de noite
+	hora += dt / (SEG_POR_HORA * (0.5 if noite() else 1.0))
 	if hora >= 24.0:
 		hora -= 24.0
 		dia += 1
@@ -165,13 +172,33 @@ func _process(dt: float) -> void:
 			_nascer_perto()
 	if Input.is_action_just_pressed("mochila") and jogador.vivo:
 		ui.abrir(not ui.aberto)
-	if Input.is_action_just_pressed("sair"):
-		if ui.aberto:
-			ui.abrir(false)
-		else:
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if Input.mouse_mode == Input.MOUSE_MODE_VISIBLE and not ui.aberto and jogador.vivo and Input.is_action_just_pressed("atacar"):
+	# voltou de outra janela (Alt+Tab): um clique prende o mouse de novo
+	if not modo_teste and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE and not ui.aberto and not ui.menu_aberto and jogador.vivo \
+			and Input.is_action_just_pressed("atacar"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Gráficos: baixo (PC fraco), médio e alto. Mexe no antisserrilhado, na resolução 3D, nas sombras, no brilho,
+## na neblina e até onde a mata aparece.
+func aplicar_qualidade(q: int) -> void:
+	var cfg: Dictionary = [
+		{"msaa": Viewport.MSAA_DISABLED, "escala": 0.75, "sombra": 2048, "dist": 40.0, "brilho": false, "mata": 0.55, "longe": 420.0, "neblina": 0.0085,
+			"capim": 56, "capim_passo": 0.9},
+		{"msaa": Viewport.MSAA_DISABLED, "escala": 1.0, "sombra": 2048, "dist": 75.0, "brilho": true, "mata": 0.8, "longe": 650.0, "neblina": 0.0055,
+			"capim": 90, "capim_passo": 0.8},
+		{"msaa": Viewport.MSAA_2X, "escala": 1.0, "sombra": 4096, "dist": 110.0, "brilho": true, "mata": 1.0, "longe": 900.0, "neblina": 0.0042,
+			"capim": 120, "capim_passo": 0.75},
+	][clampi(q, 0, 2)]
+	var vp := get_viewport()
+	vp.msaa_3d = cfg["msaa"]
+	vp.scaling_3d_scale = cfg["escala"]
+	RenderingServer.directional_shadow_atlas_set_size(cfg["sombra"], true)
+	sol.directional_shadow_max_distance = cfg["dist"]
+	amb.glow_enabled = cfg["brilho"]
+	amb.fog_density = cfg["neblina"]
+	jogador.cam.far = cfg["longe"]
+	mundo.alcance(cfg["mata"])
+	grama.densidade(cfg["capim"], cfg["capim_passo"])
 
 
 func _zumbis_vila() -> void:
@@ -227,6 +254,8 @@ func texto_mira() -> String:
 		return "E  Revistar a caixa" if mundo.caixas[c.get_meta("caixa")]["cheia"] else "Caixa vazia"
 	if c.has_meta("porta"):
 		return "E  Fechar a porta" if construcao.portas[c.get_meta("porta")]["aberta"] else "E  Abrir a porta"
+	if c.has_meta("bau"):
+		return "E  Abrir o baú"
 	if c.has_meta("recurso"):
 		var r: Dictionary = mundo.recursos[c.get_meta("recurso")]
 		match r["tipo"]:
@@ -238,6 +267,10 @@ func texto_mira() -> String:
 				return "Pedra (bata com a picareta)"
 	if c.has_meta("zumbi"):
 		return "Zumbi"
+	if c.has_meta("peca") and construcao.peca_viva(c.get_meta("peca")):
+		var pe: Dictionary = construcao.pecas[c.get_meta("peca")]
+		var dica := "  (o pé de cabra conserta)" if float(pe["vida"]) < float(pe["max"]) else ""
+		return "%s  %d/%d%s" % [Dados.peca(pe["id"])["nome"], int(pe["vida"]), int(pe["max"]), dica]
 	return ""
 
 
@@ -246,9 +279,12 @@ func _morreu() -> void:
 	ui.mostrar_morte(true)
 
 
-func renascer() -> void:
+func renascer(no_saco := false) -> void:
 	ui.mostrar_morte(false)
-	jogador.renascer(Vector3(SPAWN.x, terreno.h(SPAWN.x, SPAWN.z) + 0.5, SPAWN.z))
+	var p := Vector3(SPAWN.x, terreno.h(SPAWN.x, SPAWN.z) + 0.5, SPAWN.z)
+	if no_saco and construcao.sacos.size() > 0:
+		p = construcao.sacos[construcao.sacos.size() - 1] + Vector3(0, 0.6, 0)
+	jogador.renascer(p)
 	jogador.inv.mudou.connect(ui.atualizar)
 	ui.atualizar()
 
@@ -287,6 +323,20 @@ func _segurar(acao: String, n: int) -> void:
 	Input.action_press(acao)
 	await _quadros(n)
 	Input.action_release(acao)
+
+
+## põe o item na mão (traz para a barra se estiver na mochila)
+func _na_mao(id: String) -> bool:
+	var inv := jogador.inv
+	for i in Inventario.ESPACOS:
+		if inv.slots[i] != null and inv.slots[i]["id"] == id:
+			var k := i
+			if k >= Inventario.BARRA:
+				inv.trocar(k, 5)
+				k = 5
+			jogador.selecionar(k)
+			return true
+	return false
 
 
 func _por_em(p: Vector3) -> void:
@@ -478,7 +528,53 @@ func _teste() -> void:
 		construcao.alternar_porta(0)
 		await _quadros(40)
 		_confere(absf(dob.rotation.y) < 0.08, "porta fechou")
+		# zumbi do lado de fora da porta fechada: bate na porta, não em quem está dentro
+		_por_em(b0["xf"] * Vector3(0.4, F + 0.05, 0.0))
+		jogador.vida = 100.0
+		var ip_porta := -1
+		for k in construcao.pecas.size():
+			if construcao.pecas[k]["id"] == "porta":
+				ip_porta = k
+		var v_porta: float = construcao.pecas[ip_porta]["vida"]
+		var zp := _nascer(b0["xf"] * Vector3(-3.2, 0, 0.0), false)
+		await _quadros(240)
+		var v_depois: float = construcao.pecas[ip_porta]["vida"]
+		_confere(v_depois < v_porta, "zumbi bate na porta fechada (porta %d de %d)" % [int(v_depois), int(v_porta)])
+		_confere(jogador.vida >= 99.0, "a porta segura: o zumbi não acerta quem está dentro (vida %d)" % int(jogador.vida))
+		zp.ferir(999.0, jogador.global_position)
+		# o pé de cabra conserta a porta
+		jogador.inv.por("martelo", 1)
+		jogador.inv.por("madeira", 20)
+		_na_mao("martelo")
+		_olhar(b0["xf"] * Vector3(-1.5, F + 1.2, 0.0))
+		jogador.cd = 0.0
+		jogador.atacar()
+		_confere(float(construcao.pecas[ip_porta]["vida"]) > v_depois or v_depois >= v_porta, "pé de cabra conserta a porta (%d)" % int(construcao.pecas[ip_porta]["vida"]))
 		_confere(construcao.pecas.size() == 10, "peças na base: %d (4 fundações, 4 paredes, piso, escada)" % construcao.pecas.size())
+		# saco de dormir, baú e lanterna
+		jogador.inv.por("saco", 1)
+		jogador.inv.por("bau", 1)
+		jogador.inv.por("lanterna", 1)
+		_por_em(b0["xf"] * Vector3(0, F + 0.05, 3.6))
+		await _quadros(6)
+		_olhar(b0["xf"] * Vector3(0, F, 2.4))
+		_na_mao("saco")
+		jogador.cd = 0.0
+		jogador.atacar()
+		_confere(construcao.sacos.size() == 1, "saco de dormir no chão da base")
+		_olhar(b0["xf"] * Vector3(1.2, F, 3.6))
+		_na_mao("bau")
+		jogador.cd = 0.0
+		jogador.atacar()
+		_confere(construcao.baus.size() == 1, "baú no chão da base")
+		if construcao.baus.size() == 1:
+			ui.abrir_bau(construcao.baus[0]["inv"])
+			ui._guardar_recursos()
+			var bi: Inventario = construcao.baus[0]["inv"]
+			_confere(bi.conta("madeira") > 0 and jogador.inv.conta("madeira") == 0, "guardou a madeira no baú (%d)" % bi.conta("madeira"))
+			ui.abrir(false)
+		_na_mao("lanterna")
+		_confere(jogador.luz_mao.visible, "lanterna acende na mão")
 	# caixa da vila
 	var L: Array = mundo.revistar(0)
 	_confere(L.size() > 0 and not mundo.caixas[0]["cheia"], "caixa da vila tem coisa e fica vazia depois (%s)" % str(L))
@@ -519,6 +615,12 @@ func _teste() -> void:
 	renascer()
 	await _quadros(5)
 	_confere(jogador.vivo and jogador.inv.conta("madeira") == 0, "renasceu na clareira de mão vazia")
+	if construcao.sacos.size() > 0:
+		jogador.ferir(999.0)
+		await _quadros(3)
+		renascer(true)
+		await _quadros(5)
+		_confere(jogador.vivo and jogador.global_position.distance_to(construcao.sacos[0]) < 2.0, "renasceu no saco de dormir")
 	hora = 22.0
 	_confere(noite(), "noite às 22h")
 	if _erros.is_empty():
@@ -529,7 +631,7 @@ func _teste() -> void:
 
 
 func _foto(nome: String) -> void:
-	await _quadros(45)
+	await _quadros(24)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://fotos"))
@@ -553,6 +655,17 @@ func _fotos() -> void:
 	hora = 9.5
 	await _cam(Vector3(0, 0, 14), Vector3(0, 2.5, -60))
 	await _foto("1_clareira")
+	jogador.inv.por("pedra", 120)
+	jogador.inv.por("fibra", 30)
+	jogador.inv.por("madeira", 260)
+	jogador.inv.por("machado", 1)
+	ui.abrir(true)
+	await _foto("7_mochila")
+	ui.abrir(false)
+	jogador.inv = Inventario.new()
+	jogador.inv.mudou.connect(jogador._atualizar_mao)
+	jogador.inv.mudou.connect(ui.atualizar)
+	ui.atualizar()
 	await _cam(Vector3(-40, 0, -70), Vector3(-80, 2.0, -120))
 	await _foto("2_mata")
 	await _cam(Vector3(40, 0, -20), Vector3(Terreno.VILA.x, 2.0, Terreno.VILA.y))
@@ -627,9 +740,4 @@ func _fotos() -> void:
 	zz.estado = "vaga"
 	await _cam(Vector3(30, 0, 44.5), Vector3(30, 1.2, 40))
 	await _foto("6_zumbi")
-	jogador.inv.por("pedra", 120)
-	jogador.inv.por("fibra", 30)
-	jogador.inv.por("machado", 1)
-	ui.abrir(true)
-	await _foto("7_mochila")
 	get_tree().quit()

@@ -10,12 +10,17 @@ const ITENS := {
 	"lata": {"nome": "Lata de feijão", "max": 10, "tipo": "comida", "fome": 30.0, "sede": -4.0, "cor": Color(0.7, 0.3, 0.2)},
 	"agua": {"nome": "Garrafa d'água", "max": 10, "tipo": "comida", "sede": 35.0, "cor": Color(0.4, 0.6, 0.85)},
 	"bandagem": {"nome": "Bandagem", "max": 10, "tipo": "cura", "vida": 20.0, "cor": Color(0.9, 0.9, 0.85)},
+	"fruta": {"nome": "Frutinha do mato", "max": 30, "tipo": "comida", "fome": 9.0, "sede": 4.0, "cor": Color(0.62, 0.15, 0.3)},
 	"machado": {"nome": "Machado", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/machado.glb", "dano": 22.0, "madeira": 1.0, "pedra": 0.25, "tempo": 0.75},
 	"picareta": {"nome": "Picareta", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/picareta.glb", "dano": 20.0, "madeira": 0.3, "pedra": 1.0, "tempo": 0.85},
 	"facao": {"nome": "Facão", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/facao.glb", "dano": 30.0, "madeira": 0.45, "pedra": 0.1, "tempo": 0.5},
 	"taco": {"nome": "Taco", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/taco.glb", "dano": 26.0, "madeira": 0.2, "pedra": 0.1, "tempo": 0.65},
 	"plano": {"nome": "Plano de construção", "max": 1, "tipo": "plano", "cor": Color(0.3, 0.45, 0.75)},
+	"martelo": {"nome": "Pé de cabra (conserta a base)", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/peDeCabra.glb", "dano": 12.0, "madeira": 0.3, "pedra": 0.2, "tempo": 0.6, "conserta": true},
 	"fogueira": {"nome": "Fogueira", "max": 5, "tipo": "colocavel", "cor": Color(0.85, 0.45, 0.15)},
+	"saco": {"nome": "Saco de dormir", "max": 3, "tipo": "colocavel", "cor": Color(0.3, 0.42, 0.3)},
+	"bau": {"nome": "Baú de madeira", "max": 3, "tipo": "colocavel", "cor": Color(0.5, 0.36, 0.2)},
+	"lanterna": {"nome": "Lanterna", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/lanterna.glb", "dano": 6.0, "madeira": 0.2, "pedra": 0.1, "tempo": 0.6, "luz": true},
 }
 
 ## o que cada mão vazia ou ferramenta tira de cada recurso por golpe
@@ -27,9 +32,13 @@ const RECEITAS := [
 	{"faz": "taco", "n": 1, "custo": {"madeira": 40}},
 	{"faz": "facao", "n": 1, "custo": {"sucata": 8, "madeira": 10}},
 	{"faz": "plano", "n": 1, "custo": {"madeira": 20}},
+	{"faz": "martelo", "n": 1, "custo": {"madeira": 25, "pedra": 5}},
 	{"faz": "bandagem", "n": 1, "custo": {"pano": 3}},
 	{"faz": "pano", "n": 1, "custo": {"fibra": 8}},
 	{"faz": "fogueira", "n": 1, "custo": {"madeira": 50, "pedra": 10}},
+	{"faz": "saco", "n": 1, "custo": {"pano": 10}},
+	{"faz": "bau", "n": 1, "custo": {"madeira": 100}},
+	{"faz": "lanterna", "n": 1, "custo": {"sucata": 12, "pano": 2}},
 ]
 
 ## peças de construção (tamanho do módulo: 3 m, como no Rust)

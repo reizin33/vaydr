@@ -17,6 +17,10 @@ var morto_t := 0.0
 var gemido := 0.0
 var preso_t := 0.0
 var ultima := Vector3.ZERO
+var alvo_peca := -1        # peça da base que está no caminho (o zumbi bate nela)
+var ponto_peca := Vector3.ZERO
+var desvio := 0.0          # preso numa árvore ou pedra: anda de lado um pouco
+var lado := 1.0
 
 
 func _init(m: Node, corre: bool) -> void:
@@ -45,6 +49,15 @@ func _ready() -> void:
 	floor_snap_length = 0.5
 	gemido = randf_range(2.0, 9.0)
 	_tocar("sFeridoParado")
+
+
+## o que está entre o zumbi e o jogador (parede, porta, árvore...): vazio se nada
+func _bloqueio(j) -> Dictionary:
+	var a := global_position + Vector3(0, 1.3, 0)
+	var b: Vector3 = j.global_position + Vector3(0, 1.3, 0)
+	var fora: Array[RID] = [get_rid(), (j as CollisionObject3D).get_rid()]
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1, fora)
+	return get_world_3d().direct_space_state.intersect_ray(q)
 
 
 func _tocar(n: String, vel := 1.0) -> void:
@@ -96,13 +109,32 @@ func _physics_process(dt: float) -> void:
 	var dir := Vector3.ZERO
 	if estado == "caca":
 		dir = Vector3(para.x, 0, para.z).normalized()
-		if dist < 1.5:
+		var bl := {}
+		if dist < 7.0:
+			bl = _bloqueio(j)
+		var peca := -1
+		if not bl.is_empty() and (bl["collider"] as Object).has_meta("peca") and global_position.distance_to(bl["position"]) < 1.9:
+			peca = (bl["collider"] as Object).get_meta("peca")
+		if peca >= 0 and main.construcao.peca_viva(peca):
+			# parede ou porta no caminho: bate nela até cair
 			vel = 0.0
+			alvo_peca = peca
+			ponto_peca = bl["position"]
+			if golpe_t < 0.0:
+				golpe_t = 0.0
+				_tocar("sGolpe", 1.1)
+		elif dist < 1.5 and bl.is_empty():
+			vel = 0.0
+			alvo_peca = -1
 			if golpe_t < 0.0:
 				golpe_t = 0.0
 				_tocar("sGolpe", 1.3)
 		else:
+			alvo_peca = -1
 			vel = 4.4 if (corredor and noite) else 1.55
+			if desvio > 0.0:
+				desvio -= dt
+				dir = (dir + Vector3(-dir.z, 0, dir.x) * lado * 1.3).normalized()
 	else:
 		tempo -= dt
 		if tempo <= 0.0 or global_position.distance_to(alvo_vaga) < 1.5:
@@ -115,8 +147,11 @@ func _physics_process(dt: float) -> void:
 	if golpe_t >= 0.0:
 		golpe_t += dt
 		vel = 0.0
-		if golpe_t > 0.55 and golpe_t - dt <= 0.55 and dist < 1.9 and j.vivo:
-			j.ferir(11.0 if not corredor else 9.0)
+		if golpe_t > 0.55 and golpe_t - dt <= 0.55:
+			if alvo_peca >= 0:
+				main.construcao.ferir_peca(alvo_peca, 4.0 if corredor else 3.0, ponto_peca)
+			elif dist < 1.9 and j.vivo and _bloqueio(j).is_empty():
+				j.ferir(11.0 if not corredor else 9.0)
 		if golpe_t > 1.2:
 			golpe_t = -1.0
 	velocity.x = dir.x * vel
@@ -140,6 +175,8 @@ func _physics_process(dt: float) -> void:
 		if preso_t > 1.2:
 			alvo_vaga = global_position + Vector3(randf_range(-6, 6), 0, randf_range(-6, 6))
 			preso_t = 0.0
+			desvio = 1.2
+			lado = 1.0 if randf() < 0.5 else -1.0
 	else:
 		preso_t = 0.0
 	ultima = global_position

@@ -32,6 +32,7 @@ var passo := 0.0
 var tremor := 0.0
 var queda_v := 0.0
 var preso := false   # menu aberto: não anda nem gira
+var luz_mao: SpotLight3D
 
 
 func _init(m: Node) -> void:
@@ -57,6 +58,17 @@ func _ready() -> void:
 	mao = Node3D.new()
 	mao.position = Vector3(0.32, -0.3, -0.5)
 	cam.add_child(mao)
+	# lanterna: um facho de luz que sai da câmera quando ela está na mão
+	luz_mao = SpotLight3D.new()
+	luz_mao.light_color = Color(1.0, 0.95, 0.82)
+	luz_mao.light_energy = 3.2
+	luz_mao.spot_range = 34.0
+	luz_mao.spot_angle = 26.0
+	luz_mao.spot_attenuation = 0.9
+	luz_mao.shadow_enabled = true
+	luz_mao.position = Vector3(0.25, -0.2, -0.3)
+	luz_mao.visible = false
+	cam.add_child(luz_mao)
 	floor_max_angle = deg_to_rad(48.0)
 	floor_snap_length = 0.4
 	inv.mudou.connect(_atualizar_mao)
@@ -101,6 +113,7 @@ func _atualizar_mao() -> void:
 		ferramenta_no.rotation = Vector3(deg_to_rad(-70), deg_to_rad(10), deg_to_rad(0))
 		ferramenta_no.scale = Vector3.ONE * 0.9
 		mao.add_child(ferramenta_no)
+	luz_mao.visible = id != "" and Dados.ITENS[id].get("luz", false)
 	main.construcao.ativar(id == "plano")
 
 
@@ -196,6 +209,14 @@ func atacar() -> void:
 		main.construcao.por_fogueira(self)
 		cd = 0.5
 		return
+	if id == "saco":
+		main.construcao.por_saco(self)
+		cd = 0.5
+		return
+	if id == "bau":
+		main.construcao.por_bau(self)
+		cd = 0.5
+		return
 	var d: Dictionary = Dados.ITENS[id] if id != "" and Dados.ITENS[id]["tipo"] == "ferramenta" else Dados.MAO
 	cd = d["tempo"]
 	golpe = 1.0
@@ -212,6 +233,8 @@ func atacar() -> void:
 		if not r.is_empty():
 			var sobra := inv.por(r[0], r[1])
 			main.ui.aviso("+%d %s" % [r[1] - sobra, Dados.nome(r[0])])
+			if rec["tipo"] == "planta":
+				_frutinha()
 		main.sons.tocar("madeira" if rec["item"] == "madeira" else ("pedra" if rec["item"] == "pedra" else "planta"), h["position"], 0.0)
 		main.efeitos.lascas(h["position"], h["normal"], rec["item"])
 	elif c.has_meta("zumbi"):
@@ -219,6 +242,9 @@ func atacar() -> void:
 		z.ferir(d["dano"], global_position)
 		main.sons.tocar("acerto", h["position"], 0.0)
 		main.efeitos.sangue(h["position"], h["normal"])
+	elif c.has_meta("peca") and d.get("conserta", false):
+		if main.construcao.consertar(c.get_meta("peca")):
+			main.efeitos.lascas(h["position"], h["normal"], "madeira")
 
 
 func usar() -> void:
@@ -237,6 +263,9 @@ func usar() -> void:
 		if c.has_meta("porta"):
 			main.construcao.alternar_porta(c.get_meta("porta"))
 			return
+		if c.has_meta("bau"):
+			main.ui.abrir_bau(main.construcao.baus[c.get_meta("bau")]["inv"])
+			return
 		if c.has_meta("recurso"):
 			var i: int = c.get_meta("recurso")
 			if main.mundo.recursos[i]["tipo"] == "planta":
@@ -245,6 +274,8 @@ func usar() -> void:
 					inv.por(r[0], r[1])
 					main.ui.aviso("+%d %s" % [r[1], Dados.nome(r[0])])
 					main.sons.tocar("planta", h["position"], 0.0)
+					main.efeitos.lascas(h["position"], h["normal"], "fibra")
+					_frutinha()
 				return
 	# beber no lago
 	var o := cam.global_position - cam.global_transform.basis.z * 1.5
@@ -252,6 +283,14 @@ func usar() -> void:
 		sede = minf(100.0, sede + 25.0)
 		main.ui.aviso("Você bebeu água do lago")
 		main.sons.tocar("agua", global_position, -4.0)
+
+
+## às vezes a planta tem frutinha (comida que dá para achar no mato)
+func _frutinha() -> void:
+	if randf() < 0.35:
+		var n := randi_range(1, 3)
+		inv.por("fruta", n)
+		main.ui.aviso("+%d %s" % [n, Dados.nome("fruta")])
 
 
 func consumir() -> void:

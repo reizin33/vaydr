@@ -18,6 +18,8 @@ var pecas := []           # {id, xf, no}
 var ocupado := {}         # chave -> true (celas e beiradas)
 var alvo := {}            # onde a peça vai (calculado a cada quadro)
 var fogueiras := []
+var sacos := []           # onde estão os sacos de dormir (renasce no último)
+var baus := []            # {no, inv}: baús de guardar coisa na base
 
 
 func _init(m: Node) -> void:
@@ -92,11 +94,11 @@ func _calcular() -> Dictionary:
 		if base == null:
 			var y: float = main.terreno.h(p.x, p.z)
 			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y + FUND, p.z))
-			return {"xf": xf, "ok": p.distance_to(j.global_position) < 10.0 and _plano(xf), "chave": "c|%d|%d|%d|0" % [pecas.size() + 1000, 0, 0], "nova": true}
+			return {"xf": xf, "ok": p.distance_to(j.global_position) < 10.0 and _plano(xf) and _sem_obstaculo(xf), "chave": "c|%d|%d|%d|0" % [pecas.size() + 1000, 0, 0], "nova": true}
 		var c := _cela(base, p)
 		var xf := _xf_cela(base, c.x, c.y, 0)
 		var chave := "c|%d|%d|%d|0" % [base["id"], c.x, c.y]
-		return {"xf": xf, "ok": not ocupado.has(chave) and _plano(xf), "chave": chave}
+		return {"xf": xf, "ok": not ocupado.has(chave) and _plano(xf) and _sem_obstaculo(xf), "chave": chave}
 	if base == null:
 		return {}
 	# paredes, piso e escada: o ponto é onde a mira cruza a altura do andar em que você está (mais 1,2 m)
@@ -199,6 +201,19 @@ func _plano(xf: Transform3D) -> bool:
 	return ys.max() - ys.min() < 1.4
 
 
+## a fundação não entra em árvore, pedra, tronco nem barraco (o chão não conta)
+func _sem_obstaculo(xf: Transform3D) -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	var caixa := BoxShape3D.new()
+	caixa.size = Vector3(M - 0.3, 1.6, M - 0.3)
+	q.shape = caixa
+	q.transform = xf * Transform3D(Basis(), Vector3(0, -0.9, 0))
+	q.collision_mask = 1
+	var fora: Array[RID] = [main.terreno.corpo_chao.get_rid()]
+	q.exclude = fora
+	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+
 func colocar(id: String, xf: Transform3D, chave: String) -> void:
 	if not main.jogador.inv.pagar(Dados.peca(id)["custo"]):
 		return
@@ -218,9 +233,46 @@ func colocar(id: String, xf: Transform3D, chave: String) -> void:
 	ocupado[chave] = true
 	var no := _no(id, xf)
 	add_child(no)
-	pecas.append({"id": id, "xf": xf, "no": no, "chave": chave})
+	var idx := pecas.size()
+	for sb in no.find_children("*", "StaticBody3D", true, false):
+		sb.set_meta("peca", idx)
+	var vida: float = Dados.peca(id)["vida"]
+	pecas.append({"id": id, "xf": xf, "no": no, "chave": chave, "vida": vida, "max": vida})
 	main.sons.tocar("construir", xf.origin, 0.0)
 	main.ui.aviso("Construiu: " + Dados.peca(id)["nome"])
+
+
+## zumbi batendo numa peça (a noite pode derrubar parede e porta); quando a vida acaba, a peça cai
+func ferir_peca(i: int, dano: float, onde: Vector3) -> void:
+	var pe: Dictionary = pecas[i]
+	if pe.get("caiu", false):
+		return
+	pe["vida"] = float(pe["vida"]) - dano
+	main.sons.tocar("madeira", onde, -2.0)
+	main.efeitos.lascas(onde, Vector3.UP, "madeira")
+	if float(pe["vida"]) <= 0.0:
+		pe["caiu"] = true
+		ocupado.erase(pe["chave"])
+		(pe["no"] as Node3D).queue_free()
+		main.sons.tocar("construir", onde, 4.0)
+		main.ui.aviso("Caiu: " + Dados.peca(pe["id"])["nome"] + "!")
+
+
+## martelo: conserta a peça (gasta um pouco de madeira)
+func consertar(i: int) -> bool:
+	var pe: Dictionary = pecas[i]
+	if pe.get("caiu", false) or float(pe["vida"]) >= float(pe["max"]):
+		return false
+	if not main.jogador.inv.pagar({"madeira": 5}):
+		main.ui.aviso("Falta madeira para consertar")
+		return false
+	pe["vida"] = minf(float(pe["max"]), float(pe["vida"]) + 60.0)
+	main.sons.tocar("construir", (pe["no"] as Node3D).global_position, -4.0)
+	return true
+
+
+func peca_viva(i: int) -> bool:
+	return i >= 0 and i < pecas.size() and not pecas[i].get("caiu", false)
 
 
 var _malhas := {}
@@ -350,6 +402,65 @@ func alternar_porta(i: int) -> void:
 	var tw := create_tween()
 	tw.tween_property(p["dob"], "rotation:y", -PI / 2.0 if p["aberta"] else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
 	main.sons.tocar("porta", (p["dob"] as Node3D).global_position, 0.0)
+
+
+## baú de guardar: 18 espaços; abre com E
+func por_bau(j) -> void:
+	var h: Dictionary = j.mira(4.0, 1)
+	if h.is_empty() or not j.inv.tirar("bau", 1):
+		return
+	var no := Node3D.new()
+	no.position = h["position"]
+	no.rotation.y = j.rotation.y + PI
+	add_child(no)
+	var m := MeshInstance3D.new()
+	m.mesh = main.mundo.malha("res://assets/objetos/bau.glb")
+	m.scale = Vector3.ONE * 0.8
+	no.add_child(m)
+	var corpo := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(0.9, 0.7, 0.7)
+	cs.shape = bs
+	cs.position.y = 0.35
+	corpo.add_child(cs)
+	no.add_child(corpo)
+	corpo.set_meta("bau", baus.size())
+	baus.append({"no": no, "inv": Inventario.new(18, false)})
+	main.ui.aviso("Baú no lugar: E abre")
+
+
+## saco de dormir: no chão ou na fundação; quem morre pode renascer nele
+func por_saco(j) -> void:
+	var h: Dictionary = j.mira(4.0, 1)
+	if h.is_empty() or not j.inv.tirar("saco", 1):
+		return
+	var no := Node3D.new()
+	no.position = h["position"]
+	no.rotation.y = j.rotation.y
+	add_child(no)
+	var pano := StandardMaterial3D.new()
+	pano.albedo_color = Color(0.25, 0.36, 0.26)
+	pano.roughness = 0.95
+	var corpo := MeshInstance3D.new()
+	var cm := CapsuleMesh.new()
+	cm.radius = 0.4
+	cm.height = 2.0
+	corpo.mesh = cm
+	corpo.material_override = pano
+	corpo.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0).scaled(Vector3(1.0, 0.3, 1.0)), Vector3(0, 0.11, 0))
+	no.add_child(corpo)
+	var trav := MeshInstance3D.new()
+	var tb := BoxMesh.new()
+	tb.size = Vector3(0.55, 0.12, 0.32)
+	trav.mesh = tb
+	var tm := StandardMaterial3D.new()
+	tm.albedo_color = Color(0.78, 0.76, 0.68)
+	trav.material_override = tm
+	trav.position = Vector3(0, 0.22, -0.72)
+	no.add_child(trav)
+	sacos.append(no.global_position)
+	main.ui.aviso("Saco de dormir no lugar: se morrer, dá para renascer aqui")
 
 
 ## fogueira: luz e calor; à noite segura a escuridão em volta

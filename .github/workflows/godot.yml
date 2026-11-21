@@ -72,7 +72,7 @@ jobs:
         run: |
           set +e
           export LIBGL_ALWAYS_SOFTWARE=1
-          timeout 840 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
+          timeout 870 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
           ls -la godot/fotos || true
 
       # as fotos saem no próprio registro (em base64), para conferir sem baixar o artefato

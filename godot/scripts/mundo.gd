@@ -25,7 +25,7 @@ const PEDRAS := ["res://assets/mata/pedra.glb", "res://assets/mata/pedras_musgo_
 	"res://assets/mata/pedras_musgo_2.glb", "res://assets/mata/pedras_musgo_3.glb"]
 
 const SAQUE := [["lata", 1, 2, 0.5], ["agua", 1, 2, 0.5], ["pano", 2, 5, 0.6], ["sucata", 2, 6, 0.7], ["bandagem", 1, 2, 0.35],
-	["madeira", 10, 30, 0.3], ["facao", 1, 1, 0.06], ["taco", 1, 1, 0.08], ["machado", 1, 1, 0.05], ["picareta", 1, 1, 0.05]]
+	["madeira", 10, 30, 0.3], ["facao", 1, 1, 0.06], ["taco", 1, 1, 0.08], ["machado", 1, 1, 0.05], ["picareta", 1, 1, 0.05], ["lanterna", 1, 1, 0.1]]
 
 
 func _init(t: Terreno) -> void:
@@ -33,7 +33,8 @@ func _init(t: Terreno) -> void:
 	rng.seed = 2026
 
 
-func malha(caminho: String) -> Mesh:
+## a malha de um modelo .glb (a primeira que tiver); "tinta" escurece/esverdeia o material (casca, folha, pedra)
+func malha(caminho: String, tinta := Color(1, 1, 1), tinta_folha := Color(1, 1, 1)) -> Mesh:
 	if malhas.has(caminho):
 		return malhas[caminho]
 	var cena: PackedScene = load(caminho)
@@ -43,23 +44,32 @@ func malha(caminho: String) -> Mesh:
 		m = (f as MeshInstance3D).mesh
 		break
 	no.free()
+	if m != null and (tinta != Color(1, 1, 1) or tinta_folha != Color(1, 1, 1)):
+		for s in m.get_surface_count():
+			var mt := m.surface_get_material(s) as BaseMaterial3D
+			if mt == null:
+				continue
+			var novo := mt.duplicate() as BaseMaterial3D
+			var folha := novo.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED
+			novo.albedo_color = novo.albedo_color * (tinta_folha if folha else tinta)
+			(m as ArrayMesh).surface_set_material(s, novo)
 	malhas[caminho] = m
 	return m
 
 
-func _chave(p: Vector3) -> Vector2i:
-	return Vector2i(floori((p.x + Terreno.TAM / 2.0) / PEDACO), floori((p.z + Terreno.TAM / 2.0) / PEDACO))
+func _chave(p: Vector3, pedaco: float) -> Vector2i:
+	return Vector2i(floori((p.x + Terreno.TAM / 2.0) / pedaco), floori((p.z + Terreno.TAM / 2.0) / pedaco))
 
 
 ## guarda uma instância para montar depois (as MultiMesh nascem com o número certo)
 var _pend := {}
 
 
-func _instancia(caminho: String, xf: Transform3D, alcance: float, sombra: bool) -> Dictionary:
-	var k := _chave(xf.origin)
-	var id := "%s|%d|%d" % [caminho, k.x, k.y]
+func _instancia(caminho: String, xf: Transform3D, alc: float, sombra: bool, pedaco := PEDACO) -> Dictionary:
+	var k := _chave(xf.origin, pedaco)
+	var id := "%s|%d|%d|%d" % [caminho, int(pedaco), k.x, k.y]
 	if not _pend.has(id):
-		_pend[id] = {"m": caminho, "xfs": [], "alc": alcance, "sombra": sombra}
+		_pend[id] = {"m": caminho, "xfs": [], "alc": alc, "sombra": sombra}
 	_pend[id]["xfs"].append(xf)
 	return {"grupo": id, "idx": _pend[id]["xfs"].size() - 1}
 
@@ -79,7 +89,7 @@ func _fechar_grupos() -> void:
 		mmi.visibility_range_end_margin = 8.0
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if g["sombra"] else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mmi)
-		grupos[id] = {"mmi": mmi, "xfs": g["xfs"]}
+		grupos[id] = {"mmi": mmi, "xfs": g["xfs"], "alc": g["alc"]}
 	_pend.clear()
 
 
@@ -104,8 +114,16 @@ func montar() -> void:
 	var soma := 0
 	for a in ARVORES:
 		soma += a["peso"]
+	# cores da mata um pouco mais escuras e verdes (os modelos vieram claros demais)
+	for a in ARVORES:
+		malha(a["m"], Color(0.78, 0.72, 0.64), Color(0.82, 1.0, 0.78))
+	for m in PEDRAS:
+		malha(m, Color(0.8, 0.78, 0.76))
+	malha("res://assets/mata/paredao.glb", Color(0.75, 0.72, 0.68))
+	malha("res://assets/mata/paredao2.glb", Color(0.75, 0.72, 0.68))
 	var tent := 0
 	var feitas := 0
+	var sombras := []
 	while feitas < 700 and tent < 20000:
 		tent += 1
 		var p := Vector2(rng.randf_range(-236, 236), rng.randf_range(-236, 236))
@@ -132,7 +150,9 @@ func montar() -> void:
 			"grupo": ins["grupo"], "idx": ins["idx"], "corpo": corpo, "volta": 0.0}
 		corpo.set_meta("recurso", recursos.size())
 		recursos.append(rec)
+		sombras.append([Vector3(p.x, y, p.y), 3.0 + esc * 1.6])
 		feitas += 1
+	terreno.sombrear(sombras)
 	# plantas (dão fibra) e capim (só enfeite)
 	for i in 900:
 		var p := Vector2(rng.randf_range(-236, 236), rng.randf_range(-236, 236))
@@ -149,7 +169,7 @@ func montar() -> void:
 			"grupo": ins["grupo"], "idx": ins["idx"], "corpo": corpo, "volta": 0.0}
 		corpo.set_meta("recurso", recursos.size())
 		recursos.append(rec)
-	for i in 14000:
+	for i in 6000:
 		var p := Vector2(rng.randf_range(-236, 236), rng.randf_range(-236, 236))
 		if p.distance_to(Terreno.LAGO) < 44.0 or p.distance_to(Terreno.VILA) < 30.0:
 			continue
@@ -158,7 +178,7 @@ func montar() -> void:
 		if absf(hx) > 0.6 or y < Terreno.AGUA + 0.3:
 			continue
 		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.8, 1.3)), Vector3(p.x, y - 0.05, p.y))
-		_instancia(CAPIM[i % CAPIM.size()], xf, 70.0, false)
+		_instancia(CAPIM[i % CAPIM.size()], xf, 75.0, false, 32.0)
 	# pedras (dão pedra), troncos e tocos (dão madeira)
 	for i in 170:
 		var p := Vector2(rng.randf_range(-236, 236), rng.randf_range(-236, 236))
@@ -171,6 +191,7 @@ func montar() -> void:
 		no.mesh = malha(m)
 		no.transform = Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * esc), Vector3(p.x, y - 0.25 * esc, p.y))
 		no.visibility_range_end = 220.0
+		_alcances.append([no, 220.0])
 		add_child(no)
 		var corpo := StaticBody3D.new()
 		var cs := CollisionShape3D.new()
@@ -192,6 +213,7 @@ func montar() -> void:
 		no.mesh = malha(m)
 		no.transform = Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(1.0, 1.6)), Vector3(p.x, y - 0.05, p.y))
 		no.visibility_range_end = 160.0
+		_alcances.append([no, 160.0])
 		add_child(no)
 		var corpo := StaticBody3D.new()
 		var cs := CollisionShape3D.new()
@@ -214,6 +236,18 @@ func montar() -> void:
 		add_child(no)
 	_vila()
 	_fechar_grupos()
+
+
+## até onde a mata, as pedras e os troncos aparecem (gráficos baixo/médio/alto)
+var _alcances := []
+
+
+func alcance(k: float) -> void:
+	for id in grupos:
+		var g: Dictionary = grupos[id]
+		(g["mmi"] as MultiMeshInstance3D).visibility_range_end = float(g["alc"]) * k
+	for par in _alcances:
+		(par[0] as GeometryInstance3D).visibility_range_end = float(par[1]) * k
 
 
 func _corpo_cilindro(p: Vector3, raio: float, altura: float) -> StaticBody3D:

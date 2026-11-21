@@ -14,6 +14,9 @@ const LAGO := Vector2(-80, 70)
 var ruido := FastNoiseLite.new()
 var ruido2 := FastNoiseLite.new()
 var alturas := PackedFloat32Array()
+var mat: ShaderMaterial
+var corpo_chao: StaticBody3D
+var sombra_img: Image     # chão mais escuro debaixo das árvores (sombra de mata, 1 ponto a cada 2 m)
 
 
 func _init() -> void:
@@ -87,7 +90,8 @@ func _malha() -> void:
 	var mi := MeshInstance3D.new()
 	mi.name = "Chao"
 	mi.mesh = st.commit()
-	mi.material_override = _material()
+	mat = _material()
+	mi.material_override = mat
 	add_child(mi)
 
 
@@ -105,7 +109,9 @@ uniform sampler2D n_folhas : hint_normal, filter_linear_mipmap_anisotropic, repe
 uniform sampler2D t_rocha : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D n_rocha : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D ruido : filter_linear_mipmap, repeat_enable;
+uniform sampler2D sombra_mata : filter_linear, repeat_disable;
 uniform float agua = 0.35;
+uniform float tam = 512.0;
 varying vec3 wn;
 varying float wy;
 void vertex() {
@@ -124,15 +130,17 @@ void fragment() {
 	float wm = smoothstep(0.45, 0.62, n1 + (n2 - 0.5) * 0.3);
 	float wf = smoothstep(0.58, 0.74, n2) * (1.0 - wm * 0.5);
 	float wb = 1.0 - smoothstep(agua + 0.1, agua + 1.2, wy);
-	vec3 c = duas(t_grama, uv, 2.0);
+	vec3 c = duas(t_grama, uv, 2.0) * vec3(0.92, 1.12, 0.78);
 	vec3 nm = texture(n_grama, uv / 2.0).rgb;
 	c = mix(c, duas(t_mata, uv, 3.2), wm);
 	nm = mix(nm, texture(n_mata, uv / 3.2).rgb, wm);
-	c = mix(c, duas(t_folhas, uv, 2.4), wf);
+	c = mix(c, duas(t_folhas, uv, 2.4) * 0.85, wf);
 	nm = mix(nm, texture(n_folhas, uv / 2.4).rgb, wf);
 	c = mix(c, duas(t_mata, uv, 3.2) * vec3(0.62, 0.58, 0.52), wb);
-	c = mix(c, duas(t_rocha, uv, 1.8), wr);
+	c = mix(c, duas(t_rocha, uv, 1.8) * vec3(0.58, 0.56, 0.53), wr);
 	nm = mix(nm, texture(n_rocha, uv / 1.8).rgb, wr);
+	float sm = texture(sombra_mata, (uv + tam * 0.5) / tam).r;
+	c = mix(c * vec3(0.55, 0.58, 0.5), c, sm);
 	ALBEDO = c * (0.85 + 0.3 * n1);
 	NORMAL_MAP = nm;
 	NORMAL_MAP_DEPTH = 1.2;
@@ -156,7 +164,33 @@ void fragment() {
 	nt.noise = fn
 	m.set_shader_parameter("ruido", nt)
 	m.set_shader_parameter("agua", AGUA)
+	m.set_shader_parameter("tam", TAM)
+	sombra_img = Image.create_empty(N, N, false, Image.FORMAT_L8)
+	sombra_img.fill(Color(1, 1, 1))
+	m.set_shader_parameter("sombra_mata", ImageTexture.create_from_image(sombra_img))
 	return m
+
+
+## escurece o chão em volta de cada árvore (chamado pela mata depois de plantar tudo)
+func sombrear(arvores: Array) -> void:
+	for a in arvores:
+		var p: Vector3 = a[0]
+		var r: float = a[1]
+		var ci := int(round((p.x + TAM / 2.0) / PASSO))
+		var cj := int(round((p.z + TAM / 2.0) / PASSO))
+		var n := int(ceil(r / PASSO))
+		for dj in range(-n, n + 1):
+			for di in range(-n, n + 1):
+				var i := ci + di
+				var j := cj + dj
+				if i < 0 or j < 0 or i >= N or j >= N:
+					continue
+				var d := Vector2(di, dj).length() * PASSO / r
+				if d >= 1.0:
+					continue
+				var v := sombra_img.get_pixel(i, j).r
+				sombra_img.set_pixel(i, j, Color(v * (0.55 + 0.45 * d), 0, 0))
+	mat.set_shader_parameter("sombra_mata", ImageTexture.create_from_image(sombra_img))
 
 
 func _colisao() -> void:
@@ -176,6 +210,7 @@ func _colisao() -> void:
 	cs.scale = Vector3(PASSO, PASSO, PASSO)
 	corpo.add_child(cs)
 	add_child(corpo)
+	corpo_chao = corpo
 
 
 func _agua() -> void:

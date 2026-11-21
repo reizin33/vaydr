@@ -7,11 +7,13 @@ signal mudou
 const ESPACOS := 30
 const BARRA := 6
 var slots: Array = []
+var com_barra := true     # a mochila tem barra de atalhos; o baú não
 
 
-func _init() -> void:
-	slots.resize(ESPACOS)
-	for i in ESPACOS:
+func _init(n := ESPACOS, barra := true) -> void:
+	com_barra = barra
+	slots.resize(n)
+	for i in n:
 		slots[i] = null
 
 
@@ -36,11 +38,11 @@ func por(id: String, n: int) -> int:
 	# ferramentas e plano vão primeiro para a barra; recurso vai para a mochila depois da barra
 	var ordem: Array = []
 	var tipo: String = Dados.ITENS[id]["tipo"] if Dados.ITENS.has(id) else ""
-	if tipo in ["ferramenta", "plano", "colocavel", "cura", "comida"]:
-		for i in ESPACOS:
+	if not com_barra or tipo in ["ferramenta", "plano", "colocavel", "cura", "comida"]:
+		for i in slots.size():
 			ordem.append(i)
 	else:
-		for i in range(BARRA, ESPACOS):
+		for i in range(BARRA, slots.size()):
 			ordem.append(i)
 		for i in BARRA:
 			ordem.append(i)
@@ -58,7 +60,7 @@ func por(id: String, n: int) -> int:
 func tirar(id: String, n: int) -> bool:
 	if conta(id) < n:
 		return false
-	for i in range(ESPACOS - 1, -1, -1):
+	for i in range(slots.size() - 1, -1, -1):
 		var s = slots[i]
 		if n <= 0:
 			break
@@ -102,3 +104,11 @@ func usar_um(i: int) -> void:
 	if int(s["n"]) <= 0:
 		slots[i] = null
 	mudou.emit()
+
+
+## tira um espaço inteiro (para levar a outro inventário)
+func pegar(i: int):
+	var s = slots[i]
+	slots[i] = null
+	mudou.emit()
+	return s
