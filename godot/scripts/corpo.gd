@@ -615,6 +615,17 @@ func animar(dt: float, ent: Dictionary) -> void:
 	if (golpe_s >= 0.0 or mira_k > 0.25) and estado != "queda":
 		for b in [SPINE1, SPINE2, NECK, HEAD]:
 			lm[b] = 0.15
+	# o empurrão, a voadora e o pisão (64b_combate.js): as pernas e os braços vêm da pose do jogo só nessa hora
+	var acao_c := str(ent.get("acao", ""))
+	var acao_k := clampf(float(ent.get("acao_k", 0.0)), 0.0, 1.0)
+	if acao_c != "" and estado != "queda":
+		for b in range(L_OMBRO, R_MAO + 1):
+			lm[b] = 0.0
+		if acao_c in ["voadora", "pisao"]:
+			for b in range(L_COXA, R_DEDO + 1):
+				lm[b] = 0.0
+			for b in [HIPS, SPINE, SPINE1, SPINE2]:
+				lm[b] = 0.3
 	# a pose do jogo (o boneco antigo): passos, agachar, o item na mão, o golpe
 	amp = _chegar(amp, (1.0 if correndo else 0.75) if sp_real > 0.4 else 0.0, dt * 4.0)
 	ph += dt * (11.0 if correndo else 7.5) * (1.0 if sp_real > 0.3 else 0.25)
@@ -654,6 +665,13 @@ func animar(dt: float, ent: Dictionary) -> void:
 			_s3(o, 6, -0.45, 0, 0)
 	if usar_k > 0.01:
 		_pose_use(usar_k)
+	match acao_c:
+		"empurrao":
+			_pose_empurrao(minf(1.0, minf(acao_k * 0.4 / 0.12, (1.0 - acao_k) * 0.4 / 0.2)))
+		"voadora":
+			_pose_voadora(acao_k)
+		"pisao":
+			_pose_pisao(acao_k)
 	_da_pose()
 	# mistura por osso, suavização e cinemática direta
 	var ks := 1.0 - exp(-dt * 16.0)
@@ -839,6 +857,45 @@ static func _ease_io(x: float) -> float:
 
 static func _ease_out(x: float) -> float:
 	return 1.0 - pow(1.0 - x, 3.0)
+
+
+## o empurrão: os dois braços para a frente (posePush do jogo antigo)
+func _pose_empurrao(k: float) -> void:
+	_s3(o, 3, lerpf(o[9], -1.55, k), 0, lerpf(o[11], 0.1, k))
+	_s3(o, 4, lerpf(o[12], -0.1, k), 0, 0)
+	_s3(o, 5, lerpf(o[15], -1.55, k), 0, lerpf(o[17], -0.1, k))
+	_s3(o, 6, lerpf(o[18], -0.1, k), 0, 0)
+	_s3(o, 1, lerpf(o[3], 0.25, k), 0, 0)
+
+
+## a voadora: o pé direito para a frente, a perna de apoio reta, os braços abertos (poseVoadora)
+func _pose_voadora(k: float) -> void:
+	var s := sin(minf(1.0, k) * PI)
+	_s3(o, 9, -1.4 * s, 0, 0)
+	_s3(o, 10, lerpf(0.9, 0.05, minf(1.0, k * 2.2)) * s + 0.05, 0, 0)
+	_s3(o, 7, 0.06 * s, 0, 0)
+	_s3(o, 8, 0.08 * s, 0, 0)
+	_s3(o, 1, -0.32 * s, 0, 0)
+	_s3(o, 3, -0.5 * s, 0, 0.75 * s)
+	_s3(o, 5, -0.3 * s, 0, -0.85 * s)
+	_s3(o, 0, -0.12 * s, 0, 0)
+
+
+## o pisão: o joelho sobe e o pé desce de uma vez (posePisao)
+func _pose_pisao(k: float) -> void:
+	var sobe := sin(k / 0.5 * PI / 2.0) if k < 0.5 else 1.0
+	var desce := 0.0 if k < 0.5 else minf(1.0, (k - 0.5) / 0.12)
+	var volta := (k - 0.75) / 0.25 if k > 0.75 else 0.0
+	var th := lerpf(-1.25 * sobe, -0.35, desce)
+	var kn := lerpf(1.55 * sobe, 0.15, desce)
+	_s3(o, 9, th * (1.0 - volta), 0, 0)
+	_s3(o, 10, kn * (1.0 - volta), 0, 0)
+	_s3(o, 7, 0.04 * sobe * (1.0 - volta), 0, 0)
+	_s3(o, 8, 0.08 * sobe * (1.0 - volta), 0, 0)
+	_s3(o, 1, 0.35 * (1.0 - volta), 0, 0)
+	_s3(o, 2, 0.25 * (1.0 - volta), 0, 0)
+	_s3(o, 3, -0.4 * sobe * (1.0 - volta), 0, 0.35)
+	_s3(o, 5, -0.4 * sobe * (1.0 - volta), 0, -0.35)
 
 
 ## golpe corpo a corpo: s de 0 a 1; vertical para machado e picareta (o tronco gira junto), horizontal para o resto

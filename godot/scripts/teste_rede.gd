@@ -411,18 +411,23 @@ func fotos_principal() -> void:
 	j.alternar_camera(false)
 	if is_instance_valid(z):
 		z.queue_free()
-	# a troca: o amigo abre a partida dele e este jogo entra como convidado
+	# a troca: o amigo sai, abre a partida dele e este jogo entra como convidado
 	Rede.mandar_controle("abre")
 	await get_tree().create_timer(1.5).timeout
 	Rede.desligar(true)
 	var t0 := Time.get_ticks_msec()
-	while not Rede.on and Time.get_ticks_msec() - t0 < 90000:
+	var tentativas := 0
+	while not Rede.on and Time.get_ticks_msec() - t0 < 120000:
 		await get_tree().create_timer(2.0).timeout
+		tentativas += 1
 		Rede.entrar("127.0.0.1")
 		await _esperar(func(): return Rede.on or not Rede._conectando, 20.0)
+		if not Rede.on:
+			print("fotos da rede: tentativa %d (%.0f s): %s" % [tentativas, (Time.get_ticks_msec() - t0) / 1000.0, Rede.erro.left(60)])
 	if not Rede.on:
 		print("fotos da rede: não entrou na partida do amigo (%s)" % Rede.erro)
 		return
+	print("fotos da rede: entrou na partida do amigo (%d tentativas)" % tentativas)
 	main.telas.mostrar("multi")
 	await _quadros(20)
 	await main._foto("24_multiplayer_entrou_na_partida")
@@ -494,11 +499,17 @@ func fotos_amigo() -> void:
 						main.jogador.atacar()
 					await get_tree().create_timer(0.7).timeout
 			"abre":
-				await _esperar(func(): return not Rede.on, 30.0)
-				await get_tree().create_timer(1.0).timeout
+				# sai da partida de lá (sem esperar o aviso de que ela fechou) e abre a dele
+				Rede.desligar(true)
+				await get_tree().create_timer(3.0).timeout
 				main.hora = 15.8
-				await Rede.hospedar()
-				print("amigo das fotos: abriu a partida dele")
+				for k in 5:
+					await Rede.hospedar()
+					if Rede.on:
+						break
+					print("amigo das fotos: não abriu (%s); de novo" % Rede.erro)
+					await get_tree().create_timer(2.0).timeout
+				print("amigo das fotos: abriu a partida dele (%s, pergunta pelo TCP %s)" % [Rede.on, "sim" if Rede._tcp != null else "não"])
 			"zumbi":
 				main._nascer(Vector3(float(p[1]), float(p[2]), float(p[3])), false)
 			"fim":

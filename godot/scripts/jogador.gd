@@ -70,6 +70,12 @@ var _dobra_a := 0.0      # o pulso da mão da primeira pessoa (para o lado do mi
 var _dobra_f := 0.0      # (para a frente ou para trás)
 var golpe_n := 0         # quantos golpes já deu (a partida em rede manda: o boneco dele golpeia junto)
 var uso_n := 0           # quantas vezes comeu ou bebeu (idem)
+var acao := {}           # o empurrão (Q), a voadora (Q correndo) e o pisão (no zumbi caído): {tipo, t, dur, alvo, feito}
+var acao_n := 0          # (a partida em rede manda: o boneco faz junto)
+## a lanterna acesa no escuro ajuda os zumbis a te ver
+var lanterna_acesa: bool:
+	get:
+		return luz_mao != null and luz_mao.visible
 
 
 func _init(m: Node) -> void:
@@ -590,6 +596,9 @@ func _physics_process(dt: float) -> void:
 		if passo <= 0.0:
 			passo = 1.9 if corre else 1.5
 			main.sons.tocar("passo", global_position, -10.0 if agachado else -2.0)
+			# correndo faz barulho (os zumbis ouvem); andando, pouco; agachado, nada
+			if not agachado:
+				main.barulho(global_position, 9.0 if corre else 3.0)
 	_bob = Vector3(cos(balanco) * 0.025 * minf(1.0, hs / 4.0), sin(balanco * 2.0) * 0.035 * minf(1.0, hs / 4.0), 0)
 	tremor = maxf(0.0, tremor - dt)
 	if tremor > 0.0:
@@ -597,6 +606,7 @@ func _physics_process(dt: float) -> void:
 	if not terceira:
 		cam.position = _bob
 	golpe = maxf(0.0, golpe - dt * 3.2)
+	_passo_acao(dt)
 	if global_position.y < -30.0:
 		ferir(999.0, false)
 
@@ -615,6 +625,9 @@ func _process(dt: float) -> void:
 			selecionar(i)
 	if Input.is_action_pressed("atacar") and cd <= 0.0:
 		atacar()
+	# Q: o empurrão (com o plano na mão o Q troca a aba da construção)
+	if Input.is_action_just_pressed("aba_obra") and not main.construcao.ativo:
+		empurrar()
 	if Input.is_action_just_pressed("usar"):
 		usar()
 
@@ -691,7 +704,8 @@ func _animar_corpo(dt: float) -> void:
 			uk = 0.0
 	corpo.animar(dt, {"vel": velocity, "chao": is_on_floor(), "agachado": agachado, "correndo": _corre, "ferido": vida < 28.0,
 		"energia": energia, "item": id, "golpe": gs, "vertical": bool(d.get("vertical", false)), "usar": maxf(0.0, uk), "mira": 0.0,
-		"vivo": vivo, "primeira": not terceira, "yaw": rotation.y, "vira_anda": bool(Ajustes.v.get("corpo_anda", false))})
+		"vivo": vivo, "primeira": not terceira, "yaw": rotation.y, "vira_anda": bool(Ajustes.v.get("corpo_anda", false)),
+		"acao": str(acao.get("tipo", "")), "acao_k": (float(acao["t"]) / float(acao["dur"])) if not acao.is_empty() else 0.0})
 	# a roupa no corpo (muda pela mochila, rasga com os golpes)
 	_roupa_t -= dt
 	if _roupa_t <= 0.0:
@@ -719,26 +733,47 @@ func atacar() -> void:
 		return
 	var arma := tp == "arma"
 	var st: Dictionary = d if arma else Dados.MAO
+	# um zumbi caído na frente: o golpe vira pisão
+	if not acao.is_empty():
+		return
+	var caido = _caido_na_frente(1.7)
+	if caido != null and energia >= 5.0:
+		_pisao(caido)
+		return
 	cd = float(st.get("tempo", 0.55))
 	golpe = 1.0
 	golpe_t = 0.0
 	golpe_dur = maxf(0.3, cd * 0.85)
 	golpe_n += 1
 	main.sons.tocar("golpe", global_position, -8.0)
-	var h := mira(float(st.get("alcance", 1.9)) + 0.7)
+	var alc := float(st.get("alcance", 1.9))
+	var h := mira(alc + 0.7)
+	# os zumbis: o da mira primeiro, depois os do arco do golpe (o golpe de lado pega até dois; o de cima, um)
+	var direto = null
+	if not h.is_empty() and (h["collider"] as Object).has_meta("zumbi"):
+		direto = (h["collider"] as Object).get_meta("zumbi")
+	var no_arco := _zumbis_no_golpe(alc)
+	if direto != null or (not no_arco.is_empty() and (h.is_empty() or not (h["collider"] as Object).has_meta("recurso"))):
+		var alvos := []
+		if direto != null:
+			alvos.append(direto)
+		for z in no_arco:
+			if z != direto:
+				alvos.append(z)
+		var max_hits := 1 if bool(d.get("vertical", false)) else 2
+		for i in mini(max_hits, alvos.size()):
+			_bater_zumbi(alvos[i], st, d, arma, h if alvos[i] == direto else {})
+		main.ui.acerto()
+		main.barulho(global_position, 6.0)
+		if arma:
+			_gastar()
+		return
 	if h.is_empty():
 		return
 	var c: Object = h["collider"]
 	if c.has_meta("recurso"):
 		_coletar(c.get_meta("recurso"), d, arma, h)
-	elif c.has_meta("zumbi"):
-		var z = c.get_meta("zumbi")
-		z.ferir(float(st.get("dano", 9.0)), global_position)
-		main.ui.acerto()
-		main.sons.tocar("acerto", h["position"], 0.0)
-		main.efeitos.sangue(h["position"], h["normal"])
-		if arma:
-			_gastar()
+		main.barulho(global_position, 6.0)
 	elif c.has_meta("peca") and bool(d.get("conserta", false)):
 		var r: String = main.construcao.consertar(c.get_meta("peca"), inv)
 		if r == "":
@@ -747,6 +782,192 @@ func atacar() -> void:
 			_gastar()
 		else:
 			main.ui.aviso(r)
+
+
+## um golpe num zumbi: de cima rende mais; agachado, pelas costas de quem não te viu, dobra (golpe furtivo); as armas pesadas
+## às vezes derrubam
+func _bater_zumbi(z, st: Dictionary, d: Dictionary, arma: bool, h: Dictionary) -> void:
+	var dano := float(st.get("dano", 9.0)) * randf_range(0.92, 1.08)
+	if bool(d.get("vertical", false)):
+		dano *= 1.15
+	var furtivo: bool = agachado and z.estado in ["vaga", "alerta", "dorme"]
+	if furtivo:
+		dano *= 2.0
+		main.ui.aviso("Golpe furtivo: dano dobrado")
+	var emp := float(d.get("empurra", 0.6))
+	var derr := 0.0
+	if arma:
+		derr = maxf(0.0, emp - 1.0) * 0.45 + (0.15 if bool(d.get("vertical", false)) and float(d.get("dano", 0.0)) >= 30.0 else 0.0)
+	var p: Vector3 = h["position"] if not h.is_empty() else z.global_position + Vector3(0, 1.25 * z.escala, 0) + (global_position - z.global_position).normalized() * 0.28
+	z.ferir(dano, global_position, 0, {"k": "golpe", "forte": d.has("empurra"), "empurra": emp, "derruba": derr})
+	main.sons.tocar("acerto", p, 0.0)
+	main.efeitos.sangue(p, (global_position + Vector3(0, 1.2, 0) - p).normalized())
+
+
+## os zumbis no arco do golpe (na frente, ao alcance, sem parede no meio), do mais perto para o mais longe
+func _zumbis_no_golpe(alc: float) -> Array:
+	var fr := -global_transform.basis.z
+	fr.y = 0.0
+	fr = fr.normalized()
+	var L := []
+	for z in main.zumbis:
+		if not is_instance_valid(z) or z.estado == "morto":
+			continue
+		var dz: Vector3 = z.global_position - global_position
+		if absf(dz.y) > 1.7:
+			continue
+		dz.y = 0.0
+		var dd := dz.length()
+		if dd < 0.01 or dd > alc + float(z.S["r"]) + 0.15 or fr.dot(dz / dd) < 0.32:
+			continue
+		if not _livre_ate(z):
+			continue
+		L.append([dd, z])
+	L.sort_custom(func(a, b): return a[0] < b[0])
+	var r := []
+	for e in L:
+		r.append(e[1])
+	return r
+
+
+## nada (parede, porta, árvore) entre o peito e o zumbi
+func _livre_ate(z) -> bool:
+	var a := global_position + Vector3(0, 1.2, 0)
+	var b: Vector3 = z.global_position + Vector3(0, 1.0 * z.escala, 0)
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1, [get_rid(), z.get_rid()])
+	var h := get_world_3d().direct_space_state.intersect_ray(q)
+	return h.is_empty() or (h["collider"] as Object).has_meta("zumbi")
+
+
+func _caido_na_frente(alc: float):
+	var fr := -global_transform.basis.z
+	fr.y = 0.0
+	fr = fr.normalized()
+	var melhor = null
+	var bd := alc
+	for z in main.zumbis:
+		if not is_instance_valid(z) or z.estado != "derrubado":
+			continue
+		var dz: Vector3 = z.global_position - global_position
+		if absf(dz.y) > 1.2:
+			continue
+		dz.y = 0.0
+		var dd := dz.length()
+		if dd < bd and fr.dot(dz / maxf(dd, 0.01)) > 0.25:
+			bd = dd
+			melhor = z
+	return melhor
+
+
+# ---------------------------------------------------------------- empurrão, voadora e pisão (64b_combate.js do jogo antigo)
+## Q: empurra quem está na frente (cambaleiam para trás; golpe logo depois derruba). Correndo, vira voadora: pula com o pé e
+## derruba (o brutamontes só cambaleia). Com um zumbi caído na frente, vira pisão na cabeça
+func empurrar() -> void:
+	if not vivo or not acao.is_empty() or cd > 0.0:
+		return
+	var caido = _caido_na_frente(1.9)
+	if caido != null and energia >= 5.0:
+		_pisao(caido)
+		return
+	if _corre and is_on_floor() and energia >= 14.0:
+		energia -= 14.0
+		_folego_t = 0.0
+		var fr := -global_transform.basis.z
+		fr.y = 0.0
+		fr = fr.normalized()
+		velocity.x = fr.x * 8.2
+		velocity.z = fr.z * 8.2
+		velocity.y = 3.3
+		acao = {"tipo": "voadora", "t": 0.0, "dur": 0.7, "feito": false, "dir": fr}
+		acao_n += 1
+		main.sons.tocar("golpe", global_position, -4.0)
+		main.barulho(global_position, 5.0)
+		return
+	if energia < 8.0:
+		return
+	energia -= 8.0
+	_folego_t = 0.0
+	acao = {"tipo": "empurrao", "t": 0.0, "dur": 0.4, "feito": false}
+	acao_n += 1
+	cd = 0.45
+	main.sons.tocar("golpe", global_position, -8.0)
+
+
+func _pisao(z) -> void:
+	energia -= 5.0
+	_folego_t = 0.0
+	acao = {"tipo": "pisao", "t": 0.0, "dur": 0.62, "feito": false, "alvo": z}
+	acao_n += 1
+	cd = 0.62
+	main.sons.tocar("golpe", global_position, -6.0)
+
+
+func _passo_acao(dt: float) -> void:
+	if acao.is_empty():
+		return
+	acao["t"] = float(acao["t"]) + dt
+	var t: float = acao["t"]
+	var fr := -global_transform.basis.z
+	fr.y = 0.0
+	fr = fr.normalized()
+	match str(acao["tipo"]):
+		"empurrao":
+			if not acao["feito"] and t >= 0.15:
+				acao["feito"] = true
+				var n := 0
+				for z in main.zumbis:
+					if not is_instance_valid(z) or z.estado == "morto":
+						continue
+					var dz: Vector3 = z.global_position - global_position
+					dz.y = 0.0
+					var dd := dz.length()
+					if dd < 2.2 and fr.dot(dz / maxf(dd, 0.01)) > 0.3 and _livre_ate(z):
+						z.empurrar(dz)
+						n += 1
+				if n > 0:
+					main.sons.tocar("acerto", global_position + fr, -2.0)
+				main.barulho(global_position, 6.0)
+		"voadora":
+			var dirv: Vector3 = acao["dir"]
+			if not acao["feito"] and t >= 0.16:
+				var n := 0
+				for z in main.zumbis:
+					if not is_instance_valid(z) or z.estado == "morto":
+						continue
+					var dz: Vector3 = z.global_position - global_position
+					if absf(dz.y) > 1.6:
+						continue
+					dz.y = 0.0
+					var dd := dz.length()
+					if dd < 2.5 and dirv.dot(dz / maxf(dd, 0.01)) > 0.35:
+						z.ferir(12.0, global_position, 0, {"k": "voadora", "forte": true, "derruba": 1.0, "empurra": 1.8})
+						n += 1
+				if n > 0:
+					acao["feito"] = true
+					main.sons.tocar("impacto", global_position, 2.0)
+					tremor = 0.3
+					velocity.x *= 0.35
+					velocity.z *= 0.35
+				elif t >= 0.42:
+					acao["feito"] = true
+		"pisao":
+			if not acao["feito"] and t >= 0.34:
+				acao["feito"] = true
+				var z = acao.get("alvo")
+				if z != null and is_instance_valid(z) and z.estado == "derrubado" and z.global_position.distance_to(global_position) < 2.3:
+					var p: Vector3 = z.global_position + Vector3(0, 0.2, 0)
+					z.ferir(260.0, global_position, 0, {"k": "pisao", "forte": true})
+					main.efeitos.sangue(p, Vector3.UP)
+					main.efeitos.sangue(p, Vector3.UP)
+					main.sons.tocar("impacto", p, 2.0)
+					main.sons.tocar("acerto", p, 2.0)
+					tremor = 0.35
+					main.barulho(global_position, 6.0)
+					main.ui.acerto()
+				else:
+					main.sons.tocar("passo", global_position, 0.0)
+	if t >= float(acao["dur"]):
+		acao = {}
 
 
 ## o golpe gastou a arma/ferramenta da mão (quebra quando acaba, como no jogo antigo)
@@ -1082,6 +1303,7 @@ func ferir(dano: float, tremer := true, de := Vector3.INF) -> void:
 func renascer(p: Vector3) -> void:
 	global_position = p
 	velocity = Vector3.ZERO
+	acao = {}
 	vida = 100.0
 	fome = 80.0
 	sede = 80.0

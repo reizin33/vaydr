@@ -34,6 +34,12 @@ func _ready() -> void:
 	bancos["comer"] = [_ruido(0.35, 1500.0, 0.3, 6.0)]
 	bancos["agua"] = [_ruido(0.5, 900.0, 0.35, 4.0)]
 	bancos["clique"] = [_tom(0.05, 1200.0, 1100.0, 0.3, 60.0)]
+	# os zumbis (etapa 5): o capacete do policial, o tranco no chão, o inchado estourando, o gritador e a tosse no gás
+	bancos["metal"] = [_mistura(_tom(0.22, 1850.0, 1760.0, 0.32, 14.0), _tom(0.3, 2720.0, 2680.0, 0.2, 10.0))]
+	bancos["impacto"] = [_mistura(_tom(0.2, 95.0, 48.0, 0.9, 16.0), _ruido(0.14, 650.0, 0.55, 22.0))]
+	bancos["estouro"] = [_mistura(_ruido(0.55, 950.0, 0.85, 6.0), _tom(0.45, 75.0, 38.0, 0.75, 7.0))]
+	bancos["grito"] = [_mistura(_gemido(1.3, 360.0), _ruido(1.1, 3200.0, 0.22, 2.2)), _mistura(_gemido(1.1, 420.0), _ruido(0.9, 2800.0, 0.2, 2.6))]
+	bancos["tosse"] = [_mistura(_ruido(0.22, 1300.0, 0.55, 13.0), _tom(0.18, 180.0, 120.0, 0.35, 16.0))]
 	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
 	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]
 

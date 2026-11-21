@@ -35,6 +35,12 @@ var deitado := 0.0
 var visto := 0
 var _gn := -1
 var _un := -1
+var acao := ""             # empurrão, voadora ou pisão (a pose no corpo)
+var acao_k := 0.0
+## para os zumbis de quem abriu: a lanterna acesa no escuro ajuda a ver
+var lanterna_acesa: bool:
+	get:
+		return lanterna
 
 
 func _init(i: int, n: String, a: bool) -> void:
@@ -115,6 +121,9 @@ func estado(d: PackedFloat32Array, it: String) -> void:
 		uso_t = 0.0
 	_un = un
 	energia = clampf(d[12], 0.0, 100.0)
+	if d.size() >= 15:
+		acao = ["", "empurrao", "voadora", "pisao"][clampi(int(d[13]), 0, 3)]
+		acao_k = clampf(d[14], 0.0, 1.0)
 	if it != item:
 		item = it
 		if corpo != null:
@@ -189,7 +198,7 @@ func _process(dt: float) -> void:
 	var dd := Dados.item(item) if item != "" else {}
 	corpo.animar(dt, {"vel": vel, "chao": chao, "agachado": agachado, "correndo": correndo, "ferido": ferido, "energia": energia,
 		"item": item, "golpe": gs, "vertical": bool(dd.get("vertical", false)), "usar": maxf(0.0, uk), "mira": 0.0, "vivo": vivo,
-		"primeira": false, "yaw_corpo": yaw_s})
+		"primeira": false, "yaw_corpo": yaw_s, "acao": acao, "acao_k": acao_k})
 	# o nome em cima da cabeça, mais apagado de longe
 	etiqueta.position.y = (corpo.altura_total() * (0.78 if agachado else 1.0) + 0.28) if deitado < 0.5 else 0.7
 	etiqueta.modulate.a = clampf(1.25 - dc / 90.0, 0.35, 1.0)

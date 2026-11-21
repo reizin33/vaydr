@@ -335,6 +335,7 @@ func _process(dt: float) -> void:
 	var conv: bool = Rede.convidado()
 	if not modo_teste and not conv:
 		_zumbis_dos_lugares(dt)
+		_emboscadas(dt)
 	spawn_t -= dt
 	if spawn_t <= 0.0:
 		spawn_t = 12.0
@@ -405,11 +406,18 @@ func chao_em(x: float, z: float, de_cima := 90.0) -> Dictionary:
 	return {"y": (h["position"] as Vector3).y, "terra": h["collider"] == terreno.corpo_chao}
 
 
-func _nascer(p: Vector3, corre: bool) -> Zumbi:
-	var z := Zumbi.new(self, corre)
+## nasce um zumbi (tipo: o nome do tipo, ou true para o corredor e false para o comum)
+func _nascer(p: Vector3, tipo = "walker", dorme := false) -> Zumbi:
+	var z := Zumbi.new(self, tipo)
 	z.uid = Rede.novo_uid()
+	if dorme:
+		z.estado = "dorme"
 	add_child(z)
-	var y: float = chao_em(p.x, p.z, terreno.h(p.x, p.z) + 2.5)["y"]
+	# no chão de terra ou da rua; com a altura dada (o andar de cima de uma casa), no piso daquele andar
+	var de := terreno.h(p.x, p.z) + 2.5
+	if p.y > de - 1.0:
+		de = p.y + 1.2
+	var y: float = chao_em(p.x, p.z, de)["y"]
 	z.global_position = Vector3(p.x, y + 0.15, p.z)
 	zumbis.append(z)
 	return z
@@ -437,8 +445,107 @@ func _nascer_perto(centro: Vector3, frente: Vector3) -> void:
 				visto = true
 		if visto and t < 12:
 			continue
-		_nascer(p, noite() and randf() < 0.4)
+		_nascer(p, tipo_sorteado(p, ""))
 		return
+
+
+## o tipo de zumbi que nasce aqui e agora (de noite mais corredores; na cidade, policiais; o gritador e o brutamontes são raros)
+func tipo_sorteado(p: Vector3, lugar: String) -> String:
+	var nk := noite_k()
+	var r := randf()
+	var cidade := na_cidade(p)
+	if lugar.contains("delegacia") or lugar.contains("policia") or lugar.contains("militar"):
+		if r < 0.55:
+			return "policial"
+	if lugar.contains("hospital") and r < 0.4:
+		return "inchado"
+	r = randf()
+	var corre := lerpf(0.06, 0.38, nk)
+	if r < corre:
+		return "runner"
+	r -= corre
+	if r < 0.07:
+		return "screamer"
+	r -= 0.07
+	if r < 0.05:
+		return "brute"
+	r -= 0.05
+	if r < 0.05:
+		return "inchado"
+	r -= 0.05
+	if cidade and r < 0.07:
+		return "policial"
+	return "walker"
+
+
+## quanto é noite (0 de dia, 1 de noite; o fim da tarde e o amanhecer no meio), como o nightAmt do jogo antigo
+func noite_k() -> float:
+	var h := hora
+	if h >= 20.75 or h < 5.0:
+		return 1.0
+	if h >= 19.25:
+		return smoothstep(19.25, 20.75, h)
+	if h < 6.5:
+		return 1.0 - smoothstep(5.0, 6.5, h)
+	return 0.0
+
+
+## barulho em p que se ouve até r metros (tiro, explosão, golpe, corrida): os zumbis perto vão ver o que foi (alvo: para onde
+## eles vão; o gritador manda para onde você está). Na partida em rede o barulho de um convidado vai para quem abriu
+func barulho(p: Vector3, r: float, alvo := Vector3.INF) -> void:
+	if Rede.convidado():
+		Rede.ruido(p, r)
+		return
+	var para := p if alvo == Vector3.INF else alvo
+	for z in zumbis:
+		if not is_instance_valid(z) or z.lan:
+			continue
+		var d: float = z.global_position.distance_to(p)
+		if d < r:
+			z.ouvir(para, 0.15 + d / 16.0 + randf() * 0.3)
+
+
+## quem dorme nas casas (a emboscada): perto de quem chega, nas casas com móveis para revistar, às vezes um ou dois zumbis deitados
+## no escuro; acordam com barulho, com quem chega perto ou com golpe (cada casa sorteia uma vez por jogo)
+var _casas_t := 0.0
+var _casas_vistas := {}
+
+
+func _emboscadas(dt: float) -> void:
+	_casas_t -= dt
+	if _casas_t > 0.0 or mundo == null:
+		return
+	_casas_t = 2.0
+	var quem := jogadores_vivos()
+	if quem.is_empty():
+		return
+	for i in mundo.caixas.size():
+		if _casas_vistas.has(i):
+			continue
+		var cx: Dictionary = mundo.caixas[i]
+		if not cx.has("pos") or str(cx.get("nome", "")).contains("porta-malas") or str(cx.get("nome", "")).contains("carrinho"):
+			continue
+		var cp: Vector3 = cx["pos"]
+		var perto := false
+		var muito := false
+		for q in quem:
+			var d: float = (q["p"] as Vector3).distance_to(cp)
+			if d < 45.0:
+				perto = true
+			if d < 14.0:
+				muito = true
+		if not perto or muito:
+			continue
+		_casas_vistas[i] = true
+		if randf() > 0.12:
+			continue
+		for k in (1 if randf() < 0.7 else 2):
+			var a := randf() * TAU
+			var pz := cp + Vector3(cos(a), 0, sin(a)) * randf_range(0.9, 1.8)
+			var ch := chao_em(pz.x, pz.z, cp.y + 1.5)
+			if absf(float(ch["y"]) - cp.y) > 1.2:
+				continue
+			_nascer(Vector3(pz.x, float(ch["y"]), pz.z), "emboscada", true)
 
 
 ## quem está no mundo e de pé: você e, na partida em rede, os amigos que estão num mundo (onde está e para onde olha)
@@ -506,7 +613,7 @@ func _zumbis_dos_lugares(dt: float) -> void:
 			L["ativo"] = true
 			var zs := []
 			for q in pts:
-				var z := _nascer(Vector3(float(q[0]), 0, float(q[1])), noite() and randf() < 0.3)
+				var z := _nascer(Vector3(float(q[0]), 0, float(q[1])), tipo_sorteado(Vector3(float(q[0]), 0, float(q[1])), str(id).to_lower()))
 				z.set_meta("lugar", id)
 				zs.append(z)
 			L["zumbis"] = zs
@@ -562,7 +669,8 @@ func mundo_rede(h: float, L: PackedFloat32Array) -> void:
 		if z == null:
 			if st == 3:
 				continue   # já caiu lá: não nasce boneco só para cair
-			z = Zumbi.new(self, L[b + 8] > 0.5)
+			var ti := clampi(int(L[b + 8]), 0, Zumbi.TIPOS.size() - 1)
+			z = Zumbi.new(self, Zumbi.TIPOS.keys()[ti])
 			z.lan = true
 			z.uid = uid
 			add_child(z)
@@ -571,7 +679,7 @@ func mundo_rede(h: float, L: PackedFloat32Array) -> void:
 			z.lan_alvo = p
 			zumbis.append(z)
 			z_rede[uid] = z
-		z.rede(p, L[b + 4], st, L[b + 6], L[b + 7])
+		z.rede(p, L[b + 4], st, L[b + 6], L[b + 7], fposmod(L[b + 8], 1.0) >= 0.25)
 	for uid in z_rede.keys():
 		if not vistos.has(uid):
 			var z = z_rede[uid]
@@ -602,11 +710,14 @@ func rede_desligou() -> void:
 		get_tree().paused = true
 
 
-## quem abriu: o golpe (ou a armadilha) de um convidado num zumbi
-func hit_rede(uid: int, d: float, de: Vector3, quem: int) -> void:
+## quem abriu: o golpe (ou a armadilha, o empurrão, a voadora) de um convidado num zumbi
+func hit_rede(uid: int, d: float, de: Vector3, quem: int, info: Dictionary) -> void:
 	for z in zumbis:
 		if is_instance_valid(z) and z.uid == uid and not z.lan and z.estado != "morto":
-			z.ferir(d, de, quem)
+			if str(info.get("k", "")) == "empurrao":
+				z.empurrar(z.global_position - de)
+			else:
+				z.ferir(d, de, quem, info)
 			return
 
 
@@ -874,6 +985,269 @@ func _segurar(acao: String, n: int) -> void:
 	Input.action_release(acao)
 
 
+## tira os zumbis e as nuvens de gás (os testes dos zumbis começam do zero)
+func _limpar_zumbis() -> void:
+	for z in zumbis:
+		if is_instance_valid(z):
+			z.queue_free()
+	zumbis.clear()
+	for n in get_tree().get_nodes_in_group("gas"):
+		n.queue_free()
+
+
+## um zumbi de teste num ponto, olhando para "olha" (parado: de guarda, não vaga)
+func _z_teste(p: Vector3, tipo: String, olha: Vector3, parado := true, dorme := false) -> Zumbi:
+	var z := _nascer(Vector3(p.x, 0, p.z), tipo, dorme)
+	var d := olha - p
+	z.rotation.y = atan2(-d.x, -d.z)
+	z.parado = parado
+	return z
+
+
+## põe o jogador no chão em p olhando para o peito de z (ou para um ponto)
+func _jogador_em(p: Vector3, olha: Vector3) -> void:
+	_por_em(Vector3(p.x, terreno.h(p.x, p.z) + 0.15, p.z))
+	jogador.vida = 100.0
+	jogador.energia = 100.0
+	jogador.cd = 0.0
+	_olhar(olha)
+
+
+## espera até o zumbi ficar num dos estados (ou acabar o tempo); devolve o estado
+func _z_ate(z: Zumbi, estados: Array, n: int) -> String:
+	for i in n:
+		if not is_instance_valid(z) or z.estado in estados:
+			break
+		await get_tree().physics_frame
+	return z.estado if is_instance_valid(z) else "sumiu"
+
+
+## os zumbis (a etapa 5): os tipos com a roupa e o capacete, a visão (de frente, agachado, parede no meio, de noite com a
+## lanterna), o ouvido, o empurrão e o golpe logo depois dele, a voadora, o pisão, o golpe furtivo, o gritador, o inchado, a
+## emboscada que dorme nas casas e a armadura do policial
+func _teste_zumbis(livre: Vector3) -> void:
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	_limpar_zumbis()
+	hora = 10.0
+	for lugar in jogador.inv.roupa.keys():
+		if str(jogador.inv.roupa[lugar].get("id", "")) == "mascaraGas":
+			jogador.inv.despir(lugar)
+	var c := _lugar_livre(Vector2(-35, 45), 20.0, Vector2(livre.x, livre.z))
+	print("zumbis: teste em %.0f, %.0f" % [c.x, c.z])
+	var X := Vector3(1, 0, 0)
+	var Zv := Vector3(0, 0, 1)
+	_jogador_em(c + Zv * 9.0, c)
+	await _quadros(3)
+	# os tipos: a vida, o tamanho, a roupa (cascas) e o capacete
+	var tipos := {}
+	var k := 0
+	for t in Zumbi.TIPOS:
+		tipos[t] = _z_teste(c + X * (k * 2.2 - 6.6) - Zv * 6.0, t, c - Zv * 20.0)
+		k += 1
+	await _quadros(4)
+	var br: Zumbi = tipos["brute"]
+	var po: Zumbi = tipos["policial"]
+	var inc: Zumbi = tipos["inchado"]
+	var wk: Zumbi = tipos["walker"]
+	_confere(br.vida_max == 420.0 and absf(br.escala - 1.3) < 0.01 and po.capacete == 2 and po.capacete_no != null and po.cascas.size() >= 3
+		and inc.cascas.size() >= 2 and tipos["emboscada"].tipo == "emboscada",
+		"7 tipos de zumbi: brutamontes (420 de vida, 1,3x), policial (capacete e %d peças de farda), inchado, gritador, corredor, emboscada" % po.cascas.size())
+	_confere(wk.anim != null and wk.anim.has_animation("zLevantar") and wk.anim.has_animation("sCaindo") and wk.anim.has_animation("sDispara"),
+		"animações novas do zumbi: levantar do chão, cair para trás, disparada")
+	# a armadura do policial: o tiro na cabeça bate no capacete (duas vezes e ele voa); o colete segura o tiro no peito
+	var v0 := po.vida
+	po.ferir(26.0, jogador.global_position, 0, {"k": "bala", "head": true, "arma": "pistola", "mult": 2.0})
+	var cap1 := po.capacete
+	var d_cap := v0 - po.vida
+	po.ferir(26.0, jogador.global_position, 0, {"k": "bala", "head": true, "arma": "pistola", "mult": 2.0})
+	_confere(cap1 == 1 and d_cap < 8.0 and po.capacete == 0 and po.capacete_no == null,
+		"policial: o tiro na cabeça bate no capacete (%.1f de dano), no segundo ele voa" % d_cap)
+	v0 = po.vida
+	po.ferir(26.0, jogador.global_position, 0, {"k": "bala", "reg": "tronco", "arma": "pistola"})
+	_confere(absf((v0 - po.vida) - 26.0 * 0.6) < 0.2, "policial: o colete segura o tiro no peito (%.1f de 26)" % (v0 - po.vida))
+	var po2 := _z_teste(c + Zv * 3.0, "policial", c)
+	await _quadros(2)
+	po2.ferir(30.0, jogador.global_position, 0, {"k": "bala", "head": true, "arma": "espingarda", "mult": 1.6})
+	_confere(po2.capacete == 0 and po2.vida < po2.vida_max - 25.0, "policial: a espingarda arranca o capacete de uma vez")
+	_limpar_zumbis()
+	await _quadros(3)
+	# a visão: agachado atrás dele, não vê; de pé perto, vê (de qualquer lado)
+	Input.action_press("agachar")
+	_jogador_em(c - X * 2.0, c + X * 4.0 + Vector3(0, 1.2, 0))
+	await _quadros(3)
+	var z := _z_teste(c + X * 4.0, "walker", c + X * 20.0)
+	await _quadros(45)
+	var e1 := z.estado
+	Input.action_release("agachar")
+	var e2: String = await _z_ate(z, ["caca"], 50)
+	_confere(e1 == "vaga" and e2 == "caca", "visão: agachado atrás do zumbi ele não vê (%s); de pé a 6 m, vê (%s)" % [e1, e2])
+	_limpar_zumbis()
+	await _quadros(3)
+	# parede no meio: não vê; sem a parede, vê
+	_jogador_em(c - X * 4.0, c + X * 4.0 + Vector3(0, 1.4, 0))
+	var parede := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var bx := BoxShape3D.new()
+	bx.size = Vector3(0.4, 3.2, 5.0)
+	cs.shape = bx
+	parede.add_child(cs)
+	add_child(parede)
+	parede.global_position = Vector3(c.x, terreno.h(c.x, c.z) + 1.6, c.z)
+	await _quadros(3)
+	z = _z_teste(c + X * 4.0, "walker", c - X * 4.0)
+	await _quadros(45)
+	e1 = z.estado
+	var tapado := not z._enxerga(jogador)
+	parede.queue_free()
+	e2 = await _z_ate(z, ["caca"], 50)
+	_confere(e1 == "vaga" and tapado and e2 == "caca", "visão: com uma parede no meio não vê (%s); tirou a parede, viu (%s)" % [e1, e2])
+	_limpar_zumbis()
+	await _quadros(3)
+	# de noite vê menos; a lanterna acesa no escuro chama a atenção
+	hora = 23.0
+	z = _z_teste(c + X * 7.0, "walker", c - X * 7.0)
+	_jogador_em(c - X * 7.0, c + X * 7.0 + Vector3(0, 1.4, 0))
+	await _quadros(50)
+	e1 = z.estado
+	jogador.inv.por("lanterna", 1)
+	jogador.bateria = 100.0
+	if not jogador.lanterna_acesa:
+		jogador.alternar_lanterna()
+	var acesa := jogador.lanterna_acesa
+	e2 = await _z_ate(z, ["caca"], 50)
+	_confere(e1 == "vaga" and acesa and e2 == "caca", "de noite a 14 m ele não te vê (%s); com a lanterna acesa, vê (%s)" % [e1, e2])
+	if jogador.lanterna_acesa:
+		jogador.alternar_lanterna()
+	jogador.inv.tirar("lanterna", 1)
+	hora = 10.0
+	_limpar_zumbis()
+	await _quadros(3)
+	# o ouvido: de costas, longe, não vê; um barulho perto de você e ele vem ver o que foi
+	Input.action_press("agachar")
+	_jogador_em(c - X * 5.0, c + X * 7.0 + Vector3(0, 1.2, 0))
+	await _quadros(3)
+	z = _z_teste(c + X * 7.0, "walker", c + X * 30.0)
+	await _quadros(20)
+	e1 = z.estado
+	barulho(jogador.global_position, 20.0)
+	e2 = await _z_ate(z, ["alerta", "caca"], 110)
+	Input.action_release("agachar")
+	_confere(e1 == "vaga" and e2 in ["alerta", "caca"], "ouvido: o barulho a 12 m faz o zumbi vir ver o que foi (%s → %s)" % [e1, e2])
+	_limpar_zumbis()
+	await _quadros(3)
+	# o empurrão (Q): cambaleia para trás; o golpe logo depois derruba; caído, o golpe vira pisão e acaba com ele
+	z = _z_teste(c + X * 1.4, "walker", c)
+	_jogador_em(c, c + X * 1.4 + Vector3(0, 1.2, 0))
+	await _quadros(3)
+	var p_antes := z.global_position
+	jogador.empurrar()
+	await _quadros(20)
+	var e_emp := z.estado
+	var recuou := Vector2(z.global_position.x - p_antes.x, z.global_position.z - p_antes.z).length()
+	await _quadros(8)
+	_jogador_em(z.global_position - X * 1.3, z.global_position + Vector3(0, 1.1, 0))
+	jogador.atacar()
+	await _quadros(3)
+	var e_comb := z.estado
+	_confere(e_emp == "atordoado" and recuou > 0.3 and e_comb == "derrubado",
+		"Q empurra: o zumbi cambaleia para trás (%.1f m, %s); o golpe logo depois derruba (%s)" % [recuou, e_emp, e_comb])
+	await _quadros(4)
+	_jogador_em(z.global_position - X * 1.1, z.global_position + Vector3(0, 0.3, 0))
+	jogador.atacar()
+	var pisou := str(jogador.acao.get("tipo", ""))
+	var e_pis: String = await _z_ate(z, ["morto"], 45)
+	_confere(pisou == "pisao" and e_pis == "morto", "zumbi caído: o golpe vira pisão na cabeça (%s, %s)" % [pisou, e_pis])
+	_limpar_zumbis()
+	await _quadros(3)
+	# a voadora (Q correndo): derruba o comum; o brutamontes só cambaleia
+	var voadoras := []
+	for t in ["walker", "brute"]:
+		z = _z_teste(c + X * 5.0, t, c)
+		_jogador_em(c, c + X * 5.0 + Vector3(0, 1.2, 0))
+		await _quadros(3)
+		Input.action_press("frente")
+		Input.action_press("correr")
+		await _quadros(12)
+		jogador.empurrar()
+		var foi := str(jogador.acao.get("tipo", ""))
+		var e_v: String = await _z_ate(z, ["derrubado"], 30)
+		Input.action_release("correr")
+		Input.action_release("frente")
+		voadoras.append([foi, e_v, z.vida < z.vida_max])
+		await _quadros(30)
+		_limpar_zumbis()
+		await _quadros(3)
+	_confere(voadoras[0][0] == "voadora" and voadoras[0][1] == "derrubado" and voadoras[1][1] != "derrubado" and voadoras[1][2],
+		"Q correndo: a voadora derruba o zumbi (%s); o brutamontes não cai (%s)" % [voadoras[0][1], voadoras[1][1]])
+	# o golpe furtivo: agachado, pelas costas de quem não te viu, dobra
+	Input.action_press("agachar")
+	_jogador_em(c + X * 1.5, c + X * 3.0 + Vector3(0, 1.0, 0))
+	await _quadros(3)
+	z = _z_teste(c + X * 3.0, "walker", c + X * 20.0)
+	await _quadros(12)
+	_olhar(z.global_position + Vector3(0, 1.0, 0))
+	var e_f := z.estado
+	jogador.atacar()
+	var d_furtivo := z.vida_max - z.vida
+	Input.action_release("agachar")
+	_limpar_zumbis()
+	await _quadros(12)
+	z = _z_teste(c + X * 3.0, "walker", c)
+	_jogador_em(c + X * 1.5, c + X * 3.0 + Vector3(0, 1.2, 0))
+	await _quadros(4)
+	jogador.atacar()
+	var d_normal := z.vida_max - z.vida
+	_confere(e_f == "vaga" and d_normal > 0.0 and d_furtivo >= d_normal * 1.6,
+		"golpe furtivo (agachado, pelas costas): %.0f de dano contra %.0f de frente" % [d_furtivo, d_normal])
+	_limpar_zumbis()
+	await _quadros(3)
+	# o brutamontes: o soco não faz ele cambalear
+	z = _z_teste(c + X * 1.6, "brute", c)
+	_jogador_em(c, c + X * 1.6 + Vector3(0, 1.5, 0))
+	await _quadros(3)
+	jogador.atacar()
+	await _quadros(2)
+	_confere(z.vida < z.vida_max and z.estado != "atordoado", "brutamontes: o soco não faz ele cambalear (%s)" % z.estado)
+	_limpar_zumbis()
+	await _quadros(3)
+	# o gritador: te vê, grita, e o zumbi de longe (de costas, a 26 m de você) vem para onde você está
+	var gr := _z_teste(c + X * 6.0, "screamer", c - X * 2.0)
+	var longe := _z_teste(c + X * 24.0, "walker", c + X * 60.0)
+	_jogador_em(c - X * 2.0, c + X * 6.0 + Vector3(0, 1.4, 0))
+	var e_g: String = await _z_ate(gr, ["grito"], 60)
+	var e_l: String = await _z_ate(longe, ["alerta", "caca"], 200)
+	_confere(e_g == "grito" and gr.gritou and e_l in ["alerta", "caca"], "gritador: viu, gritou (%s) e o zumbi de longe veio (%s)" % [e_g, e_l])
+	_limpar_zumbis()
+	await _quadros(3)
+	# o inchado: chega perto e estoura numa nuvem de gás que machuca
+	var ic := _z_teste(c + X * 1.25, "inchado", c)
+	_jogador_em(c, c + X * 1.25 + Vector3(0, 1.2, 0))
+	var e_i: String = await _z_ate(ic, ["morto"], 60)
+	var nuvens := get_tree().get_nodes_in_group("gas").size()
+	jogador.vida = 100.0
+	await _quadros(45)
+	_confere(e_i == "morto" and ic.estourou and nuvens > 0 and jogador.vida < 99.0,
+		"inchado: chegou perto e estourou (%d nuvem de gás); no gás a vida cai (%d)" % [nuvens, int(jogador.vida)])
+	_limpar_zumbis()
+	await _quadros(3)
+	# a emboscada: dorme deitada no escuro; de longe não acorda, de perto levanta e vem
+	var em := _z_teste(c + X * 3.0, "emboscada", c, false, true)
+	_jogador_em(c - X * 3.0, c + X * 3.0)
+	await _quadros(40)
+	var e_d := em.estado
+	var deitada: bool = em.anim != null and em.anim.current_animation == "zLevantar"
+	_jogador_em(c + X * 0.9, c + X * 3.0)
+	var e_a: String = await _z_ate(em, ["levanta", "caca"], 30)
+	var e_c: String = await _z_ate(em, ["caca"], 100)
+	_confere(e_d == "dorme" and deitada and e_a in ["levanta", "caca"] and e_c == "caca",
+		"emboscada: deitada dormindo (%s); chegou perto, levantou (%s) e veio (%s)" % [e_d, e_a, e_c])
+	_limpar_zumbis()
+	await _quadros(3)
+	jogador.vida = 100.0
+	spawn_t = spawn_antes
+
+
 ## o personagem (a etapa 3): o corpo com o esqueleto e as peças, as animações pela velocidade (parado, andando, correndo,
 ## agachado, pulo), a terceira pessoa (V), o item na mão do corpo e a mão esquerda no cabo, o golpe, a roupa no corpo, a mão da
 ## primeira pessoa e a criação do personagem (que guarda no perfil e vai para o jogo)
@@ -1007,6 +1381,20 @@ func _na_mao(id: String) -> bool:
 			jogador.selecionar(k)
 			return true
 	return false
+
+
+## a mão vazia (um espaço vazio da barra; sem nenhum, o item do primeiro vai para a mochila)
+func _mao_vazia() -> void:
+	var inv := jogador.inv
+	for i in Inventario.BARRA:
+		if inv.slots[i] == null:
+			jogador.selecionar(i)
+			return
+	for i in range(Inventario.BARRA, inv.limite):
+		if inv.slots[i] == null:
+			inv.trocar(0, i)
+			jogador.selecionar(0)
+			return
 
 
 func _por_em(p: Vector3) -> void:
@@ -1781,6 +2169,7 @@ func _teste() -> void:
 	_confere(noite(), "noite às 22h")
 	# o personagem (a etapa 3), por último: mexe na mochila, na roupa e na câmera
 	hora = 10.0
+	await _teste_zumbis(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -1796,24 +2185,28 @@ func _foto(nome: String) -> void:
 		DisplayServer.window_set_size(Vector2i(1280, 720))
 		await _quadros(6)
 	await _quadros(10)
-	# no Linux sem placa de vídeo (llvmpipe), de vez em quando um quadro sai com um pedaço trocado (deslocado para o lado ou
-	# de outro quadro), na tela e na textura. Tira três seguidas e fica com uma das duas mais parecidas entre si (o defeito
-	# não se repete igual em dois quadros; o mato balançando e um zumbi andando mudam pouco)
-	var caps: Array = []
-	for k in 3:
+	# no Linux sem placa de vídeo (llvmpipe), de vez em quando um quadro sai com um pedaço deslocado (da linha tal para baixo,
+	# tudo vai para o lado), às vezes em dois quadros seguidos. As marcas magenta na beira esquerda dizem se o quadro saiu
+	# inteiro: tira de novo até sair um inteiro (e apaga as marcas da foto)
+	_marcas_fotos()
+	var img: Image = null
+	var faltam := 99
+	for k in 12:
 		await RenderingServer.frame_post_draw
 		await get_tree().process_frame
 		await RenderingServer.frame_post_draw
-		caps.append(_capturar())
-	var img: Image = caps[2]
-	var melhor := 2.0
-	for par in [[0, 1], [1, 2], [0, 2]]:
-		var d := _diferenca(caps[par[0]], caps[par[1]])
-		if d < melhor:
-			melhor = d
-			img = caps[par[0]]
-	if melhor > 0.08:
-		print("foto %s: as três ficaram diferentes (%.0f%%)" % [nome, melhor * 100.0])
+		var im := _capturar()
+		var f := _marcas_faltando(im)
+		if f < faltam:
+			faltam = f
+			img = im
+		if f == 0:
+			break
+		print("foto %s: quadro %d com defeito (%d marcas fora do lugar)" % [nome, k, f])
+		await _quadros(2 + k)
+	if faltam > 0:
+		print("foto %s: nenhum quadro saiu inteiro (%d marcas fora)" % [nome, faltam])
+	_sem_marcas(img)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://fotos"))
 	img.save_jpg(ProjectSettings.globalize_path("res://fotos/%s.jpg" % nome), 0.86)
 	var dc := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
@@ -1829,22 +2222,48 @@ func _capturar() -> Image:
 	return img
 
 
-## quanto duas fotos diferem: a fração dos quadradinhos (64 x 36) com a luz bem diferente
-func _diferenca(a: Image, b: Image) -> float:
-	if a == null or b == null or a.is_empty() or b.is_empty():
-		return 1.0
-	var pa := a.duplicate() as Image
-	var pb := b.duplicate() as Image
-	pa.resize(64, 36, Image.INTERPOLATE_BILINEAR)
-	pb.resize(64, 36, Image.INTERPOLATE_BILINEAR)
-	var ruins := 0
-	for y in 36:
-		for x in 64:
-			var ca := pa.get_pixel(x, y)
-			var cb := pb.get_pixel(x, y)
-			if absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b) > 0.3:
-				ruins += 1
-	return float(ruins) / (64.0 * 36.0)
+## as marcas das fotos: quadradinhos magenta (3 x 2 px) na beira esquerda a cada 44 linhas, por cima de tudo. Se alguma não
+## está no lugar na foto, o quadro saiu com o defeito do llvmpipe
+const MARCAS := 17
+var _marcas: CanvasLayer = null
+
+
+func _marcas_fotos() -> void:
+	if _marcas != null and is_instance_valid(_marcas):
+		return
+	_marcas = CanvasLayer.new()
+	_marcas.layer = 128
+	for k in MARCAS:
+		var r := ColorRect.new()
+		r.color = Color(1, 0, 1)
+		r.position = Vector2(0, 4 + k * 44)
+		r.size = Vector2(3, 2)
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_marcas.add_child(r)
+	get_tree().root.add_child.call_deferred(_marcas)
+
+
+## quantas marcas não estão no lugar (0: o quadro saiu inteiro)
+func _marcas_faltando(img: Image) -> int:
+	if img == null or img.is_empty() or img.get_width() < 8 or img.get_height() < 4 + MARCAS * 44:
+		return MARCAS
+	var f := 0
+	for k in MARCAS:
+		var c := img.get_pixel(1, 5 + k * 44)
+		if c.r < 0.85 or c.g > 0.15 or c.b < 0.85:
+			f += 1
+	return f
+
+
+## tira as marcas da foto (copia as colunas do lado)
+func _sem_marcas(img: Image) -> void:
+	if img == null or img.is_empty() or img.get_height() < 4 + MARCAS * 44:
+		return
+	for k in MARCAS:
+		for dy in 2:
+			var y := 4 + k * 44 + dy
+			for x in 3:
+				img.set_pixel(x, y, img.get_pixel(x + 3, y))
 
 
 ## põe a câmera num ponto do chão olhando para o alvo (relativo: a altura do alvo conta a partir do chão de lá)
@@ -1866,6 +2285,7 @@ func _cam_alto(pos: Vector3, alvo: Vector3) -> void:
 
 
 func _fotos() -> void:
+	_marcas_fotos()
 	await _quadros(30)
 	hora = 9.5
 	print("fotos das espécies prontas: ", mundo.fotos_prontas)
@@ -2134,7 +2554,7 @@ func _fotos() -> void:
 		hora = 21.5
 		await _cam(b0["xf"] * Vector3(-11.0, 0, -2.0), b0["xf"] * Vector3(-5.0, 1.0, 1.5), false)
 		await _foto("15_noite_fogueira")
-	jogador.selecionar(5)
+	_mao_vazia()
 	hora = 10.0
 	for z in zumbis:
 		if is_instance_valid(z):
@@ -2149,6 +2569,44 @@ func _fotos() -> void:
 	ui.dano(zz.global_position + Vector3(4, 0, 0))
 	await _foto("16b_apanhando")
 	jogador.vida = 100.0
+	# os tipos de zumbi lado a lado: o comum, o corredor, o brutamontes, o gritador, o policial (farda, colete e capacete), o
+	# inchado e a emboscada (os de rua com trapos de cores diferentes)
+	_limpar_zumbis()
+	var lt := _lugar_livre(Vector2(-35, 45), 16.0, Vector2(livre.x, livre.z))
+	var cam_t := lt + Vector3(0.3, 0, 6.2)
+	var kt := 0
+	for t in ["walker", "runner", "brute", "screamer", "policial", "inchado", "emboscada"]:
+		var pt := lt + Vector3(-5.1 + kt * 1.7, 0, -0.35 * absf(kt - 3.0))
+		var zt := _z_teste(pt, t, cam_t + Vector3(0, 0, 3.0))
+		zt.set_physics_process(false)
+		zt.global_position.y -= 0.15
+		kt += 1
+	await _cam(cam_t, lt + Vector3(0.3, 1.0, 0.0))
+	await _quadros(8)
+	await _foto("16c_tipos_de_zumbi")
+	# a voadora em terceira pessoa: o pé no peito e o zumbi caindo para trás
+	_limpar_zumbis()
+	var lv := _lugar_livre(Vector2(-20, 30), 8.0, Vector2(livre.x, livre.z))
+	var zv := _z_teste(lv + Vector3(0, 0, -1.5), "walker", lv)
+	zv.set_physics_process(false)
+	zv.global_position.y -= 0.15
+	_jogador_em(lv + Vector3(0, 0, 0.1), lv + Vector3(0, 1.1, -1.5))
+	jogador.alternar_camera(true)
+	await _quadros(6)
+	jogador.set_physics_process(false)
+	jogador.global_position.y += 0.45
+	jogador.acao = {"tipo": "voadora", "t": 0.27, "dur": 0.7, "feito": true, "dir": Vector3(0, 0, -1)}
+	if zv.anim != null and zv.anim.has_animation("sCaindo"):
+		zv.anim.play("sCaindo", 0.0, 1.0)
+		zv.anim.seek(0.3, true)
+		zv.anim.pause()
+	zv.rotation.x = 0.3   # inclinado para trás (o pé dele ainda no chão)
+	await _quadros(8)
+	await _foto("16d_voadora")
+	jogador.acao = {}
+	jogador.set_physics_process(true)
+	jogador.alternar_camera(false)
+	_limpar_zumbis()
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()
 	await _foto("17_pausa")

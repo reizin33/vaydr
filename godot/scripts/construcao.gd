@@ -649,21 +649,21 @@ func _armadilhas(dt: float) -> void:
 			var c: Vector3 = (pe["xf"] as Transform3D).origin
 			match id:
 				"estacas":
-					z.ferir(14.0 * dt, c)
+					z.ferir(14.0 * dt, c, 0, {"k": "armadilha"})
 					z.atrasar(0.6)
 					pe["vida"] = float(pe["vida"]) - 3.0 * dt
 				"espetosFerro":
-					z.ferir(26.0 * dt, c)
+					z.ferir(26.0 * dt, c, 0, {"k": "armadilha"})
 					z.atrasar(0.6)
 					pe["vida"] = float(pe["vida"]) - 1.5 * dt
 				"arame":
-					z.ferir(8.0 * dt, c)
+					z.ferir(8.0 * dt, c, 0, {"k": "armadilha"})
 					z.atrasar(0.9)
 					pe["vida"] = float(pe["vida"]) - 2.0 * dt
 				"armadilhaUrso":
 					if pe.get("armada", true):
 						pe["armada"] = false
-						z.ferir(45.0, c)
+						z.ferir(45.0, c, 0, {"k": "armadilha"})
 						z.prender(5.0)
 						main.sons.tocar("acerto", c, 2.0)
 				"latas":

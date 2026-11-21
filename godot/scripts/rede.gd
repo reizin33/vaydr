@@ -168,6 +168,7 @@ func hospedar() -> void:
 	jog.clear()
 	_tcp = TCPServer.new()
 	if _tcp.listen(PORTA) != OK:
+		push_warning("partida em rede: a pergunta pelo TCP não abriu na porta %d (os amigos entram assim mesmo)" % PORTA)
 		_tcp = null
 	_udp_anf = PacketPeerUDP.new()
 	if _udp_anf.bind(PORTA_ACHAR) != OK:
@@ -208,13 +209,17 @@ func entrar(txt: String) -> void:
 	var r: Dictionary = await _sondar(ip, porta)
 	if tent != _tentativa:
 		return
-	if not r["ok"] and str(r["codigo"]) != "SEM_RESPOSTA":
+	var cod := str(r.get("codigo", ""))
+	if not r["ok"] and cod != "SEM_RESPOSTA" and cod != "RECUSOU":
 		_conectando = false
 		status = ""
-		erro = _motivo(str(r["codigo"]), ip, r.get("info", {}))
+		erro = _motivo(cod, ip, r.get("info", {}))
 		mudou.emit()
 		return
+	# recusou pelo TCP: quase sempre a partida não está aberta, mas tenta o jogo mesmo assim um pouco (se a pergunta pelo
+	# TCP não abriu do lado de lá, a partida ainda funciona)
 	var sem_tcp: bool = not r["ok"]
+	var recusou: bool = cod == "RECUSOU"
 	status = "Conectando…" if not sem_tcp else "Procurando a partida em %s…" % ip
 	mudou.emit()
 	var p := ENetMultiplayerPeer.new()
@@ -224,14 +229,14 @@ func entrar(txt: String) -> void:
 		erro = _motivo("ENDERECO", ip, {})
 		mudou.emit()
 		return
-	_msg_falha = _motivo("SEM_RESPOSTA", ip, {})
+	_msg_falha = _motivo("RECUSOU" if recusou else "SEM_RESPOSTA", ip, {})
 	_peer = p
 	multiplayer.multiplayer_peer = p
 	papel = "convidado"
-	# sem resposta em 12 s (8 s quando nem o TCP respondeu): desiste com o motivo
-	await get_tree().create_timer(8.0 if sem_tcp else 12.0, true).timeout
+	# sem resposta em 12 s (8 s quando nem o TCP respondeu; 5 s quando o TCP recusou): desiste com o motivo
+	await get_tree().create_timer(5.0 if recusou else (8.0 if sem_tcp else 12.0), true).timeout
 	if tent == _tentativa and _conectando and not on:
-		var msg := _motivo("SEM_RESPOSTA", ip, {})
+		var msg := _msg_falha
 		desligar(true)
 		erro = msg
 		status = ""
@@ -595,14 +600,23 @@ func _dano(d: float, de: Vector3) -> void:
 
 ## o golpe de um convidado num zumbi (quem abriu aplica)
 @rpc("any_peer", "call_remote", "reliable")
-func _hit_z(uid: int, d: float, de: Vector3) -> void:
+func _hit_z(uid: int, d: float, de: Vector3, inf: Dictionary) -> void:
 	if papel != "anfitriao" or main == null or not is_instance_valid(main):
 		return
 	var quem := multiplayer.get_remote_sender_id()
 	if not jog.has(quem):
 		return
 	info["hits"] += 1
-	main.hit_rede(uid, clampf(d, 0.0, 500.0), de, quem)
+	var limpa := {}
+	limpa["k"] = str(inf.get("k", "golpe")).left(12)
+	limpa["head"] = bool(inf.get("head", false))
+	limpa["reg"] = str(inf.get("reg", "tronco")).left(12)
+	limpa["arma"] = str(inf.get("arma", "")).left(20)
+	limpa["forte"] = bool(inf.get("forte", false))
+	limpa["derruba"] = clampf(float(inf.get("derruba", 0.0)), 0.0, 1.0)
+	limpa["empurra"] = clampf(float(inf.get("empurra", 1.0)), 0.0, 3.0)
+	limpa["mult"] = clampf(float(inf.get("mult", 2.5)), 0.5, 4.0)
+	main.hit_rede(uid, clampf(d, 0.0, 800.0), de, quem, limpa)
 
 
 ## a armadilha da base de um convidado prendeu ou atrasou o zumbi (0: atrasa, 1: prende)
@@ -690,7 +704,13 @@ func _mandar_eu(j) -> void:
 	var v: Vector3 = j.velocity
 	var fl := (1 if j.vivo else 0) | (2 if j.agachado else 0) | (4 if j._corre else 0) | (8 if j.is_on_floor() else 0) \
 		| (16 if j.vida < 28.0 else 0) | (32 if j.luz_mao.visible else 0)
-	var d := PackedFloat32Array([p.x, p.y, p.z, v.x, v.y, v.z, j.corpo.yaw, j.cabeca.rotation.x, fl, j.golpe_n, j.golpe_dur, j.uso_n, j.energia])
+	var ac := 0
+	var ak := 0.0
+	if not j.acao.is_empty():
+		ac = ["", "empurrao", "voadora", "pisao"].find(str(j.acao["tipo"]))
+		ak = float(j.acao["t"]) / float(j.acao["dur"])
+	var d := PackedFloat32Array([p.x, p.y, p.z, v.x, v.y, v.z, j.corpo.yaw, j.cabeca.rotation.x, fl, j.golpe_n, j.golpe_dur, j.uso_n, j.energia,
+		maxi(ac, 0), ak])
 	_eu.rpc(d, str(j.item_mao().get("id", "")))
 
 
@@ -741,15 +761,49 @@ func dano_para(id: int, d: float, de: Vector3) -> void:
 	_dano.rpc_id(id, d, de)
 
 
-## convidado: o golpe (ou a armadilha) num zumbi de quem abriu; junta e manda 10 vezes por segundo
-func hit_z(uid: int, d: float, de: Vector3) -> void:
-	if papel != "convidado" or not on or d <= 0.0:
+## convidado: o golpe (ou a armadilha) num zumbi de quem abriu; junta e manda 10 vezes por segundo (o empurrão vai na hora).
+## info: o tipo do golpe (como em Zumbi.ferir): cabeça, região, arma, forte, derruba
+func hit_z(uid: int, d: float, de: Vector3, info := {}) -> void:
+	if papel != "convidado" or not on:
+		return
+	var limpa := {}
+	for k in ["k", "head", "reg", "arma", "forte", "derruba", "empurra", "mult"]:
+		if info.has(k):
+			limpa[k] = info[k]
+	if str(limpa.get("k", "")) == "empurrao":
+		_hit_z.rpc_id(1, uid, 0.0, de, limpa)
+		return
+	if d <= 0.0:
 		return
 	if _hits.has(uid):
-		_hits[uid][0] = float(_hits[uid][0]) + d
-		_hits[uid][1] = de
+		var e: Array = _hits[uid]
+		e[0] = float(e[0]) + d
+		e[1] = de
+		var ant: Dictionary = e[2]
+		for k in limpa:
+			if k in ["head", "forte"]:
+				ant[k] = bool(ant.get(k, false)) or bool(limpa[k])
+			elif k == "derruba":
+				ant[k] = maxf(float(ant.get(k, 0.0)), float(limpa[k]))
+			else:
+				ant[k] = limpa[k]
 	else:
-		_hits[uid] = [d, de]
+		_hits[uid] = [d, de, limpa]
+
+
+## convidado: o barulho que você fez (tiro, explosão, golpe, corrida) vai para os zumbis de quem abriu
+func ruido(p: Vector3, r: float) -> void:
+	if papel == "convidado" and on and _peer != null:
+		_ruido.rpc_id(1, p, r)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _ruido(p: Vector3, r: float) -> void:
+	if papel != "anfitriao" or main == null or not is_instance_valid(main) or not main.em_jogo:
+		return
+	if not jog.has(multiplayer.get_remote_sender_id()):
+		return
+	main.barulho(p, clampf(r, 0.0, 120.0))
 
 
 func efeito_z(uid: int, tipo: int, t: float) -> void:
@@ -762,7 +816,7 @@ func efeito_z(uid: int, tipo: int, t: float) -> void:
 
 func _mandar_golpes() -> void:
 	for uid in _hits:
-		_hit_z.rpc_id(1, uid, float(_hits[uid][0]), _hits[uid][1])
+		_hit_z.rpc_id(1, uid, float(_hits[uid][0]), _hits[uid][1], _hits[uid][2])
 		info["hits"] += 1
 	_hits.clear()
 	for uid in _efeitos:
