@@ -1559,15 +1559,18 @@ func _foto(nome: String) -> void:
 		print("foto %s: janela estava %s" % [nome, DisplayServer.window_get_size()])
 		DisplayServer.window_set_size(Vector2i(1280, 720))
 		await _quadros(6)
+	# no Linux sem placa de vídeo (llvmpipe), com o brilho (glow) ligado, às vezes um pedaço de baixo do quadro sai deslocado
+	# para o lado (na tela e na textura); sem o brilho não acontece: a foto sai sem ele (no PC de verdade ele continua)
+	var brilho := amb.glow_enabled
+	amb.glow_enabled = false
 	await _quadros(10)
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
-	# no Linux sem placa de vídeo, ler a imagem da textura da tela às vezes desloca a metade de baixo para o lado; a
-	# imagem da própria tela (o que a janela mostra) não tem esse defeito: usa ela e, se não der, a da textura
 	var img: Image = DisplayServer.screen_get_image(DisplayServer.window_get_current_screen())
 	var tam_ok := img != null and not img.is_empty() and img.get_size() == DisplayServer.window_get_size()
 	if not tam_ok:
 		img = get_viewport().get_texture().get_image()
+	amb.glow_enabled = brilho
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://fotos"))
 	img.save_jpg(ProjectSettings.globalize_path("res://fotos/%s.jpg" % nome), 0.86)
 	var dc := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
@@ -1761,10 +1764,14 @@ func _fotos() -> void:
 	jogador.alternar_camera(true)
 	await _quadros(70)
 	await _foto("13b_terceira_pessoa")
+	# o golpe parado no meio (sem placa de vídeo cada quadro leva um segundo: o golpe inteiro passaria entre dois quadros)
 	jogador.cd = 0.0
 	jogador.atacar()
-	await _quadros(9)
+	jogador.golpe_t = 0.2
+	jogador.golpe_parado = true
+	await _quadros(20)
 	await _foto("13c_golpe_terceira_pessoa")
+	jogador.golpe_parado = false
 	await _quadros(30)
 	for id in ["camisaLeve", "calcaCargo", "botasTrilha", "gorroPele", "cinto", "luvasCouro"]:
 		jogador.inv.por(id, 1)
@@ -1778,10 +1785,6 @@ func _fotos() -> void:
 	jogador.cabeca.rotation.x = -0.12
 	await _quadros(50)
 	await _foto("13d_roupa_no_corpo")
-	# conferência do defeito do llvmpipe (metade de baixo deslocada): o mesmo quadro sem o brilho
-	amb.glow_enabled = false
-	await _foto("13d2_sem_brilho")
-	amb.glow_enabled = true
 	jogador.rotation.y -= PI * 0.82
 	jogador.corpo.trava = false
 	jogador.alternar_camera(false)
@@ -1879,9 +1882,7 @@ func _fotos() -> void:
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()
 	await _foto("17_pausa")
-	amb.glow_enabled = false
-	await _foto("17b_pausa_sem_brilho")
-	amb.glow_enabled = true
+
 	telas.voltar_ao_jogo()
 	telas.abrir_mapa("")
 	await _foto("18_mapa")

@@ -786,6 +786,7 @@ void fragment() {
 	baixo.add_child(acao)
 	c.set_meta("tit", tit)
 	c.set_meta("extra", extra)
+	c.set_meta("acao", acao)
 	var borda := Panel.new()
 	borda.set_anchors_preset(Control.PRESET_FULL_RECT)
 	borda.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -820,6 +821,7 @@ func _montar_lobby() -> void:
 	else:
 		ex.text = "%d mundo%s" % [ms.size(), "" if ms.size() == 1 else "s"]
 	(lobby_cartoes[2].get_meta("extra") as Label).text = resumo_personagem(p)
+	(lobby_cartoes[2].get_meta("acao") as Label).text = ("EDITAR PERSONAGEM" if p.has("ap") else "CRIAR PERSONAGEM") + "   →"
 	(lobby_cartoes[3].get_meta("extra") as Label).text = "Gráficos: %s · Mouse: %.2f" % [Ajustes.QUALIDADES[clampi(int(Ajustes.v["qualidade"]), 0, 2)], float(Ajustes.v["sens"])]
 	_lobby_escolher(lobby_sel, true)
 

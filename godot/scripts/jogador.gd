@@ -63,6 +63,7 @@ var _bob := Vector3.ZERO
 var _corre := false
 var golpe_t := -1.0      # o golpe no corpo (terceira pessoa): tempo desde o clique
 var golpe_dur := 0.4
+var golpe_parado := false   # para a foto: o golpe fica parado onde está
 var uso_t := -1.0        # comendo ou bebendo: a mão vai à boca
 var _roupa_t := 0.0
 var _dobra_a := 0.0      # o pulso da mão da primeira pessoa (para o lado do mindinho ou do polegar)
@@ -612,7 +613,8 @@ func _animar_corpo(dt: float) -> void:
 	var d := Dados.item(id) if id != "" else {}
 	var gs := -1.0
 	if golpe_t >= 0.0:
-		golpe_t += dt
+		if not golpe_parado:
+			golpe_t += dt
 		gs = golpe_t / golpe_dur
 		if gs >= 1.0:
 			golpe_t = -1.0
