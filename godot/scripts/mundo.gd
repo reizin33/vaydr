@@ -5,6 +5,8 @@ extends Node3D
 ## viram espécie da mata, mais altos), as árvores gigantes com copa de jacarandá do tamanho delas, pedras, moitas (algumas com
 ## frutinha), samambaias, flores, troncos caídos e o que fica no chão (pedra solta, galho, cogumelo e fibra). Também as
 ## gavetas, armários, geladeiras, cofres e baús das casas e prédios (com as tabelas de saque do jogo antigo) e os poços.
+## Da Serra Velha (dados/mapa/pedras_plantas.json): os paredões de rocha cravados nas encostas e as pedras soltas no pé
+## deles; e a folhagem do chão da mata (calathea, antúrio e monguba) em volta dos troncos.
 ##
 ## Árvore tem três versões, trocadas por pedaço de 40 m conforme a distância: a inteira (perto), uma de meia distância (o
 ## tronco, os galhos e 1/4 das folhas, cada folha que fica um pouco maior) e, de longe, uma placa virada para a câmera com a
@@ -13,7 +15,7 @@ extends Node3D
 const PEDACO := 40.0
 const PEDACO_ARV := 32.0
 # distâncias das três versões da árvore (gráfico Alto; o Médio e o Baixo multiplicam por "mata" das opções)
-const ARV_PERTO := 55.0
+const ARV_PERTO := 60.0
 const ARV_MEIO := 130.0
 var terreno: Terreno
 var rng := RandomNumberGenerator.new()
@@ -36,6 +38,7 @@ var fotos_prontas := false
 var _folha_orig := {}     # material de folha novo -> o material do modelo (para a foto da espécie)
 var _voltando := []       # recursos que acabaram e esperam voltar (índices)
 var _vazias := []         # móveis já revistados (índices)
+var serra := {"paredoes": 0, "soltas": 0, "folhagem": 0, "colisoes": 0, "teste": Vector3.ZERO}
 
 const ESPECIES := {"jacaranda": "res://assets/mata/jacaranda.glb", "ilha1": "res://assets/mata/ilha1.glb",
 	"ilha2": "res://assets/mata/ilha2.glb", "pequena": "res://assets/mata/pequena.glb"}
@@ -46,6 +49,14 @@ const MOITAS := [["res://assets/mata/monguba_0.glb", 1.15], ["res://assets/mata/
 	["res://assets/mata/calathea_0.glb", 0.75], ["res://assets/mata/calathea_1.glb", 0.7]]
 const SAMAMBAIAS := ["res://assets/mata/samambaia_0.glb", "res://assets/mata/samambaia_1.glb", "res://assets/mata/samambaia_2.glb"]
 const FLORES := ["res://assets/mata/antorio_0.glb", "res://assets/mata/antorio_1.glb", "res://assets/mata/antorio_2.glb"]
+# Serra Velha: os dois paredões escaneados (o morro "mountainside" e o paredão "rock_face_01") e as pedras com musgo
+const PAREDOES := ["res://assets/mata/paredao.glb", "res://assets/mata/paredao2.glb"]
+const MUSGO := ["res://assets/mata/pedras_musgo_0.glb", "res://assets/mata/pedras_musgo_1.glb", "res://assets/mata/pedras_musgo_2.glb",
+	"res://assets/mata/pedras_musgo_3.glb", "res://assets/mata/pedras_musgo_4.glb", "res://assets/mata/pedras_musgo_5.glb"]
+# folhagem do chão da mata: as variantes do jogo antigo (0-4 calathea, 5-10 antúrio, 11-14 monguba); aqui há 3 de cada
+const FOLHAGEM := ["res://assets/mata/calathea_%d.glb", "res://assets/mata/antorio_%d.glb", "res://assets/mata/monguba_%d.glb"]
+# a oeste disso é a parte da serra fora do mapa (paisagem: sem colisão), como no jogo antigo
+const BORDA_OESTE := -197.0
 # itens do jogo antigo que ainda não existem aqui viram o parecido (a etapa 2 traz todos)
 const PARECIDO := {"feijao": "lata", "biscoito": "lata", "sopa": "lata", "carneAssada": "lata", "refri": "agua", "tabuas": "madeira",
 	"graveto": "madeira", "pregos": "sucata", "canoFerro": "sucata", "cabo": "sucata", "frutas": "fruta", "maca": "fruta",
@@ -217,9 +228,12 @@ func montar(col: ColisaoMapa = null) -> void:
 	_plantas(v)
 	_troncos(v["troncos"])
 	_soltos(v["picks"])
+	var pp: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://dados/mapa/pedras_plantas.json"))
+	_serra_velha(pp, col)
+	_folhagem(pp)
 	if col != null:
 		_brenha(col.brenha)
-		_serra(col.serra)
+		_serra(col.serra, pp.get("soltas", []))
 	_fechar_grupos()
 	_caixas(o)
 
@@ -608,8 +622,8 @@ func _brenha(lista: Array) -> void:
 			_instancia(ms, Transform3D(Basis(Vector3.UP, a * 3.0).scaled(Vector3.ONE * 1.8), p3), 0.0, 70.0, false, 32.0)
 
 
-## pedras grandes da serra (a colisão vem do mapa; aqui só o desenho)
-func _serra(lista: Array) -> void:
+## pedras grandes da serra que têm colisão no mapa e não estão entre as pedras soltas (essas já vêm desenhadas certas)
+func _serra(lista: Array, soltas: Array) -> void:
 	var musgo := ["res://assets/mata/pedras_musgo_0.glb", "res://assets/mata/pedras_musgo_1.glb", "res://assets/mata/pedras_musgo_3.glb"]
 	for m in musgo:
 		malha(m, Color(0.8, 0.78, 0.76))
@@ -617,8 +631,89 @@ func _serra(lista: Array) -> void:
 		var b: Array = lista[i]
 		var x := float(b[0])
 		var z := float(b[1])
+		if _tem_perto(soltas, x, z, 2.5):
+			continue
 		var esc := float(b[2]) / 0.65
 		_instancia(musgo[i % musgo.size()], Transform3D(Basis(Vector3.UP, x * 0.9 + z * 1.3).scaled(Vector3.ONE * esc), Vector3(x, terreno.h(x, z) - 0.3 * esc, z)), 0.0, 260.0, true)
+
+
+func _tem_perto(lista: Array, x: float, z: float, r: float) -> bool:
+	for q in lista:
+		if absf(float(q[0]) - x) < r and absf(float(q[2]) - z) < r:
+			return true
+	return false
+
+
+## Serra Velha: paredões de rocha cravados nas encostas (virados para baixo do morro, como no jogo antigo) e as pedras que
+## despencaram no pé deles. Os de dentro do mapa têm colisão; os de fora são paisagem.
+func _serra_velha(d: Dictionary, col: ColisaoMapa) -> void:
+	for m in PAREDOES:
+		malha(m, Color(0.9, 0.88, 0.85))
+	for a in d.get("paredoes", []):
+		var m: String = PAREDOES[int(a[5]) % 2]
+		var xf := Transform3D(Basis(Vector3.UP, float(a[3])).scaled(Vector3.ONE * float(a[4])), Vector3(float(a[0]), float(a[1]), float(a[2])))
+		_instancia(m, xf, 0.0, 700.0, true, 96.0)
+		serra["paredoes"] += 1
+		if xf.origin.x > BORDA_OESTE:
+			_corpo_convexo(m, xf)
+			if serra["teste"] == Vector3.ZERO and xf.origin.x > BORDA_OESTE + 8.0:
+				serra["teste"] = xf.origin
+	var pedra := "res://assets/mata/pedra.glb"
+	malha(pedra, Color(0.8, 0.78, 0.76))
+	for m in MUSGO:
+		malha(m, Color(0.8, 0.78, 0.76))
+	var com_colisao: Array = col.serra if col != null else []
+	for q in d.get("soltas", []):
+		var v := int(q[5]) % 8
+		# 0: o matacão no tamanho dele; 1-7: as pedras com musgo, com 1,6 m de largura no tamanho 1 (como lá)
+		var m: String = pedra if v == 0 else MUSGO[(v - 1) % MUSGO.size()]
+		var s := float(q[4])
+		if v > 0:
+			var bb := malha(m).get_aabb()
+			s *= 1.6 / maxf(maxf(bb.size.x, bb.size.z), 0.05)
+		var xf := Transform3D(Basis(Vector3.UP, float(q[3])).scaled(Vector3.ONE * s), Vector3(float(q[0]), float(q[1]), float(q[2])))
+		_instancia(m, xf, 0.0, 240.0, true, 64.0)
+		serra["soltas"] += 1
+		# as de dentro do mapa que ainda não têm colisão (a do mapa é um cilindro no lugar de algumas delas)
+		if xf.origin.x > BORDA_OESTE and not _tem_perto_col(com_colisao, xf.origin.x, xf.origin.z, 1.5):
+			_corpo_convexo(m, xf)
+
+
+func _tem_perto_col(lista: Array, x: float, z: float, r: float) -> bool:
+	for q in lista:
+		if absf(float(q[0]) - x) < r and absf(float(q[1]) - z) < r:
+			return true
+	return false
+
+
+## colisão com o formato da pedra (casca convexa da malha, uma por modelo, no tamanho e giro de cada uma)
+func _corpo_convexo(m: String, xf: Transform3D) -> void:
+	var chave := "cv:" + m
+	if not _formas.has(chave):
+		_formas[chave] = malha(m).create_convex_shape(true, true)
+	var corpo := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	cs.shape = _formas[chave]
+	corpo.add_child(cs)
+	corpo.transform = xf
+	add_child(corpo)
+	serra["colisoes"] += 1
+
+
+## a folhagem do chão da mata (só perto: some a 40 m, como no jogo antigo, que desenhava só em volta do jogador)
+func _folhagem(d: Dictionary) -> void:
+	var alturas: Array = d.get("alt_folhagem", [])
+	for q in d.get("folhagem", []):
+		var v := clampi(int(q[5]), 0, 14)
+		var e := 0 if v < 5 else (1 if v < 11 else 2)
+		var var_i: int = v - (0 if e == 0 else (5 if e == 1 else 11))
+		var cam: String = FOLHAGEM[e] % (var_i % 3)
+		var m := malha(cam, Color(0.85, 0.82, 0.78), Color(0.9, 1.0, 0.88))
+		var alvo := (float(alturas[v]) if v < alturas.size() else 0.6) * float(q[4])
+		var esc := alvo / maxf(m.get_aabb().end.y, 0.05)
+		var xf := Transform3D(Basis(Vector3.UP, float(q[3])).scaled(Vector3.ONE * esc), Vector3(float(q[0]), float(q[1]), float(q[2])))
+		_instancia(cam, xf, 0.0, 40.0, false, 32.0)
+		serra["folhagem"] += 1
 
 
 ## troncos caídos (dão madeira): o modelo deitado de um ponto ao outro, da grossura de lá

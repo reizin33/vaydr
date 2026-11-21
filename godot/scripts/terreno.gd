@@ -1,8 +1,9 @@
 class_name Terreno
 extends Node3D
-## O chão do mapa do VAYDR: o mesmo mapa do jogo antigo, tirado de lá pelos tools/exportar (relevo de 1 m em 801 x 681 m,
-## a cor do chão de cada lugar, os pisos de asfalto, terra e concreto perto da clareira, o quanto cada ponto é mata, o rio,
-## o lago e o mar). A malha vai em pedaços de 64 m com quatro níveis de detalhe (1, 2, 4 e 8 m), cada um com uma "saia" na
+## O chão do mapa do VAYDR: o mesmo mapa do jogo antigo, tirado de lá pelos tools/exportar (relevo de 1 m em 961 x 721 m,
+## com a Serra Velha a noroeste, a cor do chão de cada lugar, os pisos de asfalto, terra e concreto perto da clareira, o
+## quanto cada ponto é mata, o rio, o lago e o mar). As cores dos shaders ficam em sRGB, como o renderizador de
+## compatibilidade espera (ele converte o ALBEDO para luz linear no fim). A malha vai em pedaços de 64 m com quatro níveis de detalhe (1, 2, 4 e 8 m), cada um com uma "saia" na
 ## borda para não abrir fresta entre pedaços de nível diferente. A colisão é um campo de alturas só.
 
 const PASTA := "res://dados/mapa/"
@@ -269,10 +270,9 @@ uniform sampler2D t_folhas : source_color, filter_linear_mipmap_anisotropic, rep
 uniform sampler2D t_rocha : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D n_rocha : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D ruido : filter_linear_mipmap, repeat_enable;
-uniform vec3 med_grama;
-uniform vec3 med_mata;
-uniform vec3 med_folhas;
-uniform vec3 med_rocha;
+// cor média de cada textura (lida do mesmo jeito que a textura: o desenho dela fica em volta de 1)
+uniform vec3 med_grama : source_color;
+uniform vec3 med_mata : source_color;
 varying vec3 wpos;
 varying vec3 wn;
 
@@ -283,6 +283,10 @@ void vertex() {
 
 vec3 duas(sampler2D t, vec2 uv, float tam) {
 	return mix(texture(t, uv / tam).rgb, texture(t, uv / (tam * 3.7) + 0.37).rgb, 0.35);
+}
+
+float lum(vec3 c) {
+	return dot(c, vec3(0.3, 0.5, 0.2));
 }
 
 void fragment() {
@@ -298,26 +302,29 @@ void fragment() {
 	float n2 = texture(ruido, w * 0.027 + 0.5).r;
 	float inc = 1.0 - normalize(wn).y;
 	float wr = smoothstep(0.2, 0.42, inc + (n2 - 0.5) * 0.1);
-	// textura do chão: grama no aberto, chão de mata dentro da mata, manchas de folha seca, pedra nas encostas
-	vec3 tg = duas(t_grama, w, 2.0) / med_grama;
-	vec3 tm = duas(t_mata, w, 3.2) / med_mata;
-	vec3 tf = duas(t_folhas, w, 2.4) / med_folhas;
-	vec3 tr = duas(t_rocha, w, 1.8) / med_rocha;
+	vec3 tg = duas(t_grama, w, 2.0);
+	vec3 tm = duas(t_mata, w, 3.2);
+	vec3 tf = duas(t_folhas, w, 2.4);
+	vec3 tr = duas(t_rocha, w, 1.8);
+	float km = smoothstep(0.35, 0.75, mata);
+	// a cor é a do chão do jogo antigo (grama no aberto, chão de mata dentro da mata); a textura dá só o desenho
+	float dm = lum(tm) / lum(med_mata);
+	float d = mix(lum(tg) / lum(med_grama), dm, km);
+	vec3 c = base.rgb * clamp(mix(1.0, d, 0.6), 0.7, 1.35);
+	// manchas de folha seca no chão da mata
 	float wf = smoothstep(0.55, 0.75, n2) * mata;
-	vec3 tx = mix(tg, tm, smoothstep(0.35, 0.75, mata));
-	tx = mix(tx, tf, wf);
-	vec3 nm = mix(texture(n_grama, w / 2.0).rgb, texture(n_mata, w / 3.2).rgb, smoothstep(0.35, 0.75, mata));
-	// estradas: terra batida e asfalto (o mapa de pisos do jogo antigo) e a terra que ele marcava no chão
+	c = mix(c, tf * 0.7, wf * 0.55);
+	// terra batida (estradas de terra, terreiros, a terra que o jogo antigo marcava no chão)
 	float terra = max(pis.g, base.a);
-	tx = mix(tx, tm * 0.95, terra);
-	tx = mix(tx, vec3(0.55 + 0.25 * n2), pis.r);
-	tx = mix(tx, vec3(0.8 + 0.2 * n2), pis.b);
-	tx = mix(tx, tr, wr);
+	c = mix(c, tm * 0.65, terra);
+	// asfalto e concreto (o mapa de pisos do jogo antigo)
+	c = mix(c, vec3(0.3 + 0.06 * n2) * (0.85 + 0.15 * dm), pis.r);
+	c = mix(c, vec3(0.56 + 0.05 * n2) * (0.9 + 0.1 * dm), pis.b);
+	// pedra nas encostas, com a cor dela
+	c = mix(c, tr * 0.78, wr * 0.85);
+	vec3 nm = mix(texture(n_grama, w / 2.0).rgb, texture(n_mata, w / 3.2).rgb, km);
 	nm = mix(nm, texture(n_rocha, w / 1.8).rgb, wr);
-	vec3 c = base.rgb * clamp(tx, vec3(0.2), vec3(2.2));
-	// a pedra fica com a cor dela (a cor do chão antigo pintava a encosta de verde)
-	c = mix(c, duas(t_rocha, w, 1.8) * 0.62, wr * 0.75);
-	ALBEDO = c * (0.9 + 0.2 * n1);
+	ALBEDO = c * (0.95 + 0.1 * n1);
 	NORMAL_MAP = nm;
 	NORMAL_MAP_DEPTH = 1.0;
 	ROUGHNESS = mix(0.95, 0.85, wr);
@@ -331,9 +338,10 @@ void fragment() {
 	m.set_shader_parameter("mapa_ret", Vector4(X0 - 0.5 * P, Z0 - 0.5 * P, W * P, H * P))
 	m.set_shader_parameter("pisos_h", splat_h)
 	for k in ["grama", "mata", "folhas", "rocha"]:
-		var t: Texture2D = load("res://assets/tex/%s_cor.jpg" % k)
-		m.set_shader_parameter("t_" + k, t)
-		m.set_shader_parameter("med_" + k, _media(t))
+		m.set_shader_parameter("t_" + k, load("res://assets/tex/%s_cor.jpg" % k))
+	# cor média das texturas (medida nos arquivos, em sRGB; lida pela placa de vídeo dá erro em textura comprimida)
+	m.set_shader_parameter("med_grama", Color(0.3113, 0.2407, 0.0828))
+	m.set_shader_parameter("med_mata", Color(0.4158, 0.3511, 0.2639))
 	for k in ["grama", "mata", "rocha"]:
 		m.set_shader_parameter("n_" + k, load("res://assets/tex/%s_nrm.jpg" % k))
 	var nt := NoiseTexture2D.new()
@@ -348,23 +356,6 @@ void fragment() {
 	nt.noise = fn
 	m.set_shader_parameter("ruido", nt)
 	return m
-
-
-## cor média (em luz linear) de uma textura: o shader divide por ela para a textura só dar o desenho e a cor vir do mapa
-func _media(t: Texture2D) -> Vector3:
-	var img := t.get_image()
-	if img == null:
-		return Vector3(0.2, 0.2, 0.2)
-	if img.is_compressed():
-		img.decompress()
-	img.resize(8, 8, Image.INTERPOLATE_BILINEAR)
-	var s := Vector3.ZERO
-	for y in 8:
-		for x in 8:
-			var c := img.get_pixel(x, y).srgb_to_linear()
-			s += Vector3(c.r, c.g, c.b)
-	s /= 64.0
-	return Vector3(maxf(s.x, 0.01), maxf(s.y, 0.01), maxf(s.z, 0.01))
 
 
 ## rio e lago: um quadrado por célula de água na altura dela (as do lado se encostam; um pouco maiores para cobrir a margem)

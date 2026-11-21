@@ -14,7 +14,7 @@ extends Node3D
 
 const PASTA := "res://dados/mapa/"
 const PEDACO := 64.0
-var modelos := {}      # id -> [{mesh, mat}]
+var modelos := {}      # id -> [{mesh, tex, rep, dois, cor, e}]
 var grupos := []       # {mmi, ini, fim}
 var n_objetos := 0
 var _pend := {}
@@ -38,11 +38,16 @@ func _modelos() -> void:
 		var cor := Color(1, 1, 1)
 		if r.has("cor"):
 			cor = Color(float(r["cor"][0]), float(r["cor"][1]), float(r["cor"][2]))
-		# os escaneados dos lugares não têm "lado de trás" confiável: desenha os dois lados (como no jogo antigo)
-		var mat := MalhasMapa.material(str(r.get("tex", "")), bool(r.get("rep", false)), id.begins_with("L:"), cor, float(r.get("e", 0.0)), true)
 		if not modelos.has(id):
 			modelos[id] = []
-		modelos[id].append({"mesh": m, "mat": mat})
+		# os escaneados dos lugares não têm "lado de trás" confiável: desenha os dois lados (como no jogo antigo)
+		modelos[id].append({"mesh": m, "tex": str(r.get("tex", "")), "rep": bool(r.get("rep", false)), "dois": id.begins_with("L:"),
+			"cor": cor, "e": float(r.get("e", 0.0))})
+
+
+## o material de uma parte; "escuro": o quanto o móvel está dentro de casa (o céu não ilumina), em 5 degraus
+func _mat(parte: Dictionary, escuro: float) -> ShaderMaterial:
+	return MalhasMapa.material(parte["tex"], parte["rep"], parte["dois"], parte["cor"], parte["e"], escuro)
 
 
 func _objeto(cat: String, q: Dictionary) -> void:
@@ -70,12 +75,12 @@ func _objeto(cat: String, q: Dictionary) -> void:
 			fim = minf(L, 150.0) if L > 0.0 else (150.0 if r >= 1.0 else (90.0 if r >= 0.8 else 65.0))
 			sombra = r >= 0.8
 	var k := Vector2i(floori(xf.origin.x / PEDACO), floori(xf.origin.z / PEDACO))
+	var degrau := snappedf(clampf(escuro, 0.0, 1.0), 0.25)
 	for i in partes.size():
-		var id := "%s|%d|%s|%d|%d|%d" % [q["m"], i, cat, int(fim), k.x, k.y]
+		var id := "%s|%d|%s|%d|%d|%d|%.2f" % [q["m"], i, cat, int(fim), k.x, k.y, degrau]
 		if not _pend.has(id):
-			_pend[id] = {"parte": partes[i], "xfs": [], "fim": fim, "sombra": sombra, "escuro": []}
+			_pend[id] = {"parte": partes[i], "xfs": [], "fim": fim, "sombra": sombra, "escuro": degrau}
 		_pend[id]["xfs"].append(xf)
-		_pend[id]["escuro"].append(escuro)
 	n_objetos += 1
 
 
@@ -84,16 +89,15 @@ func _fechar() -> void:
 		var g: Dictionary = _pend[id]
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_custom_data = true
 		mm.mesh = g["parte"]["mesh"]
 		mm.instance_count = g["xfs"].size()
 		for i in g["xfs"].size():
 			mm.set_instance_transform(i, g["xfs"][i])
-			# x: o quanto aquele móvel está "dentro" (o céu não ilumina), como as salas do prédio
-			mm.set_instance_custom_data(i, Color(float(g["escuro"][i]), 0, 0, 0))
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
-		mmi.material_override = g["parte"]["mat"]
+		# o escuro de dentro vai no material (um por degrau), sem dado por instância: no renderizador de compatibilidade,
+		# MultiMesh com dado por instância e sem cor por instância multiplica a cor do vértice por zero (ficava tudo preto)
+		mmi.material_override = _mat(g["parte"], float(g["escuro"]))
 		mmi.visibility_range_end = g["fim"]
 		mmi.visibility_range_end_margin = 6.0
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if g["sombra"] else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

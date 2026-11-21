@@ -125,28 +125,33 @@ func _ambiente() -> void:
 	sky.sky_material = ceu
 	amb.background_mode = Environment.BG_SKY
 	amb.sky = sky
+	# luz de ambiente como a do jogo antigo (céu claro por cima, ~0,5 de luz): 70% uma cor clara e 30% o próprio céu
+	# (o céu sozinho é azul demais e deixava a sombra escura e azulada)
 	amb.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	amb.ambient_light_energy = 0.5
-	amb.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	amb.ambient_light_sky_contribution = 0.3
+	amb.ambient_light_color = Color(0.7, 0.74, 0.8)
+	amb.ambient_light_energy = 1.0
+	# o mesmo tom do jogo antigo (ACES)
+	amb.tonemap_mode = Environment.TONE_MAPPER_ACES
 	amb.tonemap_exposure = 1.0
 	amb.tonemap_white = 6.0
 	amb.fog_enabled = true
 	amb.fog_light_color = Color(0.52, 0.6, 0.68)
-	amb.fog_density = 0.0055
+	amb.fog_density = 0.0046
 	amb.fog_sky_affect = 0.3
 	amb.glow_enabled = true
 	amb.glow_intensity = 0.35
 	amb.glow_bloom = 0.04
 	amb.adjustment_enabled = true
-	amb.adjustment_saturation = 1.08
-	amb.adjustment_contrast = 1.08
+	amb.adjustment_saturation = 1.0
+	amb.adjustment_contrast = 1.03
 	we.environment = amb
 	add_child(we)
 	sol = DirectionalLight3D.new()
 	sol.shadow_enabled = true
 	sol.directional_shadow_max_distance = 110.0
-	sol.light_color = Color(1.0, 0.95, 0.86)
-	sol.light_energy = 1.25
+	sol.light_color = Color(1.0, 0.96, 0.89)
+	sol.light_energy = 2.0
 	add_child(sol)
 	lua = DirectionalLight3D.new()
 	lua.light_color = Color(0.55, 0.65, 0.95)
@@ -171,16 +176,19 @@ func _ciclo() -> void:
 	var alt := sin(a)
 	sol.rotation = Vector3(-a, deg_to_rad(-35), 0)
 	var dia_k := clampf(alt * 3.0, 0.0, 1.0)
-	sol.light_energy = 1.15 * dia_k
+	# o sol do jogo antigo (~2 de luz ao meio-dia); no pôr do sol fica laranja e fraco
+	sol.light_energy = 2.0 * dia_k
 	sol.visible = dia_k > 0.01
 	var por := clampf(1.0 - absf(alt) * 4.0, 0.0, 1.0) * (1.0 if alt > -0.1 else 0.0)
-	sol.light_color = Color(1.0, 0.95, 0.86).lerp(Color(1.0, 0.62, 0.38), por)
-	lua.light_energy = 0.16 * (1.0 - dia_k)
+	sol.light_color = Color(1.0, 0.96, 0.89).lerp(Color(1.0, 0.62, 0.38), por)
+	lua.light_energy = 0.3 * (1.0 - dia_k)
 	var noite_k := 1.0 - clampf((alt + 0.15) * 4.0, 0.0, 1.0)
 	ceu.sky_top_color = Color(0.2, 0.38, 0.68).lerp(Color(0.02, 0.03, 0.07), noite_k)
 	ceu.sky_horizon_color = Color(0.6, 0.7, 0.8).lerp(Color(0.95, 0.6, 0.4), por * 0.7).lerp(Color(0.05, 0.06, 0.1), noite_k)
 	amb.fog_light_color = Color(0.52, 0.6, 0.68).lerp(Color(0.75, 0.52, 0.4), por * 0.5).lerp(Color(0.03, 0.04, 0.07), noite_k)
-	amb.ambient_light_energy = lerpf(0.5, 0.1, noite_k)
+	# ambiente: claro de dia, quente no fim da tarde, azul-escuro de noite (a lua ilumina pouco)
+	amb.ambient_light_color = Color(0.7, 0.74, 0.8).lerp(Color(0.72, 0.62, 0.56), por * 0.6).lerp(Color(0.22, 0.27, 0.4), noite_k)
+	amb.ambient_light_energy = lerpf(1.0, 0.75, noite_k)
 
 
 func _process(dt: float) -> void:
@@ -223,11 +231,11 @@ func _process(dt: float) -> void:
 ## na neblina e até onde a mata aparece.
 func aplicar_qualidade(q: int) -> void:
 	var cfg: Dictionary = [
-		{"msaa": Viewport.MSAA_DISABLED, "escala": 0.75, "sombra": 2048, "dist": 40.0, "brilho": false, "mata": 0.55, "longe": 420.0, "neblina": 0.0085,
+		{"msaa": Viewport.MSAA_DISABLED, "escala": 0.75, "sombra": 2048, "dist": 40.0, "brilho": false, "mata": 0.55, "longe": 420.0, "neblina": 0.0075,
 			"capim": 56, "capim_passo": 0.9, "predios": 0.75},
-		{"msaa": Viewport.MSAA_DISABLED, "escala": 1.0, "sombra": 2048, "dist": 75.0, "brilho": true, "mata": 0.8, "longe": 650.0, "neblina": 0.0055,
+		{"msaa": Viewport.MSAA_DISABLED, "escala": 1.0, "sombra": 2048, "dist": 75.0, "brilho": true, "mata": 0.8, "longe": 650.0, "neblina": 0.0046,
 			"capim": 90, "capim_passo": 0.8, "predios": 1.0},
-		{"msaa": Viewport.MSAA_2X, "escala": 1.0, "sombra": 4096, "dist": 110.0, "brilho": true, "mata": 1.0, "longe": 900.0, "neblina": 0.0042,
+		{"msaa": Viewport.MSAA_2X, "escala": 1.0, "sombra": 4096, "dist": 110.0, "brilho": true, "mata": 1.0, "longe": 900.0, "neblina": 0.0036,
 			"capim": 120, "capim_passo": 0.75, "predios": 1.35},
 	][clampi(q, 0, 2)]
 	var vp := get_viewport()
@@ -526,7 +534,7 @@ func _teste() -> void:
 	await _quadros(5)
 	var F := Construcao.FUND
 	# o mapa do jogo antigo
-	_confere(terreno.W == 801 and terreno.H == 681 and terreno.alturas.size() == 801 * 681, "relevo do jogo antigo: %d x %d m" % [terreno.W, terreno.H])
+	_confere(terreno.W >= 801 and terreno.H >= 681 and terreno.alturas.size() == terreno.W * terreno.H, "relevo do jogo antigo: %d x %d m (com a Serra Velha)" % [terreno.W, terreno.H])
 	_confere(malhas_mapa.nos.size() >= 320 and malhas_mapa.n_vertices > 1500000, "prédios, casas, bairros, ruas, kit e o resto: %d malhas, %d mil vértices" % [malhas_mapa.nos.size(), malhas_mapa.n_vertices / 1000])
 	_confere(objetos.n_objetos > 2800 and objetos.modelos.size() > 100, "objetos 3D do jogo antigo: %d (móveis, rua, acampamento e lugares), %d modelos" % [objetos.n_objetos, objetos.modelos.size()])
 	_confere(colisao.n_formas > 5000 and colisao.brenha.size() > 1000, "colisão do mapa: %d formas (%d sem desenho ficaram de fora), borda de mato com %d pontos" % [colisao.n_formas, colisao.n_sem_desenho, colisao.brenha.size()])
@@ -536,6 +544,21 @@ func _teste() -> void:
 	_confere(n["arvore"] > 6000 and n["pedra"] > 250 and n["planta"] > 800 and n["solto"] > 700 and n["tronco"] > 50,
 		"mata do jogo antigo: %d árvores, %d pedras, %d moitas, %d coisas no chão, %d troncos caídos" % [n["arvore"], n["pedra"], n["planta"], n["solto"], n["tronco"]])
 	_confere(mundo.caixas.size() > 700 and mundo.aguas.size() >= 9, "%d móveis e baús para revistar, %d poços e barris" % [mundo.caixas.size(), mundo.aguas.size()])
+	var sv: Dictionary = mundo.serra
+	_confere(sv["paredoes"] > 100 and sv["soltas"] > 300 and sv["folhagem"] > 1000 and sv["colisoes"] > 100,
+		"Serra Velha: %d paredões de rocha e %d pedras soltas (%d com colisão dentro do mapa); %d plantas no chão da mata" % [sv["paredoes"], sv["soltas"], sv["colisoes"], sv["folhagem"]])
+	# o paredão segura (a colisão tem o formato da rocha, acima do chão da encosta)
+	var pt: Vector3 = sv["teste"]
+	var raio := PhysicsRayQueryParameters3D.create(pt + Vector3(0, 40, 0), pt - Vector3(0, 10, 0))
+	raio.exclude = [jogador.get_rid()]
+	var bate := get_world_3d().direct_space_state.intersect_ray(raio)
+	var eh_rocha := false
+	if not bate.is_empty() and bate["collider"] is StaticBody3D:
+		for c in (bate["collider"] as Node).get_children():
+			if c is CollisionShape3D and (c as CollisionShape3D).shape is ConvexPolygonShape3D:
+				eh_rocha = true
+	_confere(eh_rocha and float(bate["position"].y) > terreno.h(pt.x, pt.z) + 0.3,
+		"paredão da serra tem colisão no formato da rocha (%s)" % ("y %.1f, chão %.1f" % [float(bate["position"].y), terreno.h(pt.x, pt.z)] if not bate.is_empty() else "nada"))
 	_confere(mundo.zspawn.size() >= 10, "zumbis de %d lugares do mapa" % mundo.zspawn.size())
 	_confere(jogador.inv.conta("bandagem") == 0 and jogador.item_mao().is_empty(), "começa de mão vazia (sem item de graça)")
 	_confere(Vector2(jogador.global_position.x, jogador.global_position.z).distance_to(Vector2(SPAWN.x, SPAWN.z)) < 2.0, "começa onde o jogo antigo começa (8, 44)")
@@ -973,14 +996,18 @@ func _fotos() -> void:
 	await _foto("06b_base_militar")
 	await _cam(Vector3(128, 0, 52), Vector3(152, 3.0, 60))
 	await _foto("06c_galpao_de_trens")
+	# Serra Velha: paredões de rocha e pedras soltas na encosta (noroeste do mapa)
+	await _cam(Vector3(-160, 0, -88), Vector3(-196, 6.0, -94))
+	await _foto("06d_serra_velha")
 	# Morro do Sabiá (sul da cidade) e Cidade Alta (norte)
 	await _cam(Vector3(250, 0, 84), Vector3(255, 6.0, 135))
 	await _foto("07_morro_do_sabia")
 	await _cam(Vector3(230, 0, -70), Vector3(230, 4.0, -150))
 	await _foto("08_cidade_alta")
 	# porto e mar
-	await _cam(Vector3(326, 0, 34), Vector3(390, 4.0, 30))
+	await _cam_alto(Vector3(334, 24, 58), Vector3(378, 2.0, 8))
 	await _foto("09_porto_e_mar")
+	jogador.set_physics_process(true)
 	# vila e lago
 	await _cam(Vector3(40, 0, -60), Vector3(62, 2.0, -76))
 	await _foto("10_vila")

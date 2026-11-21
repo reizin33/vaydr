@@ -132,9 +132,9 @@ func alcance(k: float) -> void:
 
 ## o material das malhas do mapa e dos objetos 3D: cor de cada vértice (em sRGB) vezes a textura (quando tem) e a cor da
 ## peça; "lado de dentro" tira a luz do céu; brilho acende (luminária, letreiro). Sem textura, um detalhe de reboco e
-## sujeira nos três eixos tira a cara de caixa lisa. "lote": nos objetos em MultiMesh, o escuro de dentro vem de cada um.
-static func material(tex: String, repete: bool, dois_lados: bool, cor: Color, brilho: float, lote := false) -> ShaderMaterial:
-	var chave := "%s|%s|%s|%s|%.2f|%s" % [tex, repete, dois_lados, cor.to_html(false), brilho, lote]
+## sujeira nos três eixos tira a cara de caixa lisa. "escuro": o quanto a peça inteira está dentro (móveis das salas).
+static func material(tex: String, repete: bool, dois_lados: bool, cor: Color, brilho: float, escuro := 0.0) -> ShaderMaterial:
+	var chave := "%s|%s|%s|%s|%.2f|%.2f" % [tex, repete, dois_lados, cor.to_html(false), brilho, escuro]
 	if _mats.has(chave):
 		return _mats[chave]
 	var com_tex := tex != "" and ResourceLoader.exists(tex)
@@ -143,8 +143,9 @@ static func material(tex: String, repete: bool, dois_lados: bool, cor: Color, br
 		codigo += "uniform sampler2D tex : source_color, filter_linear_mipmap_anisotropic, %s;\n" % ("repeat_enable" if repete else "repeat_disable")
 	else:
 		codigo += "uniform sampler2D detalhe : filter_linear_mipmap, repeat_enable;\nuniform sampler2D detalhe2 : filter_linear_mipmap, repeat_enable;\n"
-	codigo += """uniform vec3 cor = vec3(1.0);
+	codigo += """uniform vec3 cor : source_color = vec3(1.0);
 uniform float brilho_extra = 0.0;
+uniform float escuro = 0.0;
 varying vec3 wpos;
 varying vec3 wnrm;
 varying float interior;
@@ -156,35 +157,40 @@ vec3 srgb_lin(vec3 c) {
 
 void vertex() {
 	brilho = UV2.x + brilho_extra;
-	interior = COLOR.a;
-	%s
+	interior = max(COLOR.a, escuro);
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
 void fragment() {
-	vec3 c = srgb_lin(COLOR.rgb) * cor;
+	// as cores ficam em sRGB: o renderizador de compatibilidade converte o ALBEDO para luz linear no fim (nos outros,
+	// a cor do vértice é convertida aqui; a textura e a cor da peça o próprio Godot converte)
+	vec3 c = COLOR.rgb;
+	if (!OUTPUT_IS_SRGB) {
+		c = srgb_lin(c);
+	}
+	c *= cor;
 	%s
 	ALBEDO = c;
 	ROUGHNESS = 0.88;
 	SPECULAR = 0.35;
-	// lado de dentro: o céu não ilumina (fica escuro como numa sala fechada)
-	AO = 1.0 - 0.82 * interior;
-	AO_LIGHT_AFFECT = 0.15 * interior;
+	// lado de dentro: o céu quase não ilumina (como numa sala fechada; o sol já não entra por causa da sombra)
+	AO = 1.0 - 0.8 * clamp(interior, 0.0, 1.0);
 	EMISSION = c * brilho * 1.5;
 }
-""" % ["interior = max(interior, INSTANCE_CUSTOM.x);" if lote else "",
-		"c *= texture(tex, UV).rgb;" if com_tex else """vec3 bw = pow(abs(wnrm), vec3(4.0));
+""" % ["c *= texture(tex, UV).rgb;" if com_tex else """vec3 bw = pow(abs(wnrm), vec3(4.0));
 	bw /= max(bw.x + bw.y + bw.z, 0.001);
 	float d = texture(detalhe, wpos.zy * 0.45).r * bw.x + texture(detalhe, wpos.xz * 0.45).r * bw.y + texture(detalhe, wpos.xy * 0.45).r * bw.z;
 	float d2 = texture(detalhe2, wpos.zy * 0.08).r * bw.x + texture(detalhe2, wpos.xz * 0.08).r * bw.y + texture(detalhe2, wpos.xy * 0.08).r * bw.z;
-	c *= mix(0.78, 1.12, d) * mix(0.85, 1.08, d2);"""]
+	c *= mix(0.88, 1.06, d) * mix(0.92, 1.04, d2);"""]
 	var sh := Shader.new()
 	sh.code = codigo
 	var m := ShaderMaterial.new()
 	m.shader = sh
-	m.set_shader_parameter("cor", Vector3(cor.r, cor.g, cor.b))
+	# a cor da peça vem em luz linear (do jogo antigo): vai em sRGB, como as outras cores do shader
+	m.set_shader_parameter("cor", cor.linear_to_srgb())
 	m.set_shader_parameter("brilho_extra", brilho)
+	m.set_shader_parameter("escuro", escuro)
 	if com_tex:
 		m.set_shader_parameter("tex", load(tex))
 	else:
