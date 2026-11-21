@@ -1,6 +1,8 @@
 class_name Jogador
 extends CharacterBody3D
-## Sobrevivente em primeira pessoa: anda, corre, agacha, pula, bate (coleta), fabrica, constrói, come e bebe. A coleta é a
+## Sobrevivente em primeira e terceira pessoa (V): anda, corre, agacha, pula, bate (coleta), fabrica, constrói, come e bebe.
+## O corpo é o do personagem da criação (Corpo, o do MakeHuman do jogo antigo): na terceira pessoa ele aparece com a roupa vestida
+## e o item na mão; na primeira, faz sombra, e a mão de verdade fecha em volta do cabo do que você segura. A coleta é a
 ## do jogo antigo: árvore aguenta 5 golpes de machado (1 ou 2 de madeira por golpe e mais um tanto quando cai), na mão sai
 ## 1 madeira a cada 3 socos (2 com uma pedra na mão), rocha só com picareta (2 pedras por golpe, às vezes minério de ferro).
 ## Ferramenta e arma gastam a cada golpe e quebram. A roupa protege do dano.
@@ -49,6 +51,20 @@ var cansado := false     # a energia acabou: só corre de novo depois de recuper
 var _folego_t := 0.0     # tempo desde a última corrida (a energia só volta depois de um instante)
 var lanterna_ligada := false   # F liga a lanterna que está na mochila (sem precisar pôr na mão)
 var _antes_plano := 0    # o espaço que estava na mão antes do B (o B de novo volta para ele)
+var corpo: Corpo         # o corpo do personagem (aparece na terceira pessoa; na primeira só faz sombra)
+var terceira := false    # V: terceira pessoa (a câmera atrás do ombro direito, como no jogo antigo)
+var mao_item: Node3D     # o item e a mão da primeira pessoa, no espaço da mão do jogo antigo (cabo ao longo de +z)
+var braco_fp: Node3D     # o braço da primeira pessoa (antebraço e mão do MakeHuman, fechada no cabo)
+var braco_mat: ShaderMaterial
+var cam_dist := 1.0      # distância da câmera na terceira pessoa (chega perto quando bate em parede)
+var _cam_livre := 0.0
+var _cam_dentro := 0.0
+var _bob := Vector3.ZERO
+var _corre := false
+var golpe_t := -1.0      # o golpe no corpo (terceira pessoa): tempo desde o clique
+var golpe_dur := 0.4
+var uso_t := -1.0        # comendo ou bebendo: a mão vai à boca
+var _roupa_t := 0.0
 
 
 func _init(m: Node) -> void:
@@ -84,7 +100,19 @@ func _ready() -> void:
 	luz_mao.shadow_enabled = true
 	luz_mao.position = Vector3(0.25, -0.2, -0.3)
 	luz_mao.visible = false
+	# a lanterna sai de dentro da cabeça: o corpo não pode fazer sombra dela
+	luz_mao.shadow_caster_mask = 0xFFFFF & ~Corpo.CAMADA
 	cam.add_child(luz_mao)
+	mao_item = Node3D.new()
+	# o item vem no espaço da mão do jogo antigo: cabo ao longo de +z, lâmina para -y
+	mao_item.rotation = Vector3(deg_to_rad(-70), deg_to_rad(10), deg_to_rad(0))
+	mao_item.scale = Vector3.ONE * 0.9
+	mao.add_child(mao_item)
+	corpo = Corpo.new(self)
+	add_child(corpo)
+	corpo.montar({})
+	corpo.primeira_pessoa(true)
+	_montar_braco()
 	floor_max_angle = deg_to_rad(48.0)
 	floor_snap_length = 0.4
 	_ligar_inv()
@@ -93,6 +121,37 @@ func _ready() -> void:
 func _ligar_inv() -> void:
 	inv.mudou.connect(_atualizar_mao)
 	inv.chegou.connect(_visto)
+
+
+## a aparência do personagem (a do perfil): monta o corpo e a mão da primeira pessoa
+func aparencia(ap: Dictionary) -> void:
+	corpo.montar(ap)
+	corpo.vestir(inv.roupa)
+	_montar_braco()
+	_vestir_braco()
+
+
+## V: primeira ou terceira pessoa (fica guardado nas configurações)
+func alternar_camera(on = null) -> void:
+	terceira = (not terceira) if on == null else bool(on)
+	corpo.primeira_pessoa(not terceira)
+	mao.visible = not terceira
+	cam_dist = 1.0
+	_cam_livre = 0.0
+	if not terceira:
+		cam.position = _bob
+		luz_mao.transform = Transform3D(Basis.IDENTITY, Vector3(0.25, -0.2, -0.3))
+	if bool(Ajustes.v.get("terceira", false)) != terceira:
+		Ajustes.mudar("terceira", terceira)
+
+
+## de onde sai a mira: na primeira pessoa, a câmera; na terceira, o ponto da linha da mira na altura do ombro (o alcance
+## conta dali, não de trás do personagem)
+func olho() -> Vector3:
+	var o := cam.global_position
+	if terceira:
+		o += -cam.global_transform.basis.z * cam_dist
+	return o
 
 
 func _visto(id: String) -> void:
@@ -132,6 +191,9 @@ func item_mao() -> Dictionary:
 
 
 func _atualizar_mao() -> void:
+	if corpo != null:
+		corpo.vestir(inv.roupa)
+		_vestir_braco()
 	var it := item_mao()
 	var id: String = it.get("id", "")
 	if id == ferramenta_id:
@@ -143,12 +205,140 @@ func _atualizar_mao() -> void:
 	if Dados.modelo(id) != "":
 		var cena: PackedScene = load(Dados.modelo(id))
 		ferramenta_no = cena.instantiate()
-		# o modelo vem no espaço da mão do jogo antigo: cabo ao longo de +z, lâmina para -y
-		ferramenta_no.rotation = Vector3(deg_to_rad(-70), deg_to_rad(10), deg_to_rad(0))
-		ferramenta_no.scale = Vector3.ONE * 0.9
-		mao.add_child(ferramenta_no)
+		mao_item.add_child(ferramenta_no)
+		for mi in ferramenta_no.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	corpo.segurar(id)
 	_luz()
 	main.construcao.ativar(id == "plano")
+
+
+# ---------------------------------------------------------------- a mão da primeira pessoa
+const SHADER_BRACO := """
+shader_type spatial;
+// o braço da primeira pessoa (62yh_braco.js do jogo antigo): o pulso dobra para o antebraço ir na direção do cotovelo
+// (a dobra espalhada em 5 cm para não vincar); a manga da peça do tronco e a luva de couro são pintadas na própria pele
+uniform sampler2D pele : source_color, filter_linear_mipmap;
+uniform sampler2D mascara : filter_linear_mipmap;
+uniform vec3 piv = vec3(0.0065, 0.112, -0.0387);
+uniform float dobra_a = 0.0;
+uniform float dobra_f = 0.0;
+uniform vec3 tom = vec3(1.0);
+uniform float tem_manga = 0.0;
+uniform vec3 manga = vec3(0.2);
+uniform vec3 punho = vec3(0.15);
+uniform float manga_c0 = 9.0;
+uniform float luva = 0.0;
+void vertex() {
+	float t = clamp((VERTEX.y - piv.y + 0.01) / 0.05, 0.0, 1.0);
+	t = t * t * (3.0 - 2.0 * t);
+	float ca = cos(dobra_a * t), sa = sin(dobra_a * t), cf = cos(dobra_f * t), sf = sin(dobra_f * t);
+	vec3 p = VERTEX - piv;
+	float y1 = p.y * cf - p.z * sf;
+	VERTEX = piv + vec3(p.x * ca + y1 * sa, -p.x * sa + y1 * ca, p.y * sf + p.z * cf);
+	vec3 n = NORMAL;
+	float n1 = n.y * cf - n.z * sf;
+	NORMAL = vec3(n.x * ca + n1 * sa, -n.x * sa + n1 * ca, n.y * sf + n.z * cf);
+}
+void fragment() {
+	vec3 c = texture(pele, UV).rgb;
+	vec3 mk = texture(mascara, UV).rgb;
+	vec3 s = pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
+	float l = dot(s, vec3(0.3, 0.59, 0.11)) * (255.0 / 180.0);
+	float sh = 0.55 + 0.55 * min(1.2, l);
+	vec3 o = c * tom;
+	if (luva > 0.5 && mk.r > 0.5) {
+		o = pow(min(vec3(0.353, 0.243, 0.157) * sh, vec3(1.0)), vec3(2.2));
+	} else if (tem_manga > 0.5 && mk.r < 0.5 && mk.g > manga_c0) {
+		o = pow(min((mk.g < manga_c0 + 0.09 ? punho : manga) * sh, vec3(1.0)), vec3(2.2));
+	}
+	ALBEDO = o;
+	ROUGHNESS = 0.72;
+	SPECULAR = 0.35;
+}
+"""
+## a manga de cada peça do tronco na mão da primeira pessoa (MANGAS_FP do jogo antigo): longa ou dobrada, a cor e o punho
+const MANGAS := {"camisaLeve": ["dobrada", 0x2f3742, 0x262c35], "casacoPele": ["longa", 0x7a5638, 0xd6c29c],
+	"casacoGrande": ["longa", 0x6c4b2f, 0x4a3220], "camisaCouro": ["longa", 0x8a5a36, 0x5a3820]}
+
+
+## o braço do corpo escolhido (o da mulher é mais fino, a mão menor)
+func _montar_braco() -> void:
+	var gg := "feminino" if corpo != null and corpo.g == "mulher" else "direito"
+	if braco_fp != null and str(braco_fp.get_meta("g", "")) == gg:
+		return
+	if braco_fp != null:
+		braco_fp.queue_free()
+	var cena: PackedScene = load("res://assets/personagens/braco_%s.glb" % gg)
+	braco_fp = cena.instantiate()
+	braco_fp.set_meta("g", gg)
+	mao_item.add_child(braco_fp)
+	var info: Dictionary = Corpo.META["braco"][gg]
+	if braco_mat == null:
+		var sh := Shader.new()
+		sh.code = SHADER_BRACO
+		braco_mat = ShaderMaterial.new()
+		braco_mat.shader = sh
+	braco_mat.set_shader_parameter("pele", load("res://assets/personagens/mh/" + str(info["pele"])))
+	braco_mat.set_shader_parameter("mascara", load("res://assets/personagens/mh/" + str(info["mascara"])))
+	var pv: Array = info["piv"]
+	braco_mat.set_shader_parameter("piv", Vector3(pv[0], pv[1], pv[2]))
+	for mi in braco_fp.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).material_override = braco_mat
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_vestir_braco()
+
+
+## o tom da pele escolhida (a média dela sobre a da textura do braço, na luz linear), a manga e a luva do que está vestido
+func _vestir_braco() -> void:
+	if braco_mat == null or corpo == null or corpo.m.is_empty():
+		return
+	var info: Dictionary = Corpo.META["braco"][str(braco_fp.get_meta("g", "direito"))]
+	var pl: Dictionary = Corpo.META["peles"].get(str(corpo.m["pele"]), {})
+	var tom := Vector3.ONE
+	if pl.has("media") and float(info.get("media", 0)) > 0:
+		var a := Corpo._cor(int(pl["media"])).srgb_to_linear()
+		var b := Corpo._cor(int(info["media"])).srgb_to_linear()
+		tom = Vector3(clampf(a.r / maxf(1e-4, b.r), 0.05, 1.3), clampf(a.g / maxf(1e-4, b.g), 0.05, 1.3), clampf(a.b / maxf(1e-4, b.b), 0.05, 1.3))
+	braco_mat.set_shader_parameter("tom", tom)
+	var tr := str(inv.roupa["tronco"]["id"]) if inv.roupa.has("tronco") else ""
+	var mg: Array = MANGAS.get(tr, [])
+	braco_mat.set_shader_parameter("tem_manga", 1.0 if not mg.is_empty() else 0.0)
+	if not mg.is_empty():
+		var c1 := Corpo._cor(int(mg[1]))
+		var c2 := Corpo._cor(int(mg[2]))
+		braco_mat.set_shader_parameter("manga", Vector3(c1.r, c1.g, c1.b))
+		braco_mat.set_shader_parameter("punho", Vector3(c2.r, c2.g, c2.b))
+		braco_mat.set_shader_parameter("manga_c0", 0.05 if mg[0] == "longa" else 0.6)
+	var lv := inv.roupa.has("maos") and str(inv.roupa["maos"]["id"]) == "luvasCouro"
+	braco_mat.set_shader_parameter("luva", 1.0 if lv else 0.0)
+
+
+## a mão fecha no cabo do jeito da mão do corpo (o polegar para +z, o antebraço para +y, a palma para +x); a lanterna é segura
+## pelo corpo (o eixo y dela) com o antebraço indo para o cotovelo. O pulso dobra o que falta para o antebraço ir para o
+## cotovelo (atrás, embaixo e à direita da câmera), até um limite
+func _dobrar_braco(dt: float) -> void:
+	if braco_fp == null or not braco_fp.is_visible_in_tree():
+		return
+	var cot := mao_item.global_transform.affine_inverse() * cam.to_global(Vector3(0.45, -0.38, 0.0))
+	var f := cot.normalized()
+	var x := Vector3(0, 0, -1)
+	var y := Vector3(0, 1, 0)
+	if ferramenta_id == "lanterna":
+		x = Vector3(0, 1, 0)
+		y = (f - x * f.dot(x)).normalized()
+		if y.length() < 0.5:
+			y = Vector3(0, 0, 1)
+	var z := x.cross(y)
+	braco_fp.transform = Transform3D(Basis(x, y, z), Vector3.ZERO)
+	var fx := f.dot(x)
+	var fy := maxf(1e-6, f.dot(y))
+	var fz := f.dot(z)
+	var k := 1.0 - exp(-dt * 14.0)
+	var da: float = lerpf(float(braco_mat.get_shader_parameter("dobra_a")), clampf(atan2(fx, fy), -0.35, 0.7), k)
+	var df: float = lerpf(float(braco_mat.get_shader_parameter("dobra_f")), clampf(atan2(fz, fy), -0.9, 0.9), k)
+	braco_mat.set_shader_parameter("dobra_a", da)
+	braco_mat.set_shader_parameter("dobra_f", df)
 
 
 ## a lanterna acende com ela na mão ou ligada pelo F (estando na mochila), enquanto tiver pilha
@@ -236,6 +426,7 @@ func _physics_process(dt: float) -> void:
 		_folego_t += dt
 		if _folego_t > 0.8:
 			energia = minf(100.0, energia + dt * (14.0 if dir.length() < 0.1 else 9.0))
+	_corre = corre and dir.length() > 0.1
 	var vel := AGACHA if agachado else (CORRE if corre else ANDA)
 	var alvo := dir * vel
 	var k := 12.0 if is_on_floor() else 2.5
@@ -266,23 +457,29 @@ func _physics_process(dt: float) -> void:
 		if passo <= 0.0:
 			passo = 1.9 if corre else 1.5
 			main.sons.tocar("passo", global_position, -10.0 if agachado else -2.0)
-	cam.position.y = sin(balanco * 2.0) * 0.035 * minf(1.0, hs / 4.0)
-	cam.position.x = cos(balanco) * 0.025 * minf(1.0, hs / 4.0)
+	_bob = Vector3(cos(balanco) * 0.025 * minf(1.0, hs / 4.0), sin(balanco * 2.0) * 0.035 * minf(1.0, hs / 4.0), 0)
 	tremor = maxf(0.0, tremor - dt)
 	if tremor > 0.0:
-		cam.position += Vector3(randf() - 0.5, randf() - 0.5, 0) * tremor * 0.15
+		_bob += Vector3(randf() - 0.5, randf() - 0.5, 0) * tremor * 0.15
+	if not terceira:
+		cam.position = _bob
 	# mão: balanço do golpe
 	golpe = maxf(0.0, golpe - dt * 3.2)
 	var g := sin(golpe * PI) if golpe > 0.0 else 0.0
 	mao.rotation = Vector3(-g * 1.2, g * 0.4, g * 0.3)
-	mao.position = Vector3(0.34 - g * 0.12, -0.42 + cam.position.y * 0.5, -0.55 - g * 0.15)
+	mao.position = Vector3(0.34 - g * 0.12, -0.42 + _bob.y * 0.5, -0.55 - g * 0.15)
 	if global_position.y < -30.0:
 		ferir(999.0, false)
 
 
-func _process(_dt: float) -> void:
+func _process(dt: float) -> void:
+	_camera(dt)
+	_animar_corpo(dt)
+	_dobrar_braco(dt)
 	if not vivo or preso:
 		return
+	if Input.is_action_just_pressed("camera"):
+		alternar_camera()
 	for i in Inventario.BARRA:
 		if Input.is_action_just_pressed("barra%d" % (i + 1)):
 			selecionar(i)
@@ -295,9 +492,80 @@ func _process(_dt: float) -> void:
 ## o que a mira pega (até "alcance")
 func mira(alcance: float, mascara := 3) -> Dictionary:
 	var sp := get_world_3d().direct_space_state
-	var o := cam.global_position
+	var o := olho()
 	var q := PhysicsRayQueryParameters3D.create(o, o - cam.global_transform.basis.z * alcance, mascara, [get_rid()])
 	return sp.intersect_ray(q)
+
+
+## a câmera da terceira pessoa (como a do jogo antigo, v10.3.2): atrás do ombro direito, 3,1 m; dentro de casa chega mais perto
+## e mais para trás do ombro; batendo em parede chega na hora e só volta a afastar depois de um tempinho livre (sem vai e vem)
+func _camera(dt: float) -> void:
+	if not terceira:
+		return
+	var sp := get_world_3d().direct_space_state
+	var cab := cabeca.global_position
+	var teto := sp.intersect_ray(PhysicsRayQueryParameters3D.create(cab, cab + Vector3(0, 3.2, 0), 1, [get_rid()]))
+	_cam_dentro = lerpf(_cam_dentro, 0.0 if teto.is_empty() else 1.0, 1.0 - exp(-dt * 3.0))
+	var dist := lerpf(3.1, 2.2, _cam_dentro)
+	var lado := lerpf(0.5, 0.42, _cam_dentro)
+	# o ombro não pode entrar na parede do lado
+	var piv := cabeca.to_global(Vector3(lado, 0, 0))
+	var hl := sp.intersect_ray(PhysicsRayQueryParameters3D.create(cab, piv, 1, [get_rid()]))
+	if not hl.is_empty():
+		lado = maxf(0.0, cab.distance_to(hl["position"]) - 0.12)
+		piv = cabeca.to_global(Vector3(lado, 0, 0))
+	var dd := dist
+	var h := sp.intersect_ray(PhysicsRayQueryParameters3D.create(piv, cabeca.to_global(Vector3(lado, 0, dist + 0.3)), 1, [get_rid()]))
+	if not h.is_empty():
+		dd = maxf(0.3, piv.distance_to(h["position"]) - 0.3)
+	if dd < cam_dist - 0.05:
+		_cam_livre = 0.0
+	else:
+		_cam_livre += dt
+	if dd > cam_dist and _cam_livre < 0.3:
+		dd = cam_dist
+	cam_dist += (dd - cam_dist) * (1.0 - exp(-dt * (26.0 if dd < cam_dist else 4.0)))
+	cam.position = Vector3(lado, 0, cam_dist)
+	var cg := cam.global_position
+	var gy: float = main.terreno.h(cg.x, cg.z) + 0.35
+	if cg.y < gy and global_position.y > gy - 3.0:
+		cam.global_position = Vector3(cg.x, gy, cg.z)
+	# perto demais (encostado na parede): o corpo some para não tampar a vista
+	corpo.primeira_pessoa(cam_dist < 0.75)
+	# a lanterna sai do peito, para onde a câmera olha
+	if luz_mao.visible:
+		var fr := -cam.global_transform.basis.z
+		luz_mao.global_transform = Transform3D(cam.global_transform.basis, global_position + Vector3(0, 1.35 if not agachado else 0.9, 0) + Vector3(fr.x, 0, fr.z).normalized() * 0.3)
+
+
+## o corpo anda, corre, agacha, pula, cai e golpeia com o que o jogador faz
+func _animar_corpo(dt: float) -> void:
+	if corpo == null:
+		return
+	var id := str(item_mao().get("id", ""))
+	var d := Dados.item(id) if id != "" else {}
+	var gs := -1.0
+	if golpe_t >= 0.0:
+		golpe_t += dt
+		gs = golpe_t / golpe_dur
+		if gs >= 1.0:
+			golpe_t = -1.0
+			gs = -1.0
+	var uk := 0.0
+	if uso_t >= 0.0:
+		uso_t += dt
+		uk = minf(1.0, minf(uso_t / 0.25, (0.9 - uso_t) / 0.25))
+		if uso_t >= 0.9:
+			uso_t = -1.0
+			uk = 0.0
+	corpo.animar(dt, {"vel": velocity, "chao": is_on_floor(), "agachado": agachado, "correndo": _corre, "ferido": vida < 28.0,
+		"energia": energia, "item": id, "golpe": gs, "vertical": bool(d.get("vertical", false)), "usar": maxf(0.0, uk), "mira": 0.0,
+		"vivo": vivo, "primeira": not terceira, "yaw": rotation.y, "vira_anda": bool(Ajustes.v.get("corpo_anda", false))})
+	# a roupa no corpo (muda pela mochila, rasga com os golpes)
+	_roupa_t -= dt
+	if _roupa_t <= 0.0:
+		_roupa_t = 0.5
+		corpo.vestir(inv.roupa)
 
 
 func atacar() -> void:
@@ -322,6 +590,8 @@ func atacar() -> void:
 	var st: Dictionary = d if arma else Dados.MAO
 	cd = float(st.get("tempo", 0.55))
 	golpe = 1.0
+	golpe_t = 0.0
+	golpe_dur = maxf(0.3, cd * 0.85)
 	main.sons.tocar("golpe", global_position, -8.0)
 	var h := mira(float(st.get("alcance", 1.9)) + 0.7)
 	if h.is_empty():
@@ -481,7 +751,7 @@ func usar() -> void:
 				return
 	# rio ou lago (o mar é salgado): a água tem que estar logo ali na frente, para onde você olha
 	for dist in [1.0, 1.5, 2.0, 2.5, 3.0]:
-		var o: Vector3 = cam.global_position - cam.global_transform.basis.z * dist
+		var o: Vector3 = olho() - cam.global_transform.basis.z * dist
 		var nivel: float = main.terreno.nivel_agua(o.x, o.z)
 		if nivel < -900.0 or absf(global_position.y - nivel) > 2.5:
 			continue
@@ -564,6 +834,7 @@ func consumir_slot(i: int) -> void:
 	if id == "carneCrua" and randf() < 0.35:
 		_enjoar()
 	cd = 0.8
+	uso_t = 0.0
 	var verbo := "Bebeu" if str(d.get("tipo", "")) == "bebida" else ("Usou" if str(d.get("tipo", "")) == "cura" else "Comeu")
 	main.ui.aviso("%s: %s" % [verbo, d.get("nome", id)])
 	main.sons.tocar("comer", global_position, -4.0)
@@ -692,3 +963,8 @@ func renascer(p: Vector3) -> void:
 	ferramenta_id = "-"
 	_atualizar_mao()
 	inv.mudou.emit()
+	golpe_t = -1.0
+	uso_t = -1.0
+	corpo.ini = false
+	corpo.vestir(inv.roupa)
+	_vestir_braco()

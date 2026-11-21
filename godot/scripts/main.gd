@@ -16,6 +16,7 @@ var construcao: Construcao
 var sons: Sons
 var efeitos: Efeitos
 var jogador: Jogador
+var palco: Palco          # o palco da criação do personagem (a clareira no começo da noite)
 var ui: UI
 var sol: DirectionalLight3D
 var lua: DirectionalLight3D
@@ -103,6 +104,9 @@ func _ready() -> void:
 	add_child(jogador)
 	jogador.global_position = Vector3(SPAWN.x, terreno.h(SPAWN.x, SPAWN.z) + 0.3, SPAWN.z)
 	jogador.morreu.connect(_morreu)
+	palco = Palco.new(self)
+	palco.name = "Palco"
+	add_child(palco)
 	ui = UI.new(self)
 	add_child(ui)
 	Ajustes.aplicar(self)
@@ -159,6 +163,8 @@ func comecar(m: Dictionary) -> void:
 	arq_salvo = str(m.get("arq", ""))
 	_tempo_base = float(m.get("tempo", 0.0))
 	var tinha := carregar_jogo()
+	# o corpo do personagem do perfil (o da criação; sem criação, o Sobrevivente)
+	jogador.aparencia(Perfis.atual.get("ap", {}))
 	mundo_sujo = true
 	em_jogo = true
 	ui.visible = true
@@ -191,7 +197,7 @@ func _teclas() -> void:
 		"frente": [KEY_W], "tras": [KEY_S], "esquerda": [KEY_A], "direita": [KEY_D], "pular": [KEY_SPACE], "correr": [KEY_SHIFT],
 		"agachar": [KEY_CTRL, KEY_C], "usar": [KEY_E], "mochila": [KEY_TAB, KEY_I], "girar": [KEY_R], "sair": [KEY_ESCAPE], "aba_obra": [KEY_Q], "salvar": [KEY_F5],
 		"barra1": [KEY_1], "barra2": [KEY_2], "barra3": [KEY_3], "barra4": [KEY_4], "barra5": [KEY_5], "barra6": [KEY_6], "tela_cheia": [KEY_F11],
-		"mapa": [KEY_M], "lanterna": [KEY_F], "construir": [KEY_B], "comandos": [KEY_H]}
+		"mapa": [KEY_M], "lanterna": [KEY_F], "construir": [KEY_B], "comandos": [KEY_H], "camera": [KEY_V]}
 	for a in mapa:
 		if not InputMap.has_action(a):
 			InputMap.add_action(a)
@@ -659,6 +665,125 @@ func _segurar(acao: String, n: int) -> void:
 	Input.action_release(acao)
 
 
+## o personagem (a etapa 3): o corpo com o esqueleto e as peças, as animações pela velocidade (parado, andando, correndo,
+## agachado, pulo), a terceira pessoa (V), o item na mão do corpo e a mão esquerda no cabo, o golpe, a roupa no corpo, a mão da
+## primeira pessoa e a criação do personagem (que guarda no perfil e vai para o jogo)
+func _teste_personagem(livre: Vector3) -> void:
+	var c := jogador.corpo
+	_confere(c.esq != null and c.ix.size() == Corpo.NB and not c.ix.has(-1) and c.nos.size() > 40,
+		"corpo do personagem: esqueleto de %d ossos e %d malhas (corpo em pedaços, olhos, cabelos, barbas, roupas e cascas)" % [c.ix.size(), c.nos.size()])
+	_confere(Corpo.CL.size() >= 18 and Corpo.CLIP.size() > 100000, "animações do sobrevivente: %d clipes" % Corpo.CL.size())
+	_por_em(Vector3(livre.x, livre.y + 0.2, livre.z + 4.0))
+	_olhar(jogador.global_position + Vector3(0, 1.6, -10))
+	await _quadros(40)
+	var est0 := c.estado
+	var perna0: Quaternion = c.esq.get_bone_pose_rotation(c.ix[Corpo.L_COXA])
+	Input.action_press("frente")
+	await _quadros(35)
+	var est1 := c.estado
+	var perna1: Quaternion = c.esq.get_bone_pose_rotation(c.ix[Corpo.L_COXA])
+	Input.action_press("correr")
+	await _quadros(30)
+	var est2 := c.estado
+	Input.action_release("correr")
+	Input.action_release("frente")
+	_confere(est0 == "parado" and est1 in ["andando", "correndo"] and est2 in ["correndo", "disparada"] and perna0.angle_to(perna1) > 0.05,
+		"o corpo anda com a velocidade: %s, %s, %s (a perna mexeu %.0f°)" % [est0, est1, est2, rad_to_deg(perna0.angle_to(perna1))])
+	await _quadros(40)
+	Input.action_press("agachar")
+	await _quadros(40)
+	var quadril_ag: float = c.quadril_s.y
+	Input.action_release("agachar")
+	await _quadros(30)
+	_confere(quadril_ag < c.hip - 0.2, "agachado: o quadril desce (%.2f de %.2f m)" % [quadril_ag, c.hip])
+	Input.action_press("pular")
+	await _quadros(5)
+	Input.action_release("pular")
+	await _quadros(3)
+	var est_p := c.estado
+	await _quadros(50)
+	_confere(est_p == "pulo", "pulo: o corpo pula (%s)" % est_p)
+	# terceira pessoa
+	jogador.alternar_camera(true)
+	await _quadros(50)
+	var corpo_aparece := (c.nos["corpo_0"] as MeshInstance3D).cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_confere(jogador.terceira and jogador.cam.position.z > 1.5 and corpo_aparece and not jogador.mao.visible,
+		"V: terceira pessoa (a câmera a %.1f m atrás do ombro, o corpo aparece)" % jogador.cam.position.z)
+	jogador.inv.por("machado", 1)
+	_na_mao("machado")
+	await _quadros(40)
+	_confere(c.item_no != null and c.item_id == "machado" and c.item_no.is_visible_in_tree(), "o machado vai na mão do corpo")
+	var mao_e: Vector3 = c.P[Corpo.L_MAO] + (c.Q[Corpo.L_MAO] as Quaternion) * Vector3(0, 0.075, 0)
+	var cabo: Vector3 = c.encaixe.transform * Corpo.MAO2["machado"]
+	_confere(mao_e.distance_to(cabo) < 0.12, "duas mãos: a esquerda fecha no cabo do machado (a %.2f m do ponto)" % mao_e.distance_to(cabo))
+	jogador.cd = 0.0
+	jogador.atacar()
+	await _quadros(6)
+	var gt := jogador.golpe_t
+	var braco_golpe: Quaternion = c.Ds[Corpo.R_BRACO]
+	await _quadros(30)
+	_confere(gt > 0.0 and braco_golpe.angle_to(c.Ds[Corpo.R_BRACO]) > 0.2, "o golpe mexe o braço do corpo (%.0f°)" % rad_to_deg(braco_golpe.angle_to(c.Ds[Corpo.R_BRACO])))
+	# roupa no corpo: as 3D (calça e camiseta), as botas e as justas (gorro, cinto)
+	for id in ["calcaCargo", "camiseta", "botasTrilha", "gorroPele", "cinto"]:
+		jogador.inv.por(id, 1)
+		for i in jogador.inv.limite:
+			var sm = jogador.inv.slots[i]
+			if sm != null and sm["id"] == id:
+				jogador.inv.vestir(i)
+				break
+	await _quadros(40)
+	var escondidos := 0
+	for gr in Corpo.META["corpos"][c.g]["grupos"]:
+		if not (c.nos[str(gr["no"])] as MeshInstance3D).visible:
+			escondidos += 1
+	_confere((c.nos["roupa_calcaCouro"] as MeshInstance3D).visible and (c.nos["roupa_camiseta"] as MeshInstance3D).visible and (c.nos["roupa_botasCouro"] as MeshInstance3D).visible
+		and c.cascas.size() >= 3 and escondidos >= 3,
+		"a roupa vestida aparece no corpo: calça, camiseta e botas 3D, %d cascas (gorro e cinto), %d pedaços do corpo cobertos" % [c.cascas.size(), escondidos])
+	for lugar in ["pernas", "camiseta", "pes", "cabeca", "cintura"]:
+		jogador.inv.despir(lugar)
+	await _quadros(40)
+	_confere(not (c.nos["roupa_calcaCouro"] as MeshInstance3D).visible and c.cascas.is_empty() and (c.nos["corpo_0"] as MeshInstance3D).visible, "tirou a roupa: o corpo volta de cueca")
+	# primeira pessoa de novo: o corpo só faz sombra, a mão de verdade segura o cabo
+	jogador.alternar_camera(false)
+	await _quadros(10)
+	_confere(not jogador.terceira and jogador.mao.visible and (c.nos["corpo_0"] as MeshInstance3D).cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY,
+		"V de novo: primeira pessoa (o corpo só faz sombra)")
+	_confere(jogador.braco_fp != null and jogador.braco_fp.is_visible_in_tree() and absf(float(jogador.braco_mat.get_shader_parameter("dobra_a"))) <= 0.71,
+		"primeira pessoa: o braço de verdade, com a mão fechada no cabo (pulso dobrado %.2f)" % float(jogador.braco_mat.get_shader_parameter("dobra_a")))
+	jogador.inv.tirar("machado", 1)
+	_confere(not bool(Ajustes.v["terceira"]), "a câmera escolhida fica guardada nas configurações")
+	# a criação do personagem: abre com o palco, trocar o cabelo vira Personalizado, a mulher, e salva no perfil
+	var perfil_antes := Perfis.atual
+	Perfis.atual = {"id": "teste_criacao", "nome": "Teste", "mundos": []}
+	telas.abrir_criacao()
+	await _quadros(10)
+	_confere(telas.atual == "criacao" and palco.visible and palco.cam.current and palco.corpo.g == "homem" and (palco.corpo.nos["peca_curto_grisalho"] as MeshInstance3D).visible,
+		"criação: o Sobrevivente no palco (cabelo grisalho)")
+	telas.cria._mudar("cabelo", "afro")
+	await _quadros(3)
+	_confere(str(telas.cria.ap["corpo"]) == "mh" and (palco.corpo.nos["peca_afro"] as MeshInstance3D).visible and not (palco.corpo.nos["peca_curto_grisalho"] as MeshInstance3D).visible,
+		"criação: trocar o cabelo vira Personalizado e muda no palco")
+	telas.cria._mudar("g", "mulher")
+	telas.cria._altura(4)
+	await _quadros(3)
+	_confere(palco.corpo.g == "mulher" and (palco.corpo.nos["peca_cilios_m"] as MeshInstance3D).visible and palco.corpo.escala > 1.0,
+		"criação: corpo de mulher (%.2f m)" % (palco.corpo.escala * float(Corpo.META["corpos"]["mulher"]["altura"])))
+	telas.cria.nome.text = "Ana"
+	telas.cria._confirmar()
+	await _quadros(3)
+	var ap_s: Dictionary = Perfis.atual.get("ap", {})
+	_confere(str(ap_s.get("corpo", "")) == "mh" and str(ap_s["mh"]["g"]) == "mulher" and str(ap_s["nome"]) == "Ana" and telas.atual == "lobby" and not palco.visible,
+		"criação: salvou no perfil (mulher, %s) e voltou ao lobby" % ("com retrato" if FileAccess.file_exists(str(Perfis.atual.get("retrato", ""))) else "sem retrato"))
+	_confere(telas.resumo_personagem(Perfis.atual).begins_with("Ana"), "lobby: o painel Personagem diz quem é (%s)" % telas.resumo_personagem(Perfis.atual))
+	jogador.aparencia(ap_s)
+	await _quadros(3)
+	_confere(jogador.corpo.g == "mulher" and str(jogador.braco_fp.get_meta("g", "")) == "feminino", "o personagem do perfil vai para o jogo (a mão da mulher na primeira pessoa)")
+	telas.esconder()
+	jogador.aparencia({})
+	Perfis.atual = perfil_antes
+	await _quadros(3)
+
+
 ## põe o item na mão (traz para a barra se estiver na mochila)
 func _na_mao(id: String) -> bool:
 	var inv := jogador.inv
@@ -934,6 +1059,7 @@ func _teste() -> void:
 	var gasto := jogador.energia
 	await _quadros(150)
 	_confere(gasto < 90.0 and jogador.energia > gasto + 5.0, "correr gasta energia (%.0f) e parado ela volta (%.0f)" % [gasto, jogador.energia])
+	await _teste_personagem(livre)
 	# degrau de 30 cm (meio-fio): sobe andando, sem pular
 	var dg := StaticBody3D.new()
 	var dgs := CollisionShape3D.new()
@@ -1499,7 +1625,28 @@ func _fotos() -> void:
 	await _foto("00g_configuracoes_mira")
 	telas.mostrar("multi")
 	await _foto("00h_multiplayer_em_breve")
+	# a criação do personagem (etapa 3): o Sobrevivente no palco, de perto; o cabelo; a mulher de corpo inteiro; o lobby depois
+	telas.abrir_criacao()
+	await _quadros(45)
+	await _foto("00i_criacao_rosto")
+	telas.cria._ir_aba("cabelo")
+	await _quadros(40)
+	await _foto("00j_criacao_cabelo")
+	telas.cria._mudar("g", "mulher")
+	telas.cria._mudar("cabelo", "longo")
+	telas.cria._ir_aba("corpo")
+	telas.cria.nome.text = "Ana"
+	await _quadros(50)
+	await _foto("00k_criacao_corpo_mulher")
+	telas.cria._vista("lado")
+	await _quadros(50)
+	await _foto("00l_criacao_lado")
+	telas.cria._confirmar()
+	telas._lobby_escolher(2, true)
+	await _quadros(20)
+	await _foto("00m_lobby_personagem")
 	telas.esconder()
+	jogador.aparencia({})
 	# começo do jogo: na mata ao sul da clareira
 	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
 	await _foto("01_comeco_na_mata")
@@ -1600,6 +1747,36 @@ func _fotos() -> void:
 	await _quadros(6)
 	_olhar(pa + Vector3(0, 1.5, 0))
 	await _foto("13_machado_na_mao")
+	# terceira pessoa (V): o corpo com o machado, a mão esquerda junto no cabo; o golpe; a roupa no corpo (de frente); e a mão
+	# de verdade na primeira pessoa (com a manga da camisa e a luva)
+	jogador.alternar_camera(true)
+	await _quadros(70)
+	await _foto("13b_terceira_pessoa")
+	jogador.cd = 0.0
+	jogador.atacar()
+	await _quadros(7)
+	await _foto("13c_golpe_terceira_pessoa")
+	await _quadros(30)
+	for id in ["camisaLeve", "calcaCargo", "botasTrilha", "gorroPele", "cinto", "luvasCouro"]:
+		jogador.inv.por(id, 1)
+		for i in jogador.inv.limite:
+			var sm = jogador.inv.slots[i]
+			if sm != null and sm["id"] == id:
+				jogador.inv.vestir(i)
+				break
+	jogador.corpo.trava = true
+	jogador.rotation.y += PI * 0.82
+	jogador.cabeca.rotation.x = -0.12
+	await _quadros(50)
+	await _foto("13d_roupa_no_corpo")
+	jogador.rotation.y -= PI * 0.82
+	jogador.corpo.trava = false
+	jogador.alternar_camera(false)
+	_olhar(pa + Vector3(0, 1.5, 0))
+	await _quadros(20)
+	await _foto("13e_mao_primeira_pessoa")
+	for lugar in ["tronco", "pernas", "pes", "cabeca", "cintura", "maos"]:
+		jogador.inv.despir(lugar)
 	jogador.inv.tirar("machado", 1)
 	# uma base pequena montada pelo próprio sistema de construção, num lugar livre perto da clareira
 	jogador.inv.por("mochilaExpedicao", 1)

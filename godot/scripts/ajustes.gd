@@ -11,7 +11,7 @@ const CORES_MIRA := [Color(0.925, 0.894, 0.824), Color(0.55, 0.95, 0.45), Color(
 const NOMES_CORES := ["Clara", "Verde", "Amarela", "Vermelha", "Azul"]
 
 static var v := {"qualidade": 1, "escala": 100, "fps": false, "fov": 75, "tela_cheia": true, "comandos": true,
-	"volume": 80, "sens": 1.0, "inverter_y": false, "mira_cor": 0, "mira_tam": 3}
+	"volume": 80, "sens": 1.0, "inverter_y": false, "mira_cor": 0, "mira_tam": 3, "terceira": false, "corpo_anda": false}
 
 
 static func carregar() -> void:
@@ -45,6 +45,8 @@ static func aplicar(main) -> void:
 	main.jogador.cam.fov = clampf(float(v["fov"]), 60.0, 100.0)
 	main.jogador.sens = 0.0022 * clampf(float(v["sens"]), 0.2, 3.0)
 	main.jogador.inverter_y = bool(v["inverter_y"])
+	if main.jogador.terceira != bool(v["terceira"]):
+		main.jogador.alternar_camera(bool(v["terceira"]))
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(0.0001, float(v["volume"]) / 100.0)))
 	AudioServer.set_bus_mute(0, int(v["volume"]) <= 0)
 	if main.ui != null and main.ui.hud != null:

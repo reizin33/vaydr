@@ -9,10 +9,12 @@ extends CanvasLayer
 ## - Jogar sozinho: à esquerda o mundo escolhido em destaque (imagem, números grandes e o Jogar), à direita a lista dos
 ##   mundos e o Novo mundo; renomear e apagar (com confirmação);
 ## - Configurações por abas (Gráficos, Tela, Som, Mouse e mira, Controles) e o Pronto;
-## - Multiplayer e Personagem dizem o que vem e em que etapa (sem botão que finja funcionar);
+## - Personagem: a criação do personagem (TelaCriacao, criacao.gd), com o corpo de verdade no palco; o primeiro mundo de um
+##   perfil passa por ela antes de começar;
+## - Multiplayer diz o que vem e em que etapa (sem botão que finja funcionar);
 ## - no jogo: a pausa (Esc), o mapa grande (M), a tela de morte; e a passagem escura ao entrar no mundo.
 
-const VERSAO := "0.3.1"
+const VERSAO := "0.4.0"
 const DICAS := [
 	"Com uma pedra na mão já dá para bater nas árvores e tirar madeira mais rápido.",
 	"Aperte E para pegar, abrir, beber e revistar armários, gavetas e baús.",
@@ -89,6 +91,8 @@ var modal_sim: Button
 var _modal_f: Callable
 # passagem escura
 var veu: ColorRect
+# criação do personagem
+var cria: TelaCriacao
 
 
 func _init(m: Node) -> void:
@@ -111,9 +115,9 @@ func _ready() -> void:
 	_tela_info("multi", "02", "Multiplayer", Estilo.AGUA, "O mesmo mundo com os amigos, por rede local.",
 		["Criar um mundo e chamar os amigos da mesma rede", "Entrar no mundo de um amigo", "Cada um com o próprio personagem, a sua mochila e o seu progresso"],
 		"Ainda não funciona: chega na etapa 4. Até lá, os seus mundos ficam em Jogar sozinho.")
-	_tela_info("pers", "03", "Personagem", Estilo.MUSGO, "Rosto, cabelo e corpo do seu sobrevivente.",
-		["Criação do personagem (como a do jogo antigo)", "Primeira e terceira pessoa (tecla V)", "A roupa que você veste aparece no corpo"],
-		"Chega na etapa 3. Até lá você joga em primeira pessoa.")
+	cria = TelaCriacao.new(self)
+	raiz.add_child(cria)
+	telas["criacao"] = cria
 	_tela_ajuda()
 	_tela_creditos()
 	_tela_pausa()
@@ -249,7 +253,7 @@ func _atualizar_perfis() -> void:
 			(pc.find_child("Nome", true, false) as Label).text = nome
 			(pc.find_child("Sub", true, false) as Label).text = "%d mundo%s" % [nm, "" if nm == 1 else "s"]
 			var av := pc.find_child("Avatar", true, false) as Avatar
-			av.definir(nome)
+			av.definir(nome, str(p.get("retrato", "")))
 
 
 ## a barra de cima das telas de dentro: ← LOBBY, o número e o nome do caminho na cor dele, e o perfil
@@ -281,6 +285,8 @@ func _barra_topo(t: Control, numero: String, titulo: String, cor: Color, volta: 
 
 # ================================================================ mostrar e esconder
 func mostrar(nome: String) -> void:
+	if atual == "criacao" and nome != "criacao":
+		cria.fechar()
 	if nome != atual:
 		anterior = atual
 	atual = nome
@@ -300,6 +306,8 @@ func mostrar(nome: String) -> void:
 
 
 func esconder() -> void:
+	if atual == "criacao":
+		cria.fechar()
 	anterior = atual
 	atual = ""
 	for k in telas:
@@ -572,7 +580,7 @@ func _cartao_perfil(p: Dictionary) -> Control:
 	dentro.add_child(cc)
 	var av := Avatar.new()
 	av.custom_minimum_size = Vector2(84, 84)
-	av.definir(str(p["nome"]))
+	av.definir(str(p["nome"]), str(p.get("retrato", "")))
 	cc.add_child(av)
 	var n := Estilo.rotulo(str(p["nome"]), 19, Estilo.OSSO, "ui", 800)
 	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -638,7 +646,7 @@ const CAMINHOS := [
 	{"k": "multi", "n": "0 2", "tit": "Multiplayer", "sub": "O mesmo mundo com os amigos, por rede local.", "cor": Color(0.384, 0.722, 1.0),
 		"img": "res://assets/telas/lobby_multi.jpg", "ir": "Ver como vai ser", "tag": "EM BREVE"},
 	{"k": "pers", "n": "0 3", "tit": "Personagem", "sub": "Rosto, cabelo e corpo do seu sobrevivente.", "cor": Color(0.592, 0.78, 0.431),
-		"img": "res://assets/telas/lobby_pers.jpg", "ir": "Ver como vai ser", "tag": "ETAPA 3"},
+		"img": "res://assets/telas/lobby_pers.jpg", "ir": "Criar personagem"},
 	{"k": "ajustes", "n": "0 4", "tit": "Configurações", "sub": "Gráficos, resolução, som, sensibilidade, mira e controles.", "cor": Color(0.925, 0.894, 0.824),
 		"img": "", "ir": "Abrir"},
 ]
@@ -811,6 +819,7 @@ func _montar_lobby() -> void:
 		ex.text = "Nenhum mundo ainda: comece o primeiro"
 	else:
 		ex.text = "%d mundo%s" % [ms.size(), "" if ms.size() == 1 else "s"]
+	(lobby_cartoes[2].get_meta("extra") as Label).text = resumo_personagem(p)
 	(lobby_cartoes[3].get_meta("extra") as Label).text = "Gráficos: %s · Mouse: %.2f" % [Ajustes.QUALIDADES[clampi(int(Ajustes.v["qualidade"]), 0, 2)], float(Ajustes.v["sens"])]
 	_lobby_escolher(lobby_sel, true)
 
@@ -843,7 +852,7 @@ func _lobby_entrar(i: int) -> void:
 		"multi":
 			mostrar("multi")
 		"pers":
-			mostrar("pers")
+			abrir_criacao()
 		"ajustes":
 			_volta_ajustes = "lobby"
 			mostrar("ajustes")
@@ -1065,8 +1074,29 @@ func _novo_mundo() -> void:
 	_montar_sozinho()
 
 
-## entra no mundo: com a montagem feita, é só carregar o jogo salvo dele (ou começar do zero)
+## a criação do personagem; f: o que fazer no Confirmar (entrar no mundo), de: para onde o Voltar leva
+func abrir_criacao(f := Callable(), de := "lobby") -> void:
+	cria.abrir(f, de)
+	mostrar("criacao")
+
+
+## o personagem do perfil em poucas palavras (o painel do lobby)
+func resumo_personagem(p: Dictionary) -> String:
+	if not p.has("ap"):
+		return "Ainda não criado: comece por aqui"
+	var ap := Corpo.limpa(p["ap"])
+	var m := Corpo.mh_de(ap)
+	var tipo := "Sobrevivente" if str(ap["corpo"]) != "mh" else ("Personalizada" if str(m["g"]) == "mulher" else "Personalizado")
+	var nm := str(ap.get("nome", ""))
+	return "%s%s · %s, %s" % [nm + " · " if nm != "" else "", tipo, Corpo.nome_op("g", str(m["g"]), str(m["g"])).to_lower(), Corpo.altura_txt(ap, int(ap["altura"]))]
+
+
+## entra no mundo: com a montagem feita, é só carregar o jogo salvo dele (ou começar do zero); o primeiro mundo de um perfil
+## sem personagem passa antes pela criação (como o Novo jogo do jogo antigo)
 func jogar(m: Dictionary) -> void:
+	if not Perfis.atual.has("ap") and not main.modo_teste:
+		abrir_criacao(jogar.bind(m), "sozinho")
+		return
 	if main.mundo_sujo:
 		# já jogou outro mundo nesta montagem: monta de novo e entra direto
 		Telas.mundo_pedido = str(m["id"])
@@ -1156,6 +1186,10 @@ func _montar_ajustes() -> void:
 			aj_corpo.add_child(_linha("Mostrar quadros por segundo (FPS)", Estilo.segmentos(["Não", "Sim"], 1 if v["fps"] else 0, func(i): Ajustes.mudar("fps", i == 1, main))))
 		1:
 			aj_corpo.add_child(_linha("Tela cheia (F11)", Estilo.segmentos(["Não", "Sim"], 1 if v["tela_cheia"] else 0, func(i): Ajustes.mudar("tela_cheia", i == 1, main))))
+			aj_corpo.add_child(_linha("Câmera (V)", Estilo.segmentos(["1ª pessoa", "3ª pessoa"], 1 if v["terceira"] else 0, func(i): Ajustes.mudar("terceira", i == 1, main)),
+				"Na terceira pessoa a câmera fica atrás do ombro direito e você vê o seu personagem, a roupa e o que está na mão."))
+			aj_corpo.add_child(_linha("Corpo na 3ª pessoa", Estilo.segmentos(["Olha para a câmera", "Vira para onde anda"], 1 if v["corpo_anda"] else 0, func(i): Ajustes.mudar("corpo_anda", i == 1, main)),
+				"Olhando para a câmera (como no DayZ e no PUBG) ele anda de lado e de costas; na disparada vira para onde corre."))
 			aj_corpo.add_child(_linha("Mostrar os comandos na tela (H)", Estilo.segmentos(["Não", "Sim"], 1 if v["comandos"] else 0, func(i): Ajustes.mudar("comandos", i == 1, main)),
 				"O quadro dos comandos do teclado embaixo à esquerda (W A S D, E, Tab...)."))
 		2:
@@ -1183,7 +1217,7 @@ func _montar_ajustes() -> void:
 					["Clique", "Bater, comer, beber, usar o item da mão"], ["E", "Pegar, abrir, beber, revistar, cozinhar"],
 					["Tab ou I", "Mochila, roupa e fabricação"], ["1 a 6 ou a rodinha", "Item na mão"], ["B", "Plano de construção na mão"],
 					["Botão direito (construindo)", "Próxima peça"], ["Q (construindo)", "Outra aba de peças"], ["R (construindo)", "Girar a peça"],
-					["F", "Lanterna"], ["M", "Mapa"], ["H", "Esconder ou mostrar os comandos"], ["F5", "Salvar"], ["Esc", "Pausa"], ["F11", "Tela cheia"]]:
+					["F", "Lanterna"], ["M", "Mapa"], ["V", "Primeira ou terceira pessoa"], ["H", "Esconder ou mostrar os comandos"], ["F5", "Salvar"], ["Esc", "Pausa"], ["F11", "Tela cheia"]]:
 				g.add_child(Estilo.tecla(par[0], 12))
 				g.add_child(Estilo.rotulo(par[1], 15, Estilo.OSSO, "ui", 600))
 			var p := PanelContainer.new()
@@ -1736,7 +1770,9 @@ func _esc() -> void:
 			_sair_ajustes()
 		"ajuda":
 			mostrar(_volta_ajuda)
-		"sozinho", "multi", "pers", "creditos":
+		"criacao":
+			cria._voltar()
+		"sozinho", "multi", "creditos":
 			mostrar("lobby")
 
 
@@ -1760,18 +1796,40 @@ func _input(ev: InputEvent) -> void:
 class Avatar extends Control:
 	var letra := "?"
 	var cor := Color(0.36, 0.3, 0.25)
+	var foto: Texture2D = null
+	static var _fotos := {}
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	func definir(nome: String) -> void:
+	## o nome (a letra no círculo) e o retrato da criação do personagem, quando o perfil tem
+	func definir(nome: String, retrato := "") -> void:
 		letra = nome.substr(0, 1).to_upper() if nome != "" else "?"
 		var h := float((letra.unicode_at(0) * 7) % 12) / 12.0 if letra != "?" else 0.08
 		cor = Color.from_hsv(h, 0.32, 0.4)
+		foto = null
+		if retrato != "" and FileAccess.file_exists(retrato):
+			var mod := FileAccess.get_modified_time(retrato)
+			var k := "%s|%d" % [retrato, mod]
+			if not _fotos.has(k):
+				var img := Image.load_from_file(retrato)
+				_fotos[k] = ImageTexture.create_from_image(img) if img != null and not img.is_empty() else null
+			foto = _fotos[k]
 		queue_redraw()
 
 	func _draw() -> void:
 		var r := size.x * 0.5
+		if foto != null:
+			var pts := PackedVector2Array()
+			var uvs := PackedVector2Array()
+			for i in 48:
+				var a := TAU * float(i) / 48.0
+				var d := Vector2(cos(a), sin(a))
+				pts.append(Vector2(r, r) + d * r)
+				uvs.append(Vector2(0.5, 0.5) + d * 0.5)
+			draw_colored_polygon(pts, Color.WHITE, uvs, foto)
+			draw_arc(Vector2(r, r), r - 1.0, 0.0, TAU, 48, Color(0.925, 0.894, 0.824, 0.4), 1.5, true)
+			return
 		draw_circle(Vector2(r, r), r, cor, true, -1.0, true)
 		draw_arc(Vector2(r, r), r - 1.0, 0.0, TAU, 48, Color(0.925, 0.894, 0.824, 0.4), 1.5, true)
 		var f := Estilo.fonte("titulo", 700)

@@ -273,7 +273,7 @@ func _calcular_grade(id: String) -> Dictionary:
 	var h: Dictionary = j.mira(9.0, 1)
 	var p: Vector3
 	if h.is_empty():
-		p = j.cam.global_position - j.cam.global_transform.basis.z * 4.0
+		p = j.olho() - j.cam.global_transform.basis.z * 4.0
 	else:
 		p = h["position"]
 	var yaw: float = j.rotation.y + giro
@@ -291,7 +291,7 @@ func _calcular_grade(id: String) -> Dictionary:
 	if base == null:
 		return {}
 	# paredes, piso e escada: o ponto é onde a mira cruza a altura do andar em que você está (mais 1,2 m)
-	var o: Vector3 = j.cam.global_position
+	var o: Vector3 = j.olho()
 	var dv: Vector3 = -j.cam.global_transform.basis.z
 	var nivel: float = base["y"] + maxf(0.0, round((j.global_position.y - base["y"]) / ALT)) * ALT + (1.2 if id != "piso" else ALT - 0.2)
 	if absf(dv.y) > 0.04:

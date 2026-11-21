@@ -368,6 +368,7 @@ const COMANDOS := [
 	["1 a 6", "Item na mão (ou a rodinha)"],
 	["B", "Construir (com o plano)"],
 	["M", "Mapa · F lanterna"],
+	["V", "Primeira ou terceira pessoa"],
 	["F5", "Salvar · Esc menu"],
 	["H", "Esconder estes comandos"],
 ]
