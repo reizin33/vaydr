@@ -106,6 +106,24 @@ func _fechar() -> void:
 	_pend.clear()
 
 
+## um modelo do jogo antigo como nó solto (as construções usam os móveis escaneados: cama, mesa, estante, armário...);
+## guarda a caixa dele no meta "aabb". Devolve null se o modelo não existe.
+func modelo_no(id: String) -> Node3D:
+	var partes: Array = modelos.get(id, [])
+	if partes.is_empty():
+		return null
+	var n := Node3D.new()
+	var caixa := AABB()
+	for i in partes.size():
+		var mi := MeshInstance3D.new()
+		mi.mesh = partes[i]["mesh"]
+		mi.material_override = _mat(partes[i], 0.0)
+		n.add_child(mi)
+		caixa = mi.mesh.get_aabb() if i == 0 else caixa.merge(mi.mesh.get_aabb())
+	n.set_meta("aabb", caixa)
+	return n
+
+
 ## gráficos baixo/médio/alto: até onde os objetos aparecem
 func alcance(k: float) -> void:
 	for g in grupos:

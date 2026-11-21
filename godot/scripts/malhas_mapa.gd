@@ -157,7 +157,8 @@ vec3 srgb_lin(vec3 c) {
 
 void vertex() {
 	brilho = UV2.x + brilho_extra;
-	interior = max(COLOR.a, escuro);
+	// o "lado de dentro" do jogo antigo vem suave perto das janelas: a curva deixa a sala escura de verdade
+	interior = pow(clamp(max(COLOR.a, escuro), 0.0, 1.0), 0.6);
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
@@ -174,13 +175,13 @@ void fragment() {
 	ALBEDO = c;
 	ROUGHNESS = 0.88;
 	// lado de dentro: o céu quase não ilumina (14%%-20%% da luz de fora, como numa sala fechada no jogo antigo)
-	AO = 1.0 - 0.82 * clamp(interior, 0.0, 1.0);
+	AO = 1.0 - 0.86 * interior;
 	EMISSION = c * brilho * 1.5;
 }
 
 // luz: o sol e a lua não entram no lado de dentro (como no jogo antigo); lanterna, fogueira e lâmpadas iluminam igual
 void light() {
-	float k = LIGHT_IS_DIRECTIONAL ? 1.0 - clamp(interior, 0.0, 1.0) : 1.0;
+	float k = LIGHT_IS_DIRECTIONAL ? 1.0 - interior : 1.0;
 	DIFFUSE_LIGHT += clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION * LIGHT_COLOR / PI * k;
 }
 """ % ["c *= texture(tex, UV).rgb;" if com_tex else """vec3 bw = pow(abs(wnrm), vec3(4.0));

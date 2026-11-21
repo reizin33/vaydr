@@ -57,14 +57,6 @@ const MUSGO := ["res://assets/mata/pedras_musgo_0.glb", "res://assets/mata/pedra
 const FOLHAGEM := ["res://assets/mata/calathea_%d.glb", "res://assets/mata/antorio_%d.glb", "res://assets/mata/monguba_%d.glb"]
 # a oeste disso é a parte da serra fora do mapa (paisagem: sem colisão), como no jogo antigo
 const BORDA_OESTE := -197.0
-# itens do jogo antigo que ainda não existem aqui viram o parecido (a etapa 2 traz todos)
-const PARECIDO := {"feijao": "lata", "biscoito": "lata", "sopa": "lata", "carneAssada": "lata", "refri": "agua", "tabuas": "madeira",
-	"graveto": "madeira", "pregos": "sucata", "canoFerro": "sucata", "cabo": "sucata", "frutas": "fruta", "maca": "fruta",
-	"laranja": "fruta", "remedios": "bandagem", "antisseptico": "bandagem", "kit": "bandagem", "peDeCabra": "martelo",
-	"cutelo": "facao", "faca": "facao", "corda": "fibra", "linha": "fibra", "camiseta": "pano", "camisaLeve": "pano",
-	"bermuda": "pano", "calcaCargo": "pano", "pilhas": "sucata", "fita": "pano"}
-
-
 func _init(t: Terreno) -> void:
 	terreno = t
 	rng.seed = 2026
@@ -294,7 +286,7 @@ func _arvores(v: Dictionary, me: Dictionary) -> void:
 		var pos := Vector3(float(t[0]), float(t[1]), float(t[2]))
 		var inst := _tres_versoes(e, pos, float(t[4]), s, 1.0)
 		var corpo := _corpo_arvore(pos, maxf(0.15, raio))
-		var rec := {"tipo": "arvore", "item": "madeira", "pos": pos, "vida": 100.0, "max": 100.0, "rend": 10.0 + s * 4.0,
+		var rec := {"tipo": "arvore", "item": "madeira", "pos": pos, "vida": 5.0, "max": 5.0, "s": s,
 			"inst": inst, "corpo": corpo, "volta": 0.0}
 		corpo.set_meta("recurso", recursos.size())
 		recursos.append(rec)
@@ -560,7 +552,7 @@ func _pedras(lista: Array) -> void:
 		corpo.add_child(cs)
 		corpo.transform = no.transform
 		add_child(corpo)
-		var rec := {"tipo": "pedra", "item": "pedra", "pos": rp, "vida": 100.0 * esc, "max": 100.0 * esc, "rend": 8.0 + 4.0 * esc,
+		var rec := {"tipo": "pedra", "item": "pedra", "pos": rp, "vida": 4.0, "max": 4.0, "serra": rp.x < -60.0 and rp.z < -50.0,
 			"no": no, "corpo": corpo, "volta": 0.0}
 		corpo.set_meta("recurso", recursos.size())
 		recursos.append(rec)
@@ -579,7 +571,7 @@ func _plantas(v: Dictionary) -> void:
 		var esc := float(b[3]) * float(mb[1]) / maxf(malha(mb[0]).get_aabb().end.y, 0.1)
 		var ins := _instancia(mb[0], Transform3D(Basis(Vector3.UP, float(b[4])).scaled(Vector3.ONE * esc), bp), 0.0, 130.0, true)
 		var corpo := _esfera(bp + Vector3(0, 0.45, 0), 0.6)
-		var rec := {"tipo": "planta", "item": "fibra", "pos": bp, "vida": 1.0, "max": 1.0, "rend": 6.0, "fruta": int(b[5]) == 1,
+		var rec := {"tipo": "planta", "item": "fibra", "pos": bp, "vida": 1.0, "max": 1.0, "fruta": int(b[5]) == 1,
 			"inst": [ins], "corpo": corpo, "volta": 0.0}
 		corpo.set_meta("recurso", recursos.size())
 		recursos.append(rec)
@@ -752,7 +744,7 @@ func _troncos(lista: Array) -> void:
 		corpo.add_child(cs)
 		corpo.transform = Transform3D(Basis(Quaternion(Vector3.UP, d)), meio)
 		add_child(corpo)
-		var rec := {"tipo": "tronco", "item": "madeira", "pos": meio, "vida": 70.0, "max": 70.0, "rend": 14.0, "no": no, "corpo": corpo, "volta": 0.0}
+		var rec := {"tipo": "tronco", "item": "madeira", "pos": meio, "vida": 4.0, "max": 4.0, "no": no, "corpo": corpo, "volta": 0.0}
 		corpo.set_meta("recurso", recursos.size())
 		recursos.append(rec)
 
@@ -816,8 +808,7 @@ func _soltos(lista: Array) -> void:
 		mt.roughness = 0.95
 		m.material = mt
 		malhas["solto:" + k] = m
-	var item := {"pedra": "pedra", "galho": "madeira", "cogumelo": "cogumelo", "fibra": "fibra"}
-	var qtd := {"pedra": 3, "galho": 4, "cogumelo": 1, "fibra": 4}
+	var item := {"pedra": "pedra", "galho": "graveto", "cogumelo": "cogumelo", "fibra": "fibra"}
 	for p in lista:
 		var k: String = str(p[5])
 		if not cores.has(k):
@@ -832,7 +823,7 @@ func _soltos(lista: Array) -> void:
 			y = 0.17
 		var ins := _instancia("solto:" + k, Transform3D(bas.scaled(Vector3.ONE * clampf(float(p[3]), 0.7, 1.4)), pp + Vector3(0, y, 0)), 0.0, 60.0, false, 32.0)
 		var corpo := _esfera(pp + Vector3(0, 0.15, 0), 0.4)
-		var rec := {"tipo": "solto", "nome": k, "item": item[k], "pos": pp, "vida": 1.0, "max": 1.0, "rend": float(qtd[k]),
+		var rec := {"tipo": "solto", "nome": k, "item": item[k], "pos": pp, "vida": 1.0, "max": 1.0,
 			"inst": [ins], "corpo": corpo, "volta": 0.0}
 		corpo.set_meta("recurso", recursos.size())
 		recursos.append(rec)
@@ -890,21 +881,16 @@ func _caixa_nova(p: Vector3, tam: Vector3, yaw: float, nome: String, tabela: Str
 	caixas.append({"corpo": corpo, "pos": p, "volta": 0.0, "cheia": true, "nome": nome, "tabela": tabela})
 
 
-## um golpe num recurso: devolve [item, quantidade] (vazio se nada)
-func bater(i: int, dano: float, fator: float) -> Array:
+## um golpe num recurso (árvore aguenta 5, rocha e tronco caído 4, moita e o que fica no chão 1): devolve true quando acabou
+func golpe(i: int) -> bool:
 	var r: Dictionary = recursos[i]
 	if r["vida"] <= 0.0:
-		return []
-	r["vida"] -= dano * fator
-	var q := int(round(r["rend"] * fator))
-	if r["tipo"] == "planta" or r["tipo"] == "solto":
-		q = int(r["rend"])
-		r["vida"] = 0.0
+		return false
+	r["vida"] = float(r["vida"]) - 1.0
 	if r["vida"] <= 0.0:
-		if r["tipo"] != "planta" and r["tipo"] != "solto":
-			q += int(r["rend"])
 		_acabou(i)
-	return [r["item"], maxi(q, 1)]
+		return true
+	return true if r["tipo"] in ["planta", "solto"] else false
 
 
 func _acabou(i: int) -> void:
@@ -918,7 +904,8 @@ func _acabou(i: int) -> void:
 	_voltando.append(i)
 
 
-## revista um móvel: o que tem dentro sai da tabela de saque dele no jogo antigo
+## revista um móvel: o que tem dentro sai da tabela de saque dele no jogo antigo ([item, quantidade, extra]; ferramenta e
+## arma achadas vêm usadas, com 45% a 85% do estado, como lá)
 func revistar(i: int) -> Array:
 	var c: Dictionary = caixas[i]
 	if not c["cheia"]:
@@ -926,31 +913,69 @@ func revistar(i: int) -> Array:
 	c["cheia"] = false
 	c["volta"] = 900.0
 	_vazias.append(i)
+	return sortear(str(c["tabela"]))
+
+
+## sorteia uma tabela de saque do jogo antigo (as da cidade e as de fora)
+func sortear(tab: String) -> Array:
 	var achou := {}
-	var tab: String = c["tabela"]
 	if loot_cid.has(tab):
 		for e in loot_cid[tab]:
 			if rng.randf() < float(e[1]):
-				_juntar(achou, str(e[0]), rng.randi_range(int(e[2]), int(e[3])))
+				achou[str(e[0])] = int(achou.get(str(e[0]), 0)) + rng.randi_range(int(e[2]), int(e[3]))
 	elif loot.has(tab):
 		for e in loot[tab]:
 			if rng.randf() < float(e[3]):
-				_juntar(achou, str(e[0]), rng.randi_range(int(e[1]), int(e[2])))
+				achou[str(e[0])] = int(achou.get(str(e[0]), 0)) + rng.randi_range(int(e[1]), int(e[2]))
 	else:
-		for e in [["pano", 1, 3, 0.5], ["sucata", 1, 3, 0.5], ["lata", 1, 1, 0.25], ["agua", 1, 1, 0.25], ["bandagem", 1, 1, 0.15]]:
+		for e in loot.get("casa", []):
 			if rng.randf() < float(e[3]):
-				_juntar(achou, str(e[0]), rng.randi_range(int(e[1]), int(e[2])))
+				achou[str(e[0])] = int(achou.get(str(e[0]), 0)) + rng.randi_range(int(e[1]), int(e[2]))
 	var L := []
 	for k in achou:
-		L.append([k, achou[k]])
+		if not Dados.ITENS.has(k) or int(achou[k]) <= 0:
+			continue
+		var extra := {}
+		var d := Dados.item(k)
+		if d.has("durMax"):
+			extra["dur"] = roundf(float(d["durMax"]) * (0.45 + rng.randf() * 0.4))
+		L.append([k, int(achou[k]), extra])
 	return L
 
 
-func _juntar(achou: Dictionary, item: String, n: int) -> void:
-	var id: String = PARECIDO.get(item, item)
-	if not Dados.ITENS.has(id) or n <= 0:
-		return
-	achou[id] = achou.get(id, 0) + n
+## para o jogo salvo: o que já foi colhido (e quanto falta para voltar), as árvores começadas e os móveis revistados
+func salvar() -> Dictionary:
+	var R := []
+	for i in _voltando:
+		R.append([i, recursos[i]["volta"]])
+	var C := []
+	for i in _vazias:
+		C.append([i, caixas[i]["volta"]])
+	var V := []
+	for i in recursos.size():
+		var r: Dictionary = recursos[i]
+		if float(r["vida"]) > 0.0 and float(r["vida"]) < float(r["max"]):
+			V.append([i, r["vida"]])
+	return {"acabou": R, "vazias": C, "vida": V}
+
+
+func carregar(d: Dictionary) -> void:
+	for e in d.get("acabou", []):
+		var i := int(e[0])
+		if i < recursos.size() and float(recursos[i]["vida"]) > 0.0:
+			recursos[i]["vida"] = 0.0
+			_acabou(i)
+			recursos[i]["volta"] = float(e[1])
+	for e in d.get("vazias", []):
+		var i := int(e[0])
+		if i < caixas.size() and caixas[i]["cheia"]:
+			caixas[i]["cheia"] = false
+			caixas[i]["volta"] = float(e[1])
+			_vazias.append(i)
+	for e in d.get("vida", []):
+		var i := int(e[0])
+		if i < recursos.size():
+			recursos[i]["vida"] = float(e[1])
 
 
 ## o que acabou volta depois de um tempo (árvore e pedra em 10 min, planta e coisa do chão em 5, móvel revistado em 15)

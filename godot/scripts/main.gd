@@ -33,6 +33,7 @@ const SEG_POR_HORA := 50.0
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	modo_teste = "--teste" in args or "--fotos" in args
+	Dados.carregar()
 	_teclas()
 	_ambiente()
 	var t0 := Time.get_ticks_msec()
@@ -86,15 +87,16 @@ func _ready() -> void:
 		_fotos.call_deferred()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		ui.aviso("Bata nas árvores e nas pedras (clique) para pegar madeira e pedra.", 8.0)
-		ui.aviso("Tab abre a mochila e a fabricação: comece pelo machado e pelo plano de construção.", 9.0)
-		ui.aviso("Esc: menu (gráficos, mouse, sair).", 9.0)
+		if not carregar_jogo():
+			ui.aviso("Pegue pedras, galhos e fibras do chão (E). Na mão, a cada 3 socos a árvore dá 1 madeira.", 9.0)
+			ui.aviso("Tab abre a mochila e a fabricação: comece pelo machado improvisado e pela picareta.", 10.0)
+		ui.aviso("Esc: menu (gráficos, mouse, salvar, sair). F5 salva.", 9.0)
 
 
 func _teclas() -> void:
 	var mapa := {
 		"frente": [KEY_W], "tras": [KEY_S], "esquerda": [KEY_A], "direita": [KEY_D], "pular": [KEY_SPACE], "correr": [KEY_SHIFT],
-		"agachar": [KEY_CTRL, KEY_C], "usar": [KEY_E], "mochila": [KEY_TAB, KEY_I], "girar": [KEY_R], "sair": [KEY_ESCAPE],
+		"agachar": [KEY_CTRL, KEY_C], "usar": [KEY_E], "mochila": [KEY_TAB, KEY_I], "girar": [KEY_R], "sair": [KEY_ESCAPE], "aba_obra": [KEY_Q], "salvar": [KEY_F5],
 		"barra1": [KEY_1], "barra2": [KEY_2], "barra3": [KEY_3], "barra4": [KEY_4], "barra5": [KEY_5], "barra6": [KEY_6], "tela_cheia": [KEY_F11]}
 	for a in mapa:
 		if not InputMap.has_action(a):
@@ -221,6 +223,15 @@ func _process(dt: float) -> void:
 			_nascer_perto()
 	if Input.is_action_just_pressed("mochila") and jogador.vivo:
 		ui.abrir(not ui.aberto)
+	if not modo_teste:
+		if Input.is_action_just_pressed("salvar") and jogador.vivo:
+			salvar_jogo()
+			ui.aviso("Jogo salvo")
+		_auto_t -= dt
+		if _auto_t <= 0.0:
+			_auto_t = 120.0
+			if jogador.vivo:
+				salvar_jogo()
 	# voltou de outra janela (Alt+Tab): um clique prende o mouse de novo
 	if not modo_teste and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE and not ui.aberto and not ui.menu_aberto and jogador.vivo \
 			and Input.is_action_just_pressed("atacar"):
@@ -330,18 +341,21 @@ func _zumbis_dos_lugares(dt: float) -> void:
 			L["zumbis"] = []
 
 
-func zumbi_morreu(_z) -> void:
-	if randf() < 0.6:
-		var s := jogador.inv.por("pano", randi_range(1, 2))
-		ui.aviso("O zumbi largou pano" if s == 0 else "Mochila cheia")
+## o zumbi pode deixar alguma coisa no chão (a tabela "zumbi" do jogo antigo: pano, munição, sucata)
+func zumbi_morreu(z) -> void:
+	var L: Array = mundo.sortear("zumbi")
+	if not L.is_empty():
+		construcao.soltar_no_chao(z.global_position, L)
+		ui.aviso("O zumbi deixou alguma coisa no chão")
 
 
 func fabricar(r: Dictionary) -> void:
-	if not jogador.inv.pagar(r["custo"]):
+	var m := Fabricacao.fazer(r, jogador)
+	if m != "":
+		ui.aviso(m)
 		return
-	var sobra := jogador.inv.por(r["faz"], r["n"])
 	sons.tocar("construir", jogador.global_position, -6.0)
-	ui.aviso("Fabricou: " + Dados.nome(r["faz"]) + ("" if sobra == 0 else " (mochila cheia)"))
+	ui.aviso("Fabricou: %s" % Fabricacao.nome(r))
 
 
 func texto_mira() -> String:
@@ -359,36 +373,61 @@ func texto_mira() -> String:
 	if c.has_meta("porta"):
 		return "E  Fechar a porta" if construcao.portas[c.get_meta("porta")]["aberta"] else "E  Abrir a porta"
 	if c.has_meta("bau"):
-		return "E  Pegar suas coisas" if construcao.baus[c.get_meta("bau")].get("mochila", false) else "E  Abrir o baú"
+		var bb: Dictionary = construcao.baus[c.get_meta("bau")]
+		return ("E  " + str(bb.get("titulo", "Pegar"))) if bb.get("mochila", false) else "E  Abrir o baú"
+	if c.has_meta("obra") and construcao.peca_viva(c.get_meta("obra")):
+		var po: Dictionary = construcao.pecas[c.get_meta("obra")]
+		var o := Dados.obra(str(po["id"]))
+		var acao := ""
+		if po.has("bau"):
+			acao = "E  Abrir: "
+		elif str(po["id"]) == "fogueira":
+			acao = "E  Cozinhar na "
+		elif str(po["id"]) in ["cama", "camaMadeira"]:
+			acao = "E  Renascer nesta "
+		elif o.has("estacao") or str(po["id"]) == "bancadaTrab":
+			acao = "E  Fabricar na "
+		elif str(po["id"]) == "armadilhaUrso":
+			acao = "E  Armar a " if not po.get("armada", true) else ""
+		var nv := " (nível %d)" % int(po.get("nivel", 1)) if str(po["id"]) == "bancadaTrab" else ""
+		var nm := str(o.get("nome", po["id"]))
+		return "%s%s%s  %d/%d" % [acao, nm.to_lower() if acao != "" else nm, nv, int(po["vida"]), int(po["max"])]
 	if c.has_meta("recurso"):
 		var r: Dictionary = mundo.recursos[c.get_meta("recurso")]
 		match r["tipo"]:
 			"planta":
-				return "E  Colher fibra" + (" (tem frutinha)" if r.get("fruta", false) else "")
+				return "E  Colher" + (" frutas silvestres" if r.get("fruta", false) else " fibra")
 			"solto":
 				return "E  Pegar " + str({"pedra": "a pedra", "galho": "o galho", "cogumelo": "o cogumelo", "fibra": "a fibra"}.get(r["nome"], r["nome"]))
-			"arvore", "tronco":
-				return "Madeira (bata com o machado)"
+			"arvore":
+				return "Árvore (machado; na mão, 1 madeira a cada 3 socos)"
+			"tronco":
+				return "Tronco caído (machado)"
 			"pedra":
-				return "Pedra (bata com a picareta)"
+				return "Rocha (picareta)"
 	if c.has_meta("zumbi"):
 		return "Zumbi"
 	if c.has_meta("peca") and construcao.peca_viva(c.get_meta("peca")):
 		var pe: Dictionary = construcao.pecas[c.get_meta("peca")]
-		var dica := "  (o pé de cabra conserta)" if float(pe["vida"]) < float(pe["max"]) else ""
-		return "%s  %d/%d%s" % [Dados.peca(pe["id"])["nome"], int(pe["vida"]), int(pe["max"]), dica]
+		var dica := "  (o martelo conserta)" if float(pe["vida"]) < float(pe["max"]) else ""
+		return "%s  %d/%d%s" % [Dados.nome(str(pe["id"])), int(pe["vida"]), int(pe["max"]), dica]
 	return ""
 
 
 func _morreu() -> void:
 	ui.abrir(false)
-	# como no Rust: o que você tinha fica numa mochila no chão, dá para voltar e pegar
+	# como no Rust: o que você tinha (e a roupa do corpo) fica numa mochila no chão, dá para voltar e pegar
+	var caida := Inventario.new(Inventario.MAXIMO, false)
 	var tinha := false
 	for s in jogador.inv.slots:
 		if s != null:
+			caida.por_pilha(s)
 			tinha = true
+	for k in jogador.inv.roupa:
+		caida.por_pilha(jogador.inv.roupa[k])
+		tinha = true
 	if tinha:
-		construcao.por_mochila(jogador.global_position, jogador.inv)
+		construcao.por_mochila(jogador.global_position, caida)
 	ui.mostrar_morte(true)
 
 
@@ -400,6 +439,72 @@ func renascer(no_saco := false) -> void:
 	jogador.renascer(p)
 	jogador.inv.mudou.connect(ui.atualizar)
 	ui.atualizar()
+
+
+# ======================= salvar e carregar =======================
+const ARQ_SALVO := "user://vaydr_mundo1.json"
+var _auto_t := 120.0
+
+
+## guarda o mundo num arquivo (o jogador, a mochila e a roupa, as receitas aprendidas, a hora, a base inteira com o que está
+## nos baús, o que já foi colhido e revistado)
+func salvar_jogo() -> bool:
+	var j := jogador
+	var d := {"versao": 1, "dia": dia, "hora": hora,
+		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
+			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
+			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
+		"base": construcao.salvar(), "mundo": mundo.salvar()}
+	var f := FileAccess.open(ARQ_SALVO, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_string(JSON.stringify(d))
+	f.close()
+	return true
+
+
+func carregar_jogo() -> bool:
+	if not FileAccess.file_exists(ARQ_SALVO):
+		return false
+	var d = JSON.parse_string(FileAccess.get_file_as_string(ARQ_SALVO))
+	if typeof(d) != TYPE_DICTIONARY:
+		return false
+	dia = int(d.get("dia", 1))
+	hora = float(d.get("hora", 8.0))
+	var jd: Dictionary = d.get("jogador", {})
+	var j := jogador
+	if jd.has("pos"):
+		j.global_position = Vector3(float(jd["pos"][0]), float(jd["pos"][1]) + 0.2, float(jd["pos"][2]))
+		j.rotation.y = float(jd.get("giro", 0.0))
+	j.vida = float(jd.get("vida", 100.0))
+	j.fome = float(jd.get("fome", 100.0))
+	j.sede = float(jd.get("sede", 100.0))
+	j.bateria = float(jd.get("bateria", 100.0))
+	j.consertos = int(jd.get("consertos", 0))
+	j.vistos = {}
+	for k in jd.get("vistos", []):
+		j.vistos[str(k)] = true
+	j.aprendidas = {}
+	for k in jd.get("aprendidas", []):
+		j.aprendidas[str(k)] = true
+	if jd.has("inv"):
+		j.inv.carregar(jd["inv"])
+	j.selecionar(int(jd.get("sel", 0)))
+	construcao.carregar(d.get("base", {}))
+	mundo.carregar(d.get("mundo", {}))
+	ui.atualizar()
+	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
+	return true
+
+
+func apagar_salvo() -> void:
+	if FileAccess.file_exists(ARQ_SALVO):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(ARQ_SALVO))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and not modo_teste and jogador != null and jogador.vivo:
+		salvar_jogo()
 
 
 # ======================= testes da nuvem =======================
@@ -441,7 +546,7 @@ func _segurar(acao: String, n: int) -> void:
 ## põe o item na mão (traz para a barra se estiver na mochila)
 func _na_mao(id: String) -> bool:
 	var inv := jogador.inv
-	for i in Inventario.ESPACOS:
+	for i in inv.limite:
 		if inv.slots[i] != null and inv.slots[i]["id"] == id:
 			var k := i
 			if k >= Inventario.BARRA:
@@ -458,19 +563,43 @@ func _por_em(p: Vector3) -> void:
 
 
 ## mira num ponto (local da base) e põe a peça escolhida como o jogador poria
-func _peca_mirando(b0: Dictionary, n_peca: int, de: Vector3, alvo_local: Vector3) -> bool:
-	construcao.peca = n_peca
+func _peca_mirando(b0: Dictionary, id: String, de: Vector3, alvo_local: Vector3) -> bool:
+	construcao.escolher(id)
 	_por_em(b0["xf"] * de)
 	await _quadros(4)
 	_olhar(b0["xf"] * alvo_local)
 	await _quadros(2)
 	var a2: Dictionary = construcao._calcular()
 	if a2.is_empty() or not a2["ok"]:
-		print("      (não deu para pôr %s: %s)" % [Dados.PECAS[n_peca]["id"], str(a2.get("chave", "sem alvo"))])
+		print("      (não deu para pôr %s: %s)" % [id, str(a2.get("chave", "sem alvo"))])
 		return false
 	construcao.alvo = a2
-	construcao.colocar(Dados.PECAS[n_peca]["id"], a2["xf"], a2["chave"])
+	construcao.colocar(id, a2["xf"], a2["chave"])
 	return true
+
+
+## constrói uma obra livre no chão, olhando para um ponto (como o jogador faria com o plano)
+func _obra_em(id: String, de: Vector3, alvo: Vector3) -> int:
+	construcao.escolher(id)
+	_por_em(de)
+	await _quadros(4)
+	_olhar(alvo)
+	await _quadros(2)
+	var a2: Dictionary = construcao._calcular()
+	if a2.is_empty() or not a2["ok"]:
+		print("      (não deu para pôr %s: %s)" % [id, "sem alvo" if a2.is_empty() else "lugar ocupado"])
+		return -1
+	var n0 := construcao.pecas.size()
+	construcao.colocar(id, a2["xf"], a2["chave"])
+	return n0 if construcao.pecas.size() > n0 else -1
+
+
+## a receita (a primeira com esse resultado)
+func _receita(faz: String) -> Dictionary:
+	for r in Dados.RECEITAS:
+		if str(r["faz"]) == faz:
+			return r
+	return {}
 
 
 ## um lugar livre e quase plano de "lado" metros perto de "centro" (para a base de teste e as fotos): sem árvore, pedra,
@@ -609,15 +738,18 @@ func _teste() -> void:
 	_por_em(Vector3(216.1, 3.47 + 0.6, 28.2))
 	await _quadros(45)
 	_confere(jogador.global_position.y > 3.3 and jogador.global_position.y < 4.6, "1º andar do Edifício Aurora segura (y %.2f, piso 3,47; móvel até 4,5)" % jogador.global_position.y)
-	# coleta de verdade: o jogador vai até a árvore mais perto do começo e bate com a mão
+	# coleta do jogo antigo: na mão, a cada 3 socos a árvore dá 1 madeira
 	var arv: Dictionary = {}
+	var i_arv := -1
 	var dmin := 1e9
-	for r in mundo.recursos:
+	for k in mundo.recursos.size():
+		var r: Dictionary = mundo.recursos[k]
 		if r["tipo"] == "arvore":
 			var dd: float = Vector2(r["pos"].x, r["pos"].z).distance_to(Vector2(livre.x, livre.z))
 			if dd < dmin:
 				dmin = dd
 				arv = r
+				i_arv = k
 	var pa: Vector3 = arv["pos"]
 	var raio_a: float = (((arv["corpo"] as StaticBody3D).get_child(0) as CollisionShape3D).shape as CylinderShape3D).radius
 	var lado_a := Vector3(livre.x - pa.x, 0, livre.z - pa.z).normalized()
@@ -627,13 +759,13 @@ func _teste() -> void:
 	_olhar(pa + Vector3(0, 1.3, 0))
 	await _quadros(3)
 	var md0 := jogador.inv.conta("madeira")
-	for i in 4:
+	for i in 6:
 		jogador.cd = 0.0
 		jogador.atacar()
 		await _quadros(2)
 	var com_mao := jogador.inv.conta("madeira") - md0
-	_confere(com_mao > 0, "coleta: bater na árvore com a mão deu madeira (%d em 4 golpes)" % com_mao)
-	# pedra com a mão: a pedra mais perto
+	_confere(com_mao == 2, "coleta: 6 socos na árvore deram %d madeira (1 a cada 3, como no jogo antigo)" % com_mao)
+	# rocha: na mão não sai pedra (só com picareta)
 	var ped: Dictionary = {}
 	dmin = 1e9
 	for r in mundo.recursos:
@@ -646,17 +778,16 @@ func _teste() -> void:
 	var caixa_p: AABB = pno.get_aabb()
 	var pc_w: Vector3 = pno.global_transform * caixa_p.get_center()
 	var raio_p: float = maxf(caixa_p.size.x, caixa_p.size.z) * 0.5 * pno.transform.basis.get_scale().x
-	_por_em(Vector3(pc_w.x + raio_p + 1.1, terreno.h(pc_w.x + raio_p + 1.1, pc_w.z) + 0.3, pc_w.z))
+	var de_p := Vector3(pc_w.x + raio_p + 1.1, terreno.h(pc_w.x + raio_p + 1.1, pc_w.z) + 0.3, pc_w.z)
+	_por_em(de_p)
 	await _quadros(10)
 	_olhar(pc_w + Vector3(0, 0.3, 0))
 	await _quadros(3)
 	var s0 := jogador.inv.conta("pedra")
-	for i in 3:
-		jogador.cd = 0.0
-		jogador.atacar()
-		await _quadros(2)
-	_confere(jogador.inv.conta("pedra") > s0, "coleta: bater na pedra deu pedra (%d)" % (jogador.inv.conta("pedra") - s0))
-	# pegar coisa do chão (E)
+	jogador.cd = 0.0
+	jogador.atacar()
+	_confere(jogador.inv.conta("pedra") == s0, "rocha na mão não dá pedra (precisa de picareta)")
+	# pegar coisa do chão (E): pedra solta, galho (gravetos), fibra, cogumelo
 	var solto: Dictionary = {}
 	var isolto := -1
 	dmin = 1e9
@@ -676,18 +807,48 @@ func _teste() -> void:
 	var item_s: String = solto["item"]
 	var antes_s := jogador.inv.conta(item_s)
 	jogador.usar()
-	_confere(jogador.inv.conta(item_s) > antes_s and float(mundo.recursos[isolto]["vida"]) <= 0.0, "E pega %s do chão (+%d %s)" % [solto["nome"], jogador.inv.conta(item_s) - antes_s, item_s])
-	# fabricação
-	jogador.inv.por("madeira", 600)
-	jogador.inv.por("pedra", 100)
-	for r in Dados.RECEITAS:
-		if r["faz"] in ["machado", "plano", "picareta"]:
-			fabricar(r)
-	_confere(jogador.inv.conta("machado") == 1 and jogador.inv.conta("plano") == 1 and jogador.inv.conta("picareta") == 1, "fabricou machado, picareta e plano de construção")
-	# o machado tira muito mais madeira que a mão
+	_confere(jogador.inv.conta(item_s) > antes_s and float(mundo.recursos[isolto]["vida"]) <= 0.0, "E pega %s do chão (+%d %s)" % [solto["nome"], jogador.inv.conta(item_s) - antes_s, Dados.nome(item_s)])
+	# o catálogo do jogo antigo
+	_confere(Dados.ITENS.size() >= 213 and Dados.RECEITAS.size() >= 100 and Dados.OBRAS.size() >= 40, "catálogo do jogo antigo: %d itens, %d receitas, %d construções" % [Dados.ITENS.size(), Dados.RECEITAS.size(), Dados.OBRAS.size()])
+	var sem_ico := 0
+	for k in Dados.ITENS:
+		if Dados.icone_item(k) == null:
+			sem_ico += 1
+	_confere(sem_ico == 0, "todo item tem ícone (%d sem)" % sem_ico)
+	# fabricação na mão: machado improvisado, picareta e plano (as receitas de lá)
+	jogador.inv.por("pedra", 4)
+	jogador.inv.por("graveto", 6)
+	jogador.inv.por("fibra", 10)
+	jogador.inv.por("madeira", 2)
+	for f in ["machadoPedra", "picareta", "plano"]:
+		fabricar(_receita(f))
+	_confere(jogador.inv.conta("machadoPedra") == 1 and jogador.inv.conta("picareta") == 1 and jogador.inv.conta("plano") == 1,
+		"fabricou machado improvisado, picareta e plano (pedra, gravetos e fibras)")
+	_confere(Fabricacao.pode(_receita("pregos"), jogador) != "", "pregos ficam trancados sem sucata e sem bancada")
+	# mochila nas costas: abre mais espaços
+	_confere(jogador.inv.limite == 12, "sem mochila: 6 na barra e 6 bolsos (%d)" % jogador.inv.limite)
+	jogador.inv.por("mochilaExpedicao", 1)
+	for i in jogador.inv.limite:
+		var sm = jogador.inv.slots[i]
+		if sm != null and sm["id"] == "mochilaExpedicao":
+			jogador.inv.vestir(i)
+	_confere(jogador.inv.limite == 44, "mochila de expedição nas costas: %d espaços" % jogador.inv.limite)
+	# picareta na rocha: 2 pedras por golpe e gasta a picareta
+	_na_mao("picareta")
+	_por_em(de_p)
+	await _quadros(6)
+	_olhar(pc_w + Vector3(0, 0.3, 0))
+	await _quadros(2)
+	var s1 := jogador.inv.conta("pedra")
+	var dur0 := float(jogador.item_mao().get("dur", 0.0))
+	jogador.cd = 0.0
+	jogador.atacar()
+	_confere(jogador.inv.conta("pedra") - s1 == 2, "picareta na rocha: +%d pedra" % (jogador.inv.conta("pedra") - s1))
+	_confere(float(jogador.item_mao().get("dur", 0.0)) < dur0, "a picareta gastou (%d -> %d)" % [int(dur0), int(jogador.item_mao().get("dur", 0.0))])
+	# machado na árvore: 1 ou 2 por golpe; com 5 golpes ela cai e dá mais
 	var im := -1
 	for i in Inventario.BARRA:
-		if jogador.inv.slots[i] != null and jogador.inv.slots[i]["id"] == "machado":
+		if jogador.inv.slots[i] != null and jogador.inv.slots[i]["id"] == "machadoPedra":
 			im = i
 	_confere(im >= 0, "machado foi para a barra de atalhos")
 	if im >= 0:
@@ -698,25 +859,78 @@ func _teste() -> void:
 		_olhar(pa + Vector3(0, 1.3, 0))
 		await _quadros(3)
 		var m1 := jogador.inv.conta("madeira")
-		jogador.cd = 0.0
-		jogador.atacar()
-		var com_machado := jogador.inv.conta("madeira") - m1
-		_confere(com_machado > com_mao / 4.0 * 2.0, "machado: %d de madeira num golpe (mão: %d em 4)" % [com_machado, com_mao])
-	# construção: base 2x2 num lugar livre perto da clareira, paredes, porta, janela, piso e escada
-	var ip := -1
-	for i in Inventario.ESPACOS:
-		if jogador.inv.slots[i] != null and jogador.inv.slots[i]["id"] == "plano":
-			ip = i
-	if ip >= Inventario.BARRA:
-		jogador.inv.trocar(ip, 0)
-		ip = 0
-	jogador.selecionar(ip)
+		var golpes := 0
+		while float(mundo.recursos[i_arv]["vida"]) > 0.0 and golpes < 8:
+			jogador.cd = 0.0
+			jogador.atacar()
+			golpes += 1
+			await _quadros(2)
+		var mad := jogador.inv.conta("madeira") - m1
+		_confere(float(mundo.recursos[i_arv]["vida"]) <= 0.0 and mad >= 5, "machado derrubou a árvore em %d golpes (+%d madeira)" % [golpes, mad])
+	# bancada de trabalho (madeira, pedra e corda), pregos e melhoria para o nível 2
+	jogador.inv.por("madeira", 60)
+	jogador.inv.por("pedra", 60)
+	jogador.inv.por("corda", 10)
+	jogador.inv.por("tabuas", 60)
+	jogador.inv.por("pregos", 50)
+	jogador.inv.por("sucata", 20)
+	jogador.inv.por("fibra", 20)
+	jogador.inv.por("graveto", 20)
+	jogador.inv.por("pano", 20)
+	_na_mao("plano")
 	_confere(construcao.ativo, "plano na mão liga a construção")
+	var livre3 := _lugar_livre(Vector2(18, 26), 9.0, Vector2(livre.x, livre.z))
+	var ib: int = await _obra_em("bancadaTrab", Vector3(livre3.x, livre3.y + 0.3, livre3.z + 2.5), Vector3(livre3.x, livre3.y, livre3.z))
+	_confere(ib >= 0, "bancada de trabalho construída")
+	if ib >= 0:
+		var pb2: Vector3 = (construcao.pecas[ib]["xf"] as Transform3D).origin
+		_por_em(pb2 + Vector3(0, 0.3, 1.6))
+		await _quadros(4)
+		_confere(Fabricacao.pode(_receita("pregos"), jogador) == "", "perto da bancada e com sucata já vista: dá para fazer pregos")
+		var pr0 := jogador.inv.conta("pregos")
+		fabricar(_receita("pregos"))
+		_confere(jogador.inv.conta("pregos") == pr0 + 3, "fabricou 3 pregos na bancada")
+		_confere(Fabricacao.pode(_receita("pistola"), jogador) != "", "pistola artesanal pede a bancada nível 2")
+		var m_b: String = construcao.melhorar_bancada(jogador.inv, jogador.global_position)
+		_confere(m_b == "" and construcao.nivel_bancada_perto(jogador.global_position) == 2, "bancada melhorada para o nível 2 %s" % m_b)
+	# fogueira: assa a carne e ferve a água suja
+	var ifo: int = await _obra_em("fogueira", Vector3(livre3.x + 3.5, livre3.y + 0.3, livre3.z + 2.5), Vector3(livre3.x + 3.5, livre3.y, livre3.z))
+	_confere(ifo >= 0, "fogueira construída (gravetos, pedra e fibra)")
+	if ifo >= 0:
+		jogador.inv.por("carneCrua", 3)
+		jogador.inv.por("aguaSuja", 2)
+		construcao.interagir(ifo, jogador)
+		_confere(jogador.inv.conta("carneAssada") == 3 and jogador.inv.conta("agua") >= 2 and jogador.inv.conta("carneCrua") == 0, "fogueira assou 3 carnes e ferveu 2 garrafas")
+	# comer e beber: a garrafa volta vazia
+	jogador.fome = 50.0
+	jogador.sede = 50.0
+	var ic2 := -1
+	var ia2 := -1
+	for i in jogador.inv.limite:
+		var sc = jogador.inv.slots[i]
+		if sc != null and sc["id"] == "carneAssada":
+			ic2 = i
+		if sc != null and sc["id"] == "agua":
+			ia2 = i
+	if ic2 >= 0 and ia2 >= 0:
+		jogador.consumir_slot(ic2)
+		var g0 := jogador.inv.conta("garrafa")
+		jogador.consumir_slot(ia2)
+		_confere(jogador.fome > 85.0 and jogador.sede > 85.0 and jogador.inv.conta("garrafa") == g0 + 1, "comeu carne assada e bebeu água (fome %d, sede %d; a garrafa voltou)" % [int(jogador.fome), int(jogador.sede)])
+	# roupa protege
+	jogador.inv.por("colete", 1)
+	for i in jogador.inv.limite:
+		var sv2 = jogador.inv.slots[i]
+		if sv2 != null and sv2["id"] == "colete":
+			jogador.inv.vestir(i)
+	_confere(jogador.inv.protecao() >= 0.2, "colete vestido: protege %d%% do dano" % roundi(jogador.inv.protecao() * 100.0))
+	# construção: base 2x2 num lugar livre perto da clareira, paredes, porta, janela, piso e escada
+	_na_mao("plano")
 	_por_em(Vector3(livre.x, livre.y + 0.3, livre.z + 1.0))
 	await _quadros(8)
 	_olhar(jogador.global_position + Vector3(0, -0.2, -4.0))
 	await _quadros(3)
-	construcao.peca = 0
+	construcao.escolher("fundacao")
 	var a: Dictionary = construcao._calcular()
 	construcao.alvo = a
 	_confere(not a.is_empty() and a["ok"], "fundação: lugar válido")
@@ -729,7 +943,7 @@ func _teste() -> void:
 		# as outras 3 fundações pela mira, encostadas na primeira
 		var fund := 1
 		for c in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]:
-			construcao.peca = 0
+			construcao.escolher("fundacao")
 			_por_em(b0["xf"] * Vector3(0, F + 0.05, 0))
 			await _quadros(4)
 			_olhar(b0["xf"] * Vector3(c.x * 3.0, F - 0.3, c.y * 3.0))
@@ -743,16 +957,21 @@ func _teste() -> void:
 				print("      (fundação %s não deu: %s)" % [str(c), str(af)])
 		_confere(fund == 4, "4 fundações encaixadas na grade (%d)" % fund)
 		var feitas := 0
-		for pc in [[1, Vector3(1.5, 1.2 + F, 0)], [2, Vector3(-1.5, 1.2 + F, 0)], [3, Vector3(0, 1.2 + F, -1.5)], [1, Vector3(0, 1.2 + F, 1.5)]]:
+		for pc in [["parede", Vector3(1.5, 1.2 + F, 0)], ["porta", Vector3(-1.5, 1.2 + F, 0)], ["janela", Vector3(0, 1.2 + F, -1.5)], ["parede", Vector3(0, 1.2 + F, 1.5)]]:
 			if await _peca_mirando(b0, pc[0], Vector3(0, F + 0.05, 0.3), pc[1]):
 				feitas += 1
 		_confere(feitas == 4, "paredes: parede, parede com porta, parede com janela e parede (%d de 4)" % feitas)
-		_confere(construcao.portas.size() == 1, "porta na parede com porta")
+		var ip_porta := -1
+		for k in construcao.pecas.size():
+			if construcao.pecas[k]["id"] == "porta":
+				ip_porta = k
+		_confere(ip_porta >= 0 and construcao.pecas[ip_porta].has("porta"), "porta na parede com porta")
+		var i_porta: int = int(construcao.pecas[ip_porta].get("porta", 0)) if ip_porta >= 0 else 0
 		# piso em cima da cela (0,0), apoiado nas paredes
-		var piso_ok: bool = await _peca_mirando(b0, 4, Vector3(0, F + 0.05, 0.9), Vector3(0, F + 2.8, 0))
+		var piso_ok: bool = await _peca_mirando(b0, "piso", Vector3(0, F + 0.05, 0.9), Vector3(0, F + 2.8, 0))
 		_confere(piso_ok, "piso/teto em cima das paredes")
 		# escada na cela (1,0) e subir por ela andando
-		var esc_ok: bool = await _peca_mirando(b0, 5, Vector3(3.0, F + 0.05, -0.3), Vector3(3.0, F + 1.2, 0.6))
+		var esc_ok: bool = await _peca_mirando(b0, "escada", Vector3(3.0, F + 0.05, -0.3), Vector3(3.0, F + 1.2, 0.6))
 		_confere(esc_ok, "escada na cela (1,0)")
 		if esc_ok:
 			var pe: Dictionary = construcao.pecas[construcao.pecas.size() - 1]
@@ -766,20 +985,16 @@ func _teste() -> void:
 			var subiu: float = jogador.global_position.y - ya
 			_confere(subiu > 1.1, "subiu a escada andando (%.2f m)" % subiu)
 		# porta abre e fecha
-		construcao.alternar_porta(0)
+		construcao.alternar_porta(i_porta)
 		await _quadros(40)
-		var dob: Node3D = construcao.portas[0]["dob"]
+		var dob: Node3D = construcao.portas[i_porta]["dob"]
 		_confere(absf(dob.rotation.y + PI / 2.0) < 0.08, "porta abriu (%.2f)" % dob.rotation.y)
-		construcao.alternar_porta(0)
+		construcao.alternar_porta(i_porta)
 		await _quadros(40)
 		_confere(absf(dob.rotation.y) < 0.08, "porta fechou")
 		# zumbi do lado de fora da porta fechada: bate na porta, não em quem está dentro
 		_por_em(b0["xf"] * Vector3(0.4, F + 0.05, 0.0))
 		jogador.vida = 100.0
-		var ip_porta := -1
-		for k in construcao.pecas.size():
-			if construcao.pecas[k]["id"] == "porta":
-				ip_porta = k
 		var v_porta: float = construcao.pecas[ip_porta]["vida"]
 		var zp := _nascer(b0["xf"] * Vector3(-3.2, 0, 0.0), false)
 		await _quadros(240)
@@ -787,39 +1002,74 @@ func _teste() -> void:
 		_confere(v_depois < v_porta, "zumbi bate na porta fechada (porta %d de %d)" % [int(v_depois), int(v_porta)])
 		_confere(jogador.vida >= 99.0, "a porta segura: o zumbi não acerta quem está dentro (vida %d)" % int(jogador.vida))
 		zp.ferir(999.0, jogador.global_position)
-		# o pé de cabra conserta a porta
+		# o martelo conserta a porta (gasta 30% do material dela)
 		jogador.inv.por("martelo", 1)
-		jogador.inv.por("madeira", 20)
 		_na_mao("martelo")
 		_olhar(b0["xf"] * Vector3(-1.5, F + 1.2, 0.0))
+		var tb0 := jogador.inv.conta("tabuas")
 		jogador.cd = 0.0
 		jogador.atacar()
-		_confere(float(construcao.pecas[ip_porta]["vida"]) > v_depois or v_depois >= v_porta, "pé de cabra conserta a porta (%d)" % int(construcao.pecas[ip_porta]["vida"]))
-		_confere(construcao.pecas.size() == 10, "peças na base: %d (4 fundações, 4 paredes, piso, escada)" % construcao.pecas.size())
-		# saco de dormir, baú e lanterna
-		jogador.inv.por("saco", 1)
-		jogador.inv.por("bau", 1)
+		_confere(float(construcao.pecas[ip_porta]["vida"]) >= float(construcao.pecas[ip_porta]["max"]) and jogador.inv.conta("tabuas") < tb0,
+			"martelo consertou a porta (%d) gastando tábuas" % int(construcao.pecas[ip_porta]["vida"]))
+		# móveis e defesa: baú (guarda coisas), cama (renasce nela) e estacas (ferem zumbi)
+		_na_mao("plano")
+		var ibau: int = await _obra_em("bau", b0["xf"] * Vector3(3.0, F + 0.05, 4.4), b0["xf"] * Vector3(3.0, F, 3.2))
+		_confere(ibau >= 0 and construcao.pecas[ibau].has("bau"), "baú construído no piso da base")
+		if ibau >= 0:
+			var binv: Inventario = construcao.baus[int(construcao.pecas[ibau]["bau"])]["inv"]
+			ui.abrir_bau(binv, "Baú")
+			ui._guardar_recursos()
+			_confere(binv.conta("tabuas") > 0 and jogador.inv.conta("tabuas") == 0, "guardou os materiais no baú (%d tábuas)" % binv.conta("tabuas"))
+			ui._pegar_tudo()
+			_confere(jogador.inv.conta("tabuas") > 0, "pegou de volta do baú")
+			binv.por("cogumelo", 5)
+			ui.abrir(false)
+		var n_sacos := construcao.sacos.size()
+		var icama: int = await _obra_em("cama", b0["xf"] * Vector3(0.0, F + 0.05, 4.6), b0["xf"] * Vector3(0.0, F, 3.3))
+		_confere(icama >= 0 and construcao.sacos.size() == n_sacos + 1, "colchão no piso: lugar para renascer")
+		var lv := _lugar_livre(Vector2(livre.x + 14.0, livre.z), 5.0, Vector2(livre.x, livre.z))
+		var iest: int = await _obra_em("estacas", Vector3(lv.x, lv.y + 0.3, lv.z + 3.0), Vector3(lv.x, lv.y, lv.z))
+		_confere(iest >= 0, "estacas construídas")
+		if iest >= 0:
+			var ze := _nascer((construcao.pecas[iest]["xf"] as Transform3D).origin, false)
+			var vz0: float = ze.vida
+			await _quadros(60)
+			_confere(ze.vida < vz0 or ze.estado == "morto", "zumbi nas estacas se machuca (vida %d)" % int(ze.vida))
+			ze.ferir(999.0, jogador.global_position)
+		_confere(construcao.pecas.size() >= 14, "peças na base: %d" % construcao.pecas.size())
+		# saco de dormir e lanterna
+		jogador.inv.por("sacoDormir", 1)
 		jogador.inv.por("lanterna", 1)
 		_por_em(b0["xf"] * Vector3(0, F + 0.05, 3.6))
 		await _quadros(6)
-		_olhar(b0["xf"] * Vector3(0, F, 2.4))
-		_na_mao("saco")
+		_olhar(b0["xf"] * Vector3(-1.2, F, 2.4))
+		_na_mao("sacoDormir")
+		var ns := construcao.sacos.size()
 		jogador.cd = 0.0
 		jogador.atacar()
-		_confere(construcao.sacos.size() == 1, "saco de dormir no chão da base")
-		_olhar(b0["xf"] * Vector3(1.2, F, 3.6))
-		_na_mao("bau")
-		jogador.cd = 0.0
-		jogador.atacar()
-		_confere(construcao.baus.size() == 1, "baú no chão da base")
-		if construcao.baus.size() == 1:
-			ui.abrir_bau(construcao.baus[0]["inv"])
-			ui._guardar_recursos()
-			var bi: Inventario = construcao.baus[0]["inv"]
-			_confere(bi.conta("madeira") > 0 and jogador.inv.conta("madeira") == 0, "guardou a madeira no baú (%d)" % bi.conta("madeira"))
-			ui.abrir(false)
+		_confere(construcao.sacos.size() == ns + 1, "saco de dormir no chão da base")
 		_na_mao("lanterna")
 		_confere(jogador.luz_mao.visible, "lanterna acende na mão")
+		# salvar e carregar: a mochila, a roupa, a base com o baú e o relógio voltam como estavam
+		var n_pecas := construcao.pecas.filter(func(q): return not q.get("caiu", false)).size()
+		var pedras := jogador.inv.conta("pedra")
+		var bau_tab: int = (construcao.baus[int(construcao.pecas[ibau]["bau"])]["inv"] as Inventario).conta("cogumelo") if ibau >= 0 else -1
+		hora = 15.25
+		_confere(salvar_jogo(), "jogo salvo em " + ARQ_SALVO)
+		jogador.inv.tirar("pedra", pedras)
+		hora = 3.0
+		construcao.ferir_peca(ibau, 9999.0, Vector3.ZERO)
+		_confere(carregar_jogo(), "jogo carregado")
+		await _quadros(3)
+		var n_pecas2 := construcao.pecas.filter(func(q): return not q.get("caiu", false)).size()
+		_confere(n_pecas2 == n_pecas and jogador.inv.conta("pedra") == pedras and absf(hora - 15.25) < 0.01 and jogador.inv.limite == 44 and jogador.inv.protecao() >= 0.2,
+			"depois de carregar: %d de %d peças, %d pedras, %s, %d espaços, roupa no corpo" % [n_pecas2, n_pecas, jogador.inv.conta("pedra"), hora_txt(), jogador.inv.limite])
+		var bau_ok := false
+		for b in construcao.baus:
+			if not b.get("mochila", false) and (b["inv"] as Inventario).conta("cogumelo") == bau_tab and bau_tab == 5:
+				bau_ok = true
+		_confere(bau_ok, "o baú voltou com o que estava guardado (5 cogumelos)")
+		apagar_salvo()
 	# móveis dos prédios: o que tem dentro sai da tabela do jogo antigo; depois de revistado fica vazio
 	var ic := -1
 	var achou: Array = []
@@ -921,7 +1171,7 @@ func _teste() -> void:
 		await _quadros(3)
 		renascer(true)
 		await _quadros(5)
-		_confere(jogador.vivo and jogador.global_position.distance_to(construcao.sacos[0]) < 2.0, "renasceu no saco de dormir")
+		_confere(jogador.vivo and jogador.global_position.distance_to(construcao.sacos[construcao.sacos.size() - 1]) < 2.0, "renasceu no saco de dormir")
 	hora = 22.0
 	_confere(noite(), "noite às 22h")
 	if _erros.is_empty():
@@ -972,15 +1222,33 @@ func _fotos() -> void:
 	# começo do jogo: na mata ao sul da clareira
 	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
 	await _foto("01_comeco_na_mata")
-	jogador.inv.por("pedra", 120)
-	jogador.inv.por("fibra", 30)
-	jogador.inv.por("madeira", 260)
-	jogador.inv.por("machado", 1)
+	# a mochila com os ícones do jogo antigo, a roupa no corpo, o detalhe do item e a fabricação por abas
+	for e in [["mochila", 1], ["camiseta", 1], ["bermuda", 1], ["botasTrilha", 1]]:
+		jogador.inv.por(e[0], e[1])
+	for lugar in ["costas", "camiseta", "pernas", "pes"]:
+		for i in jogador.inv.limite:
+			var sv = jogador.inv.slots[i]
+			if sv != null and str(Dados.item(str(sv["id"])).get("slot", "")) == lugar:
+				jogador.inv.vestir(i)
+				break
+	for e in [["machadoPedra", 1], ["picareta", 1], ["faca", 1], ["plano", 1], ["madeira", 24], ["pedra", 18], ["graveto", 12],
+			["fibra", 20], ["corda", 3], ["tabuas", 12], ["pregos", 9], ["sucata", 5], ["pano", 6], ["feijao", 2], ["agua", 2],
+			["bandagem", 2], ["carneCrua", 2], ["frutas", 7], ["garrafa", 1]]:
+		jogador.inv.por(e[0], e[1])
 	ui.abrir(true)
+	for i in jogador.inv.limite:
+		var s2 = jogador.inv.slots[i]
+		if s2 != null and s2["id"] == "machadoPedra":
+			ui.escolhido = i
+			ui.escolhido_dono = "jog"
+			ui._detalhe("jog", i)
+	ui.atualizar()
 	await _foto("02_mochila")
+	ui._mudar_aba("armas")
+	await _foto("02b_fabricacao_armas")
 	ui.abrir(false)
 	jogador.inv = Inventario.new()
-	jogador.inv.mudou.connect(jogador._atualizar_mao)
+	jogador._ligar_inv()
 	jogador.inv.mudou.connect(ui.atualizar)
 	ui.atualizar()
 	await _cam(Vector3(14, 0, 16), Vector3(-6, 2.0, -8))
@@ -1023,8 +1291,8 @@ func _fotos() -> void:
 	# vista do alto (câmera solta): enxerga mais longe e com menos neblina que no jogo, para mostrar o mapa inteiro
 	var far0 := jogador.cam.far
 	var neb0 := amb.fog_density
-	jogador.cam.far = 2500.0
-	amb.fog_density = 0.0012
+	jogador.cam.far = 1200.0
+	amb.fog_density = 0.0018
 	await _cam_alto(Vector3(60, 140, 190), Vector3(220, 0, -20))
 	await _foto("12_mapa_do_alto")
 	jogador.cam.far = far0
@@ -1053,12 +1321,20 @@ func _fotos() -> void:
 	await _foto("13_machado_na_mao")
 	jogador.inv.tirar("machado", 1)
 	# uma base pequena montada pelo próprio sistema de construção, num lugar livre perto da clareira
-	jogador.inv.por("madeira", 900)
+	for e in [["madeira", 200], ["pedra", 200], ["tabuas", 300], ["pregos", 200], ["corda", 30], ["graveto", 60], ["fibra", 60],
+			["sucata", 40], ["pano", 30], ["mochilaExpedicao", 1]]:
+		jogador.inv.por(e[0], e[1])
+	for i in jogador.inv.limite:
+		var sm = jogador.inv.slots[i]
+		if sm != null and sm["id"] == "mochilaExpedicao":
+			jogador.inv.vestir(i)
+	jogador.inv.por("plano", 1)
+	_na_mao("plano")
 	_por_em(Vector3(livre.x, livre.y + 0.3, livre.z + 1.0))
 	await _quadros(5)
 	_olhar(jogador.global_position + Vector3(0, -0.5, -4.0))
 	await _quadros(2)
-	construcao.peca = 0
+	construcao.escolher("fundacao")
 	var a: Dictionary = construcao._calcular()
 	construcao.alvo = a
 	if not a.is_empty():
@@ -1070,28 +1346,48 @@ func _fotos() -> void:
 			var xf: Transform3D = construcao._xf_cela(b0, c.x, c.y, 0)
 			construcao.alvo = {}
 			construcao.colocar("fundacao", xf, "c|%d|%d|%d|0" % [b0["id"], c.x, c.y])
-		for w in [[1, Vector3(-1.5, 1.2 + F, 0)], [1, Vector3(0, 1.2 + F, -1.5)], [2, Vector3(4.5, 1.2 + F, 0)], [3, Vector3(3.0, 1.2 + F, -1.5)],
-				[1, Vector3(-1.5, 1.2 + F, 3.0)], [3, Vector3(0, 1.2 + F, 4.5)], [1, Vector3(3.0, 1.2 + F, 4.5)], [1, Vector3(4.5, 1.2 + F, 3.0)]]:
+		for w in [["parede", Vector3(-1.5, 1.2 + F, 0)], ["parede", Vector3(0, 1.2 + F, -1.5)], ["porta", Vector3(4.5, 1.2 + F, 0)], ["janela", Vector3(3.0, 1.2 + F, -1.5)],
+				["parede", Vector3(-1.5, 1.2 + F, 3.0)], ["janela", Vector3(0, 1.2 + F, 4.5)], ["parede", Vector3(3.0, 1.2 + F, 4.5)], ["parede", Vector3(4.5, 1.2 + F, 3.0)]]:
 			await _peca_mirando(b0, w[0], Vector3(1.5, F + 0.05, 1.5), w[1])
-		await _peca_mirando(b0, 5, Vector3(3.0, F + 0.05, 2.0), Vector3(3.0, F + 1.2, 0.4))
-		await _peca_mirando(b0, 4, Vector3(0, F + 0.05, 1.2), Vector3(0, F + 2.8, 0))
-		await _peca_mirando(b0, 4, Vector3(0, F + 0.05, 1.8), Vector3(0, F + 2.8, 3.0))
+		await _peca_mirando(b0, "escada", Vector3(3.0, F + 0.05, 2.0), Vector3(3.0, F + 1.2, 0.4))
+		await _peca_mirando(b0, "piso", Vector3(0, F + 0.05, 1.2), Vector3(0, F + 2.8, 0))
+		await _peca_mirando(b0, "piso", Vector3(0, F + 0.05, 1.8), Vector3(0, F + 2.8, 3.0))
+		# dentro: bancada, baú, colchão e lamparina; fora: fogueira, barricada, estacas, muro e o alarme de latas
+		await _obra_em("bancadaTrab", b0["xf"] * Vector3(0.0, F + 0.05, 2.6), b0["xf"] * Vector3(0.0, F, 0.9))
+		await _obra_em("bau", b0["xf"] * Vector3(1.0, F + 0.05, 2.0), b0["xf"] * Vector3(1.0, F, 3.6))
+		await _obra_em("cama", b0["xf"] * Vector3(-0.2, F + 0.05, 2.2), b0["xf"] * Vector3(-0.8, F, 3.4))
+		await _obra_em("lamparina", b0["xf"] * Vector3(0.6, F + 0.05, 1.2), b0["xf"] * Vector3(1.0, F, 0.0))
+		var fx: Transform3D = b0["xf"]
+		await _obra_em("fogueira", fx * Vector3(-6.0, 0.3, 1.5), fx * Vector3(-4.0, 0.0, 1.5))
+		await _obra_em("barricada", fx * Vector3(9.0, 0.3, 2.0), fx * Vector3(7.5, 0.0, 1.5))
+		await _obra_em("estacas", fx * Vector3(9.0, 0.3, 6.5), fx * Vector3(7.0, 0.0, 6.0))
+		await _obra_em("muro", fx * Vector3(1.5, 0.3, -6.5), fx * Vector3(1.5, 0.0, -4.5))
+		await _obra_em("latas", fx * Vector3(-3.5, 0.3, -6.0), fx * Vector3(-3.5, 0.0, -4.0))
+		await _obra_em("bancadaTrab", fx * Vector3(-7.0, 0.3, 6.0), fx * Vector3(-5.0, 0.0, 6.5))
+		await _obra_em("fornalha", fx * Vector3(-7.0, 0.3, 9.0), fx * Vector3(-5.0, 0.0, 9.5))
 		var fora: Vector3 = b0["xf"] * Vector3(-7.0, 0, 9.0)
 		var centro: Vector3 = b0["xf"] * Vector3(1.5, 2.0, 1.5)
+		# a prévia da construção (o plano na mão) e a barra das peças
+		construcao.escolher("palicada")
+		_na_mao("plano")
+		_por_em(fx * Vector3(-2.0, 0.3, 11.0))
+		await _quadros(4)
+		_olhar(fx * Vector3(-2.0, 0.0, 7.0))
+		await _quadros(4)
+		await _foto("14b_construindo_com_o_plano")
+		jogador.selecionar(4)
 		hora = 17.4
 		_nascer(b0["xf"] * Vector3(8.0, 0, 6.0), false)
 		_nascer(b0["xf"] * Vector3(6.0, 0, 10.0), false)
 		await _cam(fora, centro, false)
 		await _foto("14_base_fim_de_tarde")
-		hora = 21.5
-		jogador.inv.por("fogueira", 1)
-		_por_em(b0["xf"] * Vector3(-4.0, 0.3, 1.5))
-		jogador.global_position.y = terreno.h(jogador.global_position.x, jogador.global_position.z) + 0.3
+		# dentro da base: bancada, baú, colchão e lamparina
+		_por_em(b0["xf"] * Vector3(1.4, F + 0.05, 3.9))
 		await _quadros(4)
-		_olhar(jogador.global_position + Vector3(0, -1.2, -1.8))
-		await _quadros(2)
-		construcao.por_fogueira(jogador)
-		await _cam(b0["xf"] * Vector3(-9.0, 0, -2.0), b0["xf"] * Vector3(-3.0, 1.0, 1.5), false)
+		_olhar(b0["xf"] * Vector3(0.2, F + 0.7, 0.6))
+		await _foto("14c_dentro_da_base")
+		hora = 21.5
+		await _cam(b0["xf"] * Vector3(-11.0, 0, -2.0), b0["xf"] * Vector3(-5.0, 1.0, 1.5), false)
 		await _foto("15_noite_fogueira")
 	jogador.selecionar(5)
 	hora = 10.0

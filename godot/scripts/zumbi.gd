@@ -19,6 +19,8 @@ var preso_t := 0.0
 var ultima := Vector3.ZERO
 var alvo_peca := -1        # peça da base que está no caminho (o zumbi bate nela)
 var ponto_peca := Vector3.ZERO
+var lento := 0.0           # estaca ou arame farpado: anda devagar por um tempo
+var preso_arm := 0.0       # armadilha de mandíbula: parado por um tempo
 var desvio := 0.0          # preso numa árvore ou pedra: anda de lado um pouco
 var lado := 1.0
 
@@ -73,6 +75,14 @@ func ferir(dano: float, de: Vector3) -> void:
 	velocity += (global_position - de).normalized() * 2.0
 	if vida <= 0.0:
 		morrer()
+
+
+func atrasar(t: float) -> void:
+	lento = maxf(lento, t)
+
+
+func prender(t: float) -> void:
+	preso_arm = maxf(preso_arm, t)
 
 
 func morrer() -> void:
@@ -154,6 +164,13 @@ func _physics_process(dt: float) -> void:
 				j.ferir(11.0 if not corredor else 9.0)
 		if golpe_t > 1.2:
 			golpe_t = -1.0
+	# armadilhas da base
+	if preso_arm > 0.0:
+		preso_arm -= dt
+		vel = 0.0
+	elif lento > 0.0:
+		lento -= dt
+		vel *= 0.35
 	velocity.x = dir.x * vel
 	velocity.z = dir.z * vel
 	if not is_on_floor():
