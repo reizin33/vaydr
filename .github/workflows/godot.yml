@@ -97,6 +97,19 @@ jobs:
           grep -h -E "^FALHA|TESTE REDE.*FALHOU|SCRIPT ERROR|Parse Error|Invalid |at: " rede_anf.log rede_conv.log | awk '!visto[$0]++' | head -24 | while IFS= read -r l; do echo "::error title=Rede::${l//%/%25}"; done
           grep -q "TESTE REDE ANFITRIAO OK" rede_anf.log && grep -q "TESTE REDE CONVIDADO OK" rede_conv.log
 
+      # os registros dos testes saem logo (dá para ler enquanto as fotos ainda estão sendo tiradas)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: testes
+          path: |
+            importar.log
+            teste.log
+            rede_anf.log
+            rede_conv.log
+          if-no-files-found: ignore
+          retention-days: 5
+
       - name: Fotos (OpenGL por software)
         if: ${{ always() && (github.event_name == 'push' || inputs.fotos) }}
         run: |
