@@ -83,4 +83,5 @@ def main():
                                                              os.path.getsize(saida + '.bin') / 1e6))
 
 
-main()
+if __name__ == '__main__':
+    main()

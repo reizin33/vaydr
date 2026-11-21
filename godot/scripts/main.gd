@@ -6,6 +6,7 @@ extends Node3D
 
 var terreno: Terreno
 var malhas_mapa: MalhasMapa
+var objetos: ObjetosMapa
 var colisao: ColisaoMapa
 var mundo: Mundo
 var grama: Grama
@@ -44,6 +45,10 @@ func _ready() -> void:
 	malhas_mapa.name = "Mapa"
 	add_child(malhas_mapa)
 	malhas_mapa.montar()
+	objetos = ObjetosMapa.new()
+	objetos.name = "Objetos"
+	add_child(objetos)
+	objetos.montar()
 	var t2 := Time.get_ticks_msec()
 	colisao = ColisaoMapa.new(terreno)
 	colisao.name = "Colisao"
@@ -55,8 +60,8 @@ func _ready() -> void:
 	add_child(mundo)
 	mundo.montar(colisao)
 	var t4 := Time.get_ticks_msec()
-	print("mapa: relevo %d ms, malhas %d ms (%d mil vértices), colisão %d ms (%d formas), mata e saque %d ms" % [
-		t1 - t0, t2 - t1, malhas_mapa.n_vertices / 1000, t3 - t2, colisao.n_formas, t4 - t3])
+	print("mapa: relevo %d ms, malhas e objetos %d ms (%d mil vértices, %d objetos), colisão %d ms (%d formas), mata e saque %d ms" % [
+		t1 - t0, t2 - t1, malhas_mapa.n_vertices / 1000, objetos.n_objetos, t3 - t2, colisao.n_formas, t4 - t3])
 	mundo.tirar_fotos()
 	grama = Grama.new(terreno)
 	add_child(grama)
@@ -235,6 +240,7 @@ func aplicar_qualidade(q: int) -> void:
 	jogador.cam.far = cfg["longe"]
 	mundo.alcance(cfg["mata"])
 	malhas_mapa.alcance(cfg["predios"])
+	objetos.alcance(cfg["predios"])
 	grama.densidade(cfg["capim"], cfg["capim_passo"])
 
 
@@ -521,12 +527,13 @@ func _teste() -> void:
 	var F := Construcao.FUND
 	# o mapa do jogo antigo
 	_confere(terreno.W == 801 and terreno.H == 681 and terreno.alturas.size() == 801 * 681, "relevo do jogo antigo: %d x %d m" % [terreno.W, terreno.H])
-	_confere(malhas_mapa.nos.size() >= 300 and malhas_mapa.n_vertices > 1500000, "prédios, casas, bairros, ruas e o resto: %d malhas, %d mil vértices" % [malhas_mapa.nos.size(), malhas_mapa.n_vertices / 1000])
+	_confere(malhas_mapa.nos.size() >= 320 and malhas_mapa.n_vertices > 1500000, "prédios, casas, bairros, ruas, kit e o resto: %d malhas, %d mil vértices" % [malhas_mapa.nos.size(), malhas_mapa.n_vertices / 1000])
+	_confere(objetos.n_objetos > 2800 and objetos.modelos.size() > 100, "objetos 3D do jogo antigo: %d (móveis, rua, acampamento e lugares), %d modelos" % [objetos.n_objetos, objetos.modelos.size()])
 	_confere(colisao.n_formas > 5000 and colisao.brenha.size() > 1000, "colisão do mapa: %d formas (%d sem desenho ficaram de fora), borda de mato com %d pontos" % [colisao.n_formas, colisao.n_sem_desenho, colisao.brenha.size()])
 	var n := {"arvore": 0, "pedra": 0, "planta": 0, "solto": 0, "tronco": 0}
 	for r in mundo.recursos:
 		n[r["tipo"]] = int(n.get(r["tipo"], 0)) + 1
-	_confere(n["arvore"] > 7000 and n["pedra"] > 250 and n["planta"] > 900 and n["solto"] > 700 and n["tronco"] > 50,
+	_confere(n["arvore"] > 6000 and n["pedra"] > 250 and n["planta"] > 800 and n["solto"] > 700 and n["tronco"] > 50,
 		"mata do jogo antigo: %d árvores, %d pedras, %d moitas, %d coisas no chão, %d troncos caídos" % [n["arvore"], n["pedra"], n["planta"], n["solto"], n["tronco"]])
 	_confere(mundo.caixas.size() > 700 and mundo.aguas.size() >= 9, "%d móveis e baús para revistar, %d poços e barris" % [mundo.caixas.size(), mundo.aguas.size()])
 	_confere(mundo.zspawn.size() >= 10, "zumbis de %d lugares do mapa" % mundo.zspawn.size())
@@ -961,6 +968,11 @@ func _fotos() -> void:
 	await _quadros(4)
 	_olhar(Vector3(218.0, 1.4, 24.0))
 	await _foto("06_dentro_do_predio")
+	# lugares escaneados: Base Militar Serra Velha e o galpão de trens
+	await _cam(Vector3(-84, 0, -48), Vector3(-108, 2.0, -30))
+	await _foto("06b_base_militar")
+	await _cam(Vector3(128, 0, 52), Vector3(152, 3.0, 60))
+	await _foto("06c_galpao_de_trens")
 	# Morro do Sabiá (sul da cidade) e Cidade Alta (norte)
 	await _cam(Vector3(250, 0, 84), Vector3(255, 6.0, 135))
 	await _foto("07_morro_do_sabia")

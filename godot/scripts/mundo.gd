@@ -88,7 +88,8 @@ func _chave(p: Vector3, pedaco: float) -> Vector2i:
 ## guarda uma instância para montar depois (as MultiMesh nascem com o número certo); ini/fim: distâncias em que aparece
 func _instancia(chave_m: String, xf: Transform3D, ini: float, fim: float, sombra: bool, pedaco := PEDACO, extra := Color(0, 0, 0, 0), ref = null) -> Array:
 	# as versões de uma árvore vão no mesmo pedaço (o do pé dela): numa distância só uma delas aparece
-	var k := _chave(xf.origin if ref == null else (ref as Vector3), pedaco)
+	var base: Vector3 = xf.origin if ref == null else ref
+	var k := _chave(base, pedaco)
 	var id := "%s|%d|%d|%d|%d" % [chave_m, int(pedaco), k.x, k.y, int(ini)]
 	if not _pend.has(id):
 		_pend[id] = {"m": chave_m, "xfs": [], "cor": [], "ini": ini, "fim": fim, "sombra": sombra}
@@ -349,7 +350,7 @@ func _desbastar(arr: Array, fracao: float, cresce: float) -> Array:
 	var nids := PackedInt32Array()
 	for t in range(0, ids.size(), 3):
 		if fica.has(raiz[ids[t]]):
-			nids.append_array([ids[t], ids[t + 1], ids[t + 2]])
+			nids.append_array(PackedInt32Array([ids[t], ids[t + 1], ids[t + 2]]))
 	var novo := arr.duplicate()
 	novo[Mesh.ARRAY_VERTEX] = nvs
 	novo[Mesh.ARRAY_INDEX] = nids

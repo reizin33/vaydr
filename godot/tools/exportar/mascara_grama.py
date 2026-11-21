@@ -3,8 +3,10 @@ Tira o capim de: água (rio, lago, mar), areia da praia, terra batida e estradas
 feito pelo homem: o piso, a calçada, a rua e a parede de cada malha do mapa que encosta no chão (prédios, casas, ruas da
 cidade, cais, ferrovia...). A borda de cada área sem capim cresce 1 m (a touceira tem 0,7 m de largura).
 Uso: python3 -I mascara_grama.py <pasta dados/mapa>"""
-import json, os, sys, zlib
+import json, os, sys
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from malhas_mundo import triangulos_do_mundo
 
 pasta = sys.argv[1]
 meta = json.load(open(os.path.join(pasta, 'mapa.json')))
@@ -60,59 +62,37 @@ def h_em(x, z):
     return rel[j, i]
 
 
-# malhas do mapa: todo triângulo que encosta no chão vira "sem capim" (a projeção dele no chão)
-def triangulos(nome):
-    idx = json.load(open(os.path.join(pasta, 'malhas', nome + '.json'), encoding='utf-8'))
-    f = open(os.path.join(pasta, 'malhas', nome + '.bin'), 'rb')
-    for r in idx:
-        if r.get('lod') in ('longe',):
-            continue
-        f.seek(r['off'])
-        bruto = zlib.decompress(f.read(r['tz']))
-        nu, ni = r['nu'], r['ni']
-        pos = np.frombuffer(bruto, '<f4', nu * 3, 0).reshape(nu, 3).astype(np.float64)
-        o = nu * 12 + nu * 8 + (nu * 8 if r['uv'] else 0)
-        ids = np.frombuffer(bruto, '<u4', ni, o).reshape(-1, 3)
-        if 'xf' in r:
-            ox, oz, yaw = r['xf']
-            c, s = np.cos(yaw), np.sin(yaw)
-            x = pos[:, 0] * c + pos[:, 2] * s + ox
-            z = -pos[:, 0] * s + pos[:, 2] * c + oz
-            pos = np.stack([x, pos[:, 1], z], 1)
-        elif 'pos' in r:
-            pos = pos + np.array(r['pos'], float)
-        yield pos[ids]
-
-
+# malhas do mapa (prédios, casas, ruas, kit, móveis, objetos da rua e lugares): todo triângulo que encosta no chão vira
+# "sem capim" (a projeção dele no chão)
 total = 0
-for grupo in ('estaticos', 'predios', 'bairros'):
-    for T in triangulos(grupo):
-        cx = T[:, :, 0].mean(1)
-        cz = T[:, :, 2].mean(1)
-        g = h_em(cx, cz)
-        ymin = T[:, :, 1].min(1)
-        ymax = T[:, :, 1].max(1)
-        perto = (ymin < g + 1.2) & (ymax > g - 3.0)
-        T = T[perto]
-        if not len(T):
-            continue
-        total += len(T)
-        xz = T[:, :, [0, 2]]
-        tam = np.max(xz.max(1) - xz.min(1), axis=1)
-        k = np.maximum(1, np.ceil(tam / 0.4)).astype(np.int64)
-        # agrupa por número de divisões (potências de 2) e amostra cada triângulo numa grade baricêntrica
-        kk = np.power(2, np.ceil(np.log2(k))).astype(np.int64)
-        for q in np.unique(kk):
-            sel = xz[kk == q]
-            u, v = np.meshgrid(np.arange(q + 1), np.arange(q + 1))
-            m = (u + v) <= q
-            w1 = (u[m] / q)[None, :, None]
-            w2 = (v[m] / q)[None, :, None]
-            w0 = 1.0 - w1 - w2
-            for a in range(0, len(sel), max(1, 2_000_000 // max(1, m.sum()))):
-                bloco = sel[a:a + max(1, 2_000_000 // max(1, m.sum()))]
-                pts = bloco[:, 0:1] * w0 + bloco[:, 1:2] * w1 + bloco[:, 2:3] * w2
-                marcar(pts.reshape(-1, 2))
+for T in triangulos_do_mundo(pasta):
+    cx = T[:, :, 0].mean(1)
+    cz = T[:, :, 2].mean(1)
+    g = h_em(cx, cz)
+    ymin = T[:, :, 1].min(1)
+    ymax = T[:, :, 1].max(1)
+    perto = (ymin < g + 1.2) & (ymax > g - 3.0)
+    T = T[perto]
+    if not len(T):
+        continue
+    total += len(T)
+    xz = T[:, :, [0, 2]]
+    tam = np.max(xz.max(1) - xz.min(1), axis=1)
+    k = np.maximum(1, np.ceil(tam / 0.4)).astype(np.int64)
+    # agrupa por número de divisões (potências de 2) e amostra cada triângulo numa grade baricêntrica
+    kk = np.power(2, np.ceil(np.log2(k))).astype(np.int64)
+    for q in np.unique(kk):
+        sel = xz[kk == q]
+        u, v = np.meshgrid(np.arange(q + 1), np.arange(q + 1))
+        m = (u + v) <= q
+        w1 = (u[m] / q)[None, :, None]
+        w2 = (v[m] / q)[None, :, None]
+        w0 = 1.0 - w1 - w2
+        passo = max(1, 2_000_000 // max(1, int(m.sum())))
+        for a in range(0, len(sel), passo):
+            bloco = sel[a:a + passo]
+            pts = bloco[:, 0:1] * w0 + bloco[:, 1:2] * w1 + bloco[:, 2:3] * w2
+            marcar(pts.reshape(-1, 2))
 
 # cresce a área sem capim em 1 m
 b = bloq.copy()

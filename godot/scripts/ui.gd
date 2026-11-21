@@ -276,11 +276,48 @@ func _montar_menu(raiz: Control) -> void:
 	teclas.autowrap_mode = TextServer.AUTOWRAP_WORD
 	teclas.custom_minimum_size = Vector2(620, 0)
 	v.add_child(teclas)
+	var cred := Button.new()
+	cred.text = "Créditos dos modelos 3D"
+	v.add_child(cred)
 	var sair := Button.new()
 	sair.text = "Sair do jogo"
 	sair.pressed.connect(func(): get_tree().quit())
 	v.add_child(sair)
+	# créditos: os modelos escaneados com licença CC BY pedem o nome do autor na tela
+	var painel := PanelContainer.new()
+	painel.add_theme_stylebox_override("panel", _estilo(Color(0.04, 0.05, 0.04, 0.97)))
+	_ancorar(painel, Control.PRESET_CENTER, Rect2(-360, -300, 720, 600))
+	painel.visible = false
+	raiz.add_child(painel)
+	var vc := VBoxContainer.new()
+	vc.add_theme_constant_override("separation", 8)
+	painel.add_child(vc)
+	vc.add_child(_lbl("Créditos dos modelos 3D", 22))
+	var rolo := ScrollContainer.new()
+	rolo.custom_minimum_size = Vector2(680, 470)
+	vc.add_child(rolo)
+	var txt := _lbl(_creditos(), 14, Color(0.8, 0.82, 0.78))
+	txt.autowrap_mode = TextServer.AUTOWRAP_WORD
+	txt.custom_minimum_size = Vector2(660, 0)
+	rolo.add_child(txt)
+	var volta := Button.new()
+	volta.text = "Voltar"
+	volta.pressed.connect(func(): painel.visible = false)
+	vc.add_child(volta)
+	cred.pressed.connect(func(): painel.visible = true)
 	_aplicar_tudo()
+
+
+func _creditos() -> String:
+	var t := "Lugares escaneados (galpão, bunker, prédios, casa, ruína, carros, Base Militar):\n"
+	var o = JSON.parse_string(FileAccess.get_file_as_string("res://dados/mapa/objetos3d.json"))
+	if o is Dictionary and o.has("creditos"):
+		for k in o["creditos"]["lugares"]:
+			t += "  · %s\n" % str(o["creditos"]["lugares"][k])
+	t += "\nPeças de fachada e telhado da cidade: Post Apocalypse Kitbash (versão gratuita), de Oleg Ushenok\n"
+	t += "Árvores, plantas, pedras, móveis e objetos da rua: Poly Haven (CC0)\n"
+	t += "Zumbi e animações: Mixamo\n"
+	return t
 
 
 func _carregar() -> void:

@@ -210,15 +210,15 @@ func _pedaco(ci: int, cj: int, passo: int) -> ArrayMesh:
 		bordas.append(0)
 		var base := vs.size()
 		for k in bordas.size():
-			var q: int = bordas[k]
-			vs.append(vs[q] - Vector3(0, 1.5 * passo, 0))
-			ns.append(ns[q])
+			var qb: int = bordas[k]
+			vs.append(vs[qb] - Vector3(0, 1.5 * passo, 0))
+			ns.append(ns[qb])
 		for k in bordas.size() - 1:
 			var q0: int = bordas[k]
 			var q1: int = bordas[k + 1]
 			var s0 := base + k
 			var s1 := base + k + 1
-			ids.append_array([q0, s1, q1, q0, s0, s1, q0, q1, s1, q0, s1, s0])
+			ids.append_array(PackedInt32Array([q0, s1, q1, q0, s0, s1, q0, q1, s1, q0, s1, s0]))
 	var arr := []
 	arr.resize(Mesh.ARRAY_MAX)
 	arr[Mesh.ARRAY_VERTEX] = vs
@@ -381,8 +381,8 @@ func _agua_doce() -> void:
 			var z := Z0 + j * P
 			var e := P * 0.5 + 0.35
 			var b := vs.size()
-			vs.append_array([Vector3(x - e, y, z - e), Vector3(x + e, y, z - e), Vector3(x + e, y, z + e), Vector3(x - e, y, z + e)])
-			ids.append_array([b, b + 1, b + 2, b, b + 2, b + 3])
+			vs.append_array(PackedVector3Array([Vector3(x - e, y, z - e), Vector3(x + e, y, z - e), Vector3(x + e, y, z + e), Vector3(x - e, y, z + e)]))
+			ids.append_array(PackedInt32Array([b, b + 1, b + 2, b, b + 2, b + 3]))
 	if vs.is_empty():
 		return
 	var arr := []

@@ -8,7 +8,7 @@ extends Node3D
 
 const PEDACO := 64.0
 # colisores que outra parte já faz (árvore, pedra e tronco caído: o Mundo) ou que ainda não têm desenho no Godot
-const PULAR := ["tree", "rock", "tronco", "lugar", "kit", "sub", "lugar,sub", "portaSub,sub", "gruta", "carro,veic"]
+const PULAR := ["tree", "rock", "tronco", "sub", "lugar,sub", "portaSub,sub", "gruta", "carro,veic"]
 var terreno: Terreno
 var corpos := {}      # chave do pedaço -> StaticBody3D
 var n_formas := 0

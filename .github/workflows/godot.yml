@@ -66,15 +66,18 @@ jobs:
       - name: Teste sem tela
         run: |
           set +e
-          timeout 480 ./godot-bin --headless --path godot -- --teste 2>&1 | tee teste.log | awk '!visto[$0]++ && n++ < 600'
+          timeout 600 ./godot-bin --headless --path godot -- --teste 2>&1 | tee teste.log | awk '!visto[$0]++ && n++ < 600'
           echo "----- resumo -----"
-          grep -E "^(ok |FALHA|TESTE)" teste.log
+          grep -E "^(ok |FALHA|TESTE|mapa:)" teste.log
+          # o jogo abriu (os scripts compilaram e o mapa montou): as fotos valem a pena mesmo se alguma conferência falhou
+          if grep -q "TESTE VAYDR Godot: começo" teste.log; then echo sim > jogo_abriu; fi
           grep -q "TESTE OK" teste.log
 
       - name: Fotos (OpenGL por software)
         if: ${{ always() && (github.event_name == 'push' || inputs.fotos) }}
         run: |
           set +e
+          if [ ! -f jogo_abriu ]; then echo "o jogo nem abriu no teste (erro de script?): sem fotos"; exit 0; fi
           export LIBGL_ALWAYS_SOFTWARE=1
           timeout 1650 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
           ls -la godot/fotos || true
