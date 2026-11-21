@@ -44,7 +44,8 @@ const SEG_POR_HORA := 50.0
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	modo_teste = "--teste" in args or "--fotos" in args
+	modo_teste = "--teste" in args or "--fotos" in args or "--teste-rede" in args or "--fotos-rede" in args
+	Rede.ligar(self)
 	Dados.carregar()
 	Ajustes.carregar()
 	_teclas()
@@ -118,8 +119,17 @@ func _ready() -> void:
 		_teste.call_deferred()
 	elif "--fotos" in args:
 		_entrar_teste()
-		_vigia(1500.0, "FOTOS")
+		_vigia(2400.0, "FOTOS")
 		_fotos.call_deferred()
+	elif "--teste-rede" in args or "--fotos-rede" in args:
+		# a partida em rede de verdade: dois jogos neste computador (quem abriu e quem entrou), cada um no seu mundo de teste
+		var papel := str(args[args.find("--teste-rede" if "--teste-rede" in args else "--fotos-rede") + 1]) if args.size() > 1 else "anfitriao"
+		arq_salvo = "user://teste_rede_%s.json" % papel
+		mundo_atual = {"id": "teste_rede", "nome": "Mundo de teste", "arq": arq_salvo}
+		em_jogo = true
+		mundo_sujo = true
+		var t := TesteRede.new(self, papel, "--fotos-rede" in args)
+		add_child(t)
 	else:
 		# o mundo fica parado (e sem o HUD) até alguém escolher um mundo no lobby
 		get_tree().paused = true
@@ -296,8 +306,9 @@ func _ciclo() -> void:
 func _process(dt: float) -> void:
 	if not pronto or not em_jogo:
 		return
+	var digitando: bool = Rede.digitando or Rede.chat_acabou_de_fechar()
 	# teclas do jogo: B constrói, F lanterna, H esconde os comandos
-	if jogador.vivo and not ui.aberto and telas.atual == "":
+	if jogador.vivo and not ui.aberto and telas.atual == "" and not digitando:
 		if Input.is_action_just_pressed("construir"):
 			jogador.construir()
 		if Input.is_action_just_pressed("lanterna"):
@@ -318,21 +329,27 @@ func _process(dt: float) -> void:
 			ui.aviso("Amanheceu: dia %d" % dia, 5.0)
 	_ciclo()
 	terreno.mare(hora)
-	# zumbis: os de cada lugar (vila, posto, fazenda, sítios...) aparecem quando você chega perto; fora isso, alguns
-	# andam pela mata e pela cidade (mais de noite), nascendo longe e fora da vista
-	if not modo_teste:
+	# zumbis: os de cada lugar (vila, posto, fazenda, sítios...) aparecem quando alguém chega perto; fora isso, alguns
+	# andam pela mata e pela cidade (mais de noite), nascendo longe e fora da vista de cada um. Na partida em rede quem decide
+	# é o jogo de quem abriu: no convidado os zumbis são bonecos que vêm de lá
+	var conv: bool = Rede.convidado()
+	if not modo_teste and not conv:
 		_zumbis_dos_lugares(dt)
 	spawn_t -= dt
 	if spawn_t <= 0.0:
 		spawn_t = 12.0
 		zumbis = zumbis.filter(func(z): return is_instance_valid(z))
-		var soltos := zumbis.filter(func(z): return z.estado != "morto" and not z.has_meta("lugar")).size()
-		var teto := 10 if noite() else 5
-		if na_cidade(jogador.global_position):
-			teto += 4
-		if soltos < teto and jogador.vivo:
-			_nascer_perto()
-	if Input.is_action_just_pressed("mochila") and jogador.vivo:
+		if not conv:
+			for q in jogadores_vivos():
+				var p: Vector3 = q["p"]
+				var soltos := zumbis.filter(func(z): return z.estado != "morto" and not z.has_meta("lugar") and not z.lan \
+					and Vector2(z.global_position.x - p.x, z.global_position.z - p.z).length() < 75.0).size()
+				var teto := 10 if noite() else 5
+				if na_cidade(p):
+					teto += 4
+				if soltos < teto:
+					_nascer_perto(p, q["frente"])
+	if Input.is_action_just_pressed("mochila") and jogador.vivo and not digitando:
 		ui.abrir(not ui.aberto)
 	if not modo_teste:
 		if Input.is_action_just_pressed("salvar") and jogador.vivo:
@@ -389,6 +406,7 @@ func chao_em(x: float, z: float, de_cima := 90.0) -> Dictionary:
 
 func _nascer(p: Vector3, corre: bool) -> Zumbi:
 	var z := Zumbi.new(self, corre)
+	z.uid = Rede.novo_uid()
 	add_child(z)
 	var y: float = chao_em(p.x, p.z, terreno.h(p.x, p.z) + 2.5)["y"]
 	z.global_position = Vector3(p.x, y + 0.15, p.z)
@@ -396,32 +414,74 @@ func _nascer(p: Vector3, corre: bool) -> Zumbi:
 	return z
 
 
-## nasce um zumbi longe e fora da vista: no chão de terra ou na rua (nunca em cima de telhado, dentro d'água ou fora do mapa)
-func _nascer_perto() -> void:
+## nasce um zumbi longe de alguém e fora da vista dele: no chão de terra ou na rua (nunca em cima de telhado, dentro d'água
+## ou fora do mapa)
+func _nascer_perto(centro: Vector3, frente: Vector3) -> void:
 	for t in 14:
 		var a := randf() * TAU
 		var r := randf_range(32.0, 55.0)
-		var p := jogador.global_position + Vector3(cos(a), 0, sin(a)) * r
+		var p := centro + Vector3(cos(a), 0, sin(a)) * r
 		if not terreno.dentro(p.x, p.z) or terreno.tipo_agua(p.x, p.z) != 0:
 			continue
 		var c := chao_em(p.x, p.z)
 		if absf(float(c["y"]) - terreno.h(p.x, p.z)) > 0.6:
 			continue
-		var frente := -jogador.cam.global_transform.basis.z
-		if frente.dot((p - jogador.global_position).normalized()) > 0.5 and t < 9:
+		if frente.dot((p - centro).normalized()) > 0.5 and t < 9:
+			continue
+		# nem na frente de outro jogador
+		var visto := false
+		for q in jogadores_vivos():
+			var pq: Vector3 = q["p"]
+			if pq.distance_to(p) < 28.0:
+				visto = true
+		if visto and t < 12:
 			continue
 		_nascer(p, noite() and randf() < 0.4)
 		return
 
 
-## os zumbis de cada lugar do mapa (os mesmos pontos do jogo antigo): aparecem quando você chega a 120 m e somem quando
-## você vai para longe (os que não estão caçando); o lugar se enche de novo 4 minutos depois
+## quem está no mundo e de pé: você e, na partida em rede, os amigos que estão num mundo (onde está e para onde olha)
+func jogadores_vivos() -> Array:
+	var L := []
+	if jogador.vivo:
+		L.append({"p": jogador.global_position, "frente": -jogador.cam.global_transform.basis.z})
+	if Rede.anfitriao():
+		for b in Rede.no_mundo():
+			if b.vivo:
+				L.append({"p": b.alvo, "frente": Vector3(-sin(b.yaw_r), 0, -cos(b.yaw_r))})
+	return L
+
+
+## o alvo de um zumbi: quem estiver mais perto (você ou um amigo da partida em rede que está no mundo, de pé e no mesmo andar)
+func alvo_zumbi(z: Node3D):
+	var melhor = jogador
+	var zp := z.global_position
+	var bd := INF
+	if jogador.vivo:
+		bd = Vector2(jogador.global_position.x - zp.x, jogador.global_position.z - zp.z).length() - 0.3
+	if Rede.anfitriao() and not Rede.jog.is_empty():
+		for b in Rede.no_mundo():
+			if not b.vivo or absf(b.alvo.y - zp.y) > 6.0:
+				continue
+			var d := Vector2(b.alvo.x - zp.x, b.alvo.z - zp.z).length()
+			if d < bd:
+				bd = d
+				melhor = b
+	return melhor
+
+
+## os zumbis de cada lugar do mapa (os mesmos pontos do jogo antigo): aparecem quando alguém chega a 120 m e somem quando
+## todos vão para longe (os que não estão caçando); o lugar se enche de novo 4 minutos depois
 func _zumbis_dos_lugares(dt: float) -> void:
 	_lugares_t -= dt
 	if _lugares_t > 0.0:
 		return
 	_lugares_t = 1.5
-	var pj := Vector2(jogador.global_position.x, jogador.global_position.z)
+	# onde cada um está (você mesmo caído conta para o lugar não sumir; para encher, só quem está de pé)
+	var pos: Array = [[Vector2(jogador.global_position.x, jogador.global_position.z), jogador.vivo]]
+	if Rede.anfitriao():
+		for b in Rede.no_mundo():
+			pos.append([Vector2(b.alvo.x, b.alvo.z), b.vivo])
 	for id in mundo.zspawn:
 		var pts: Array = mundo.zspawn[id]
 		if pts.is_empty():
@@ -430,12 +490,18 @@ func _zumbis_dos_lugares(dt: float) -> void:
 		for q in pts:
 			c += Vector2(float(q[0]), float(q[1]))
 		c /= float(pts.size())
-		var d := pj.distance_to(c)
+		var d := INF
+		var d_vivo := INF
+		for e in pos:
+			var dd: float = (e[0] as Vector2).distance_to(c)
+			d = minf(d, dd)
+			if e[1]:
+				d_vivo = minf(d_vivo, dd)
 		if not lugares_z.has(id):
 			lugares_z[id] = {"ativo": false, "zumbis": [], "volta": 0.0}
 		var L: Dictionary = lugares_z[id]
 		L["volta"] = maxf(0.0, float(L["volta"]) - 1.5)
-		if not L["ativo"] and d < 120.0 and float(L["volta"]) <= 0.0 and jogador.vivo:
+		if not L["ativo"] and d_vivo < 120.0 and float(L["volta"]) <= 0.0:
 			L["ativo"] = true
 			var zs := []
 			for q in pts:
@@ -452,13 +518,155 @@ func _zumbis_dos_lugares(dt: float) -> void:
 			L["zumbis"] = []
 
 
-## o zumbi pode deixar alguma coisa no chão (a tabela "zumbi" do jogo antigo: pano, munição, sucata)
-func zumbi_morreu(z) -> void:
+## o zumbi pode deixar alguma coisa no chão (a tabela "zumbi" do jogo antigo: pano, munição, sucata); na partida em rede, quem
+## matou leva: se foi um amigo, o saque cai no mundo dele
+func zumbi_morreu(z, quem := 0) -> void:
+	if quem != 0 and Rede.anfitriao():
+		Rede.matou_z(quem, z.global_position)
+		return
+	_saque_zumbi(z.global_position)
+
+
+func _saque_zumbi(p: Vector3) -> void:
 	stats["zumbis"] = int(stats.get("zumbis", 0)) + 1
 	var L: Array = mundo.sortear("zumbi")
 	if not L.is_empty():
-		construcao.soltar_no_chao(z.global_position, L)
+		construcao.soltar_no_chao(p, L)
 		ui.aviso("O zumbi deixou alguma coisa no chão")
+
+
+# ======================================================================== partida em rede (rede.gd)
+var z_rede := {}   # convidado: uid -> o boneco de cada zumbi de quem abriu
+
+
+## convidado: a hora e os zumbis de quem abriu (h < 0: quem abriu está no lobby)
+func mundo_rede(h: float, L: PackedFloat32Array) -> void:
+	if h >= 0.0:
+		h = fposmod(h, 24.0)
+		if h < hora - 12.0:
+			dia += 1
+		hora = h
+	var vistos := {}
+	for i in int(L.size() / 9.0):
+		var b := i * 9
+		var uid := int(L[b])
+		var p := Vector3(L[b + 1], L[b + 2], L[b + 3])
+		var st := int(L[b + 5])
+		if not (is_finite(p.x) and is_finite(p.y) and is_finite(p.z)):
+			continue
+		vistos[uid] = true
+		var z = z_rede.get(uid)
+		if z != null and not is_instance_valid(z):
+			z = null
+		if z == null:
+			if st == 3:
+				continue   # já caiu lá: não nasce boneco só para cair
+			z = Zumbi.new(self, L[b + 8] > 0.5)
+			z.lan = true
+			z.uid = uid
+			add_child(z)
+			z.global_position = p
+			z.rotation.y = L[b + 4]
+			z.lan_alvo = p
+			zumbis.append(z)
+			z_rede[uid] = z
+		z.rede(p, L[b + 4], st, L[b + 6], L[b + 7])
+	for uid in z_rede.keys():
+		if not vistos.has(uid):
+			var z = z_rede[uid]
+			if is_instance_valid(z):
+				z.queue_free()
+			z_rede.erase(uid)
+
+
+## convidado: entrou na partida (os zumbis daqui somem: vêm todos de quem abriu)
+func rede_entrou() -> void:
+	for z in zumbis:
+		if is_instance_valid(z) and not z.lan:
+			z.queue_free()
+	zumbis = zumbis.filter(func(z): return is_instance_valid(z) and z.lan)
+	lugares_z.clear()
+
+
+## saiu da partida (ou ela fechou): os bonecos dos zumbis somem e o seu mundo volta a ter os seus
+func rede_desligou() -> void:
+	for z in zumbis:
+		if is_instance_valid(z) and z.lan:
+			z.queue_free()
+	zumbis = zumbis.filter(func(z): return is_instance_valid(z) and not z.lan)
+	z_rede.clear()
+	lugares_z.clear()
+	spawn_t = 3.0
+	if em_jogo and telas.atual in ["pausa", "mapa"]:
+		get_tree().paused = true
+
+
+## quem abriu: o golpe (ou a armadilha) de um convidado num zumbi
+func hit_rede(uid: int, d: float, de: Vector3, quem: int) -> void:
+	for z in zumbis:
+		if is_instance_valid(z) and z.uid == uid and not z.lan and z.estado != "morto":
+			z.ferir(d, de, quem)
+			return
+
+
+func efeito_rede(uid: int, tipo: int, t: float) -> void:
+	for z in zumbis:
+		if is_instance_valid(z) and z.uid == uid and not z.lan and z.estado != "morto":
+			if tipo == 1:
+				z.prender(t)
+			else:
+				z.atrasar(t)
+			return
+
+
+## convidado: o zumbi que você matou caiu lá (no jogo de quem abriu); o que ele deixa cai aqui, no seu mundo
+func zumbi_morreu_rede(p: Vector3) -> void:
+	var y: float = chao_em(p.x, p.z, p.y + 1.5)["y"]
+	_saque_zumbi(Vector3(p.x, y, p.z))
+
+
+## convidado: o zumbi de quem abriu bateu em você; se a sua base está no meio (aqui, no seu mundo), ele bate nela
+func dano_rede(d: float, de: Vector3) -> void:
+	var z = null
+	var melhor := 3.0
+	for q in z_rede.values():
+		if is_instance_valid(q) and q.estado != "morto" and q.global_position.distance_to(de) < melhor:
+			melhor = q.global_position.distance_to(de)
+			z = q
+	var o: Vector3 = (z.global_position if z != null else de) + Vector3(0, 1.2, 0)
+	var fora: Array[RID] = [jogador.get_rid()]
+	if z != null:
+		fora.append(z.get_rid())
+	var rq := PhysicsRayQueryParameters3D.create(o, jogador.global_position + Vector3(0, 1.2, 0), 1, fora)
+	var h := get_world_3d().direct_space_state.intersect_ray(rq)
+	if not h.is_empty() and (h["collider"] as Object).has_meta("peca"):
+		var np := int((h["collider"] as Object).get_meta("peca"))
+		if construcao.peca_viva(np):
+			construcao.ferir_peca(np, 3.0, h["position"])
+			return
+	jogador.ferir(d, true, o)
+
+
+## /ir: para o lado de alguém (no seu mundo, onde ele está no dele)
+func ir_para(p: Vector3) -> void:
+	var sp := get_world_3d().direct_space_state
+	var dest := p
+	for k in 8:
+		var a := randf() * TAU
+		var t := p + Vector3(cos(a), 0, sin(a)) * 1.6
+		var q := PhysicsRayQueryParameters3D.create(p + Vector3(0, 1.0, 0), t + Vector3(0, 1.0, 0), 1, [jogador.get_rid()])
+		if sp.intersect_ray(q).is_empty():
+			dest = t
+			break
+	var y: float = chao_em(dest.x, dest.z, p.y + 1.6)["y"]
+	jogador.global_position = Vector3(dest.x, maxf(y, p.y - 0.5) + 0.1, dest.z)
+	jogador.velocity = Vector3.ZERO
+	jogador.queda_v = 0.0
+	sons.tocar("clique", jogador.global_position, -6.0)
+
+
+func _exit_tree() -> void:
+	Rede.soltar(self)
 
 
 func fabricar(r: Dictionary) -> void:
@@ -953,6 +1161,33 @@ func _teste_telas() -> void:
 	await _quadros(2)
 	_confere(telas.atual == "" and not get_tree().paused, "fechou o mapa e voltou ao jogo")
 	Perfis.apagar_perfil(p)
+	# o Multiplayer (etapa 4): a tela de verdade (sem "em breve"), abrir a partida liga o servidor, a pergunta pelo TCP e a
+	# procura na rede respondem, e sair desliga (a partida em rede com dois jogos tem o teste dela: --teste-rede)
+	_confere(str(Telas.CAMINHOS[1].get("tag", "")) != "EM BREVE" and str(Telas.CAMINHOS[1]["ir"]) == "Jogar junto", "lobby: o Multiplayer deixou de ser \"em breve\"")
+	telas.mostrar("multi")
+	await _quadros(3)
+	_confere(Rede.procurando and telas.mp_abrir.is_visible_in_tree() and not telas.mp_abrir.disabled and not telas.mp_jogar.visible,
+		"Multiplayer: a tela monta (abrir, entrar com IP, procurando partidas na rede)")
+	Rede.nome = "Teste"
+	await Rede.hospedar()
+	await _quadros(3)
+	var sonda: Dictionary = await Rede._sondar("127.0.0.1", RedeLan.PORTA)
+	_confere(Rede.anfitriao() and sonda["ok"] and telas.mp_jogar.visible and telas.mp_ips.visible and telas.mp_abrir.disabled,
+		"Multiplayer: abriu a partida (IPs: %s) e ela responde pela rede (versão %s)" % [", ".join(Rede.ips), str(sonda.get("info", {}).get("vaydr", "?"))])
+	telas.esconder()
+	telas.pausa()
+	await _quadros(2)
+	_confere(get_tree().paused, "partida aberta sem ninguém: a pausa ainda para o jogo")
+	telas.voltar_ao_jogo()
+	Rede.desligar(false)
+	await _quadros(3)
+	_confere(not Rede.on and Rede.papel == "", "Multiplayer: sair da partida desliga")
+	Rede.entrar("o ip do amigo")
+	await _quadros(2)
+	_confere(not Rede.on and Rede.erro.begins_with("Digite o IP"), "Multiplayer: IP errado diz o que digitar (%s)" % Rede.erro)
+	var sem := await Rede._sondar("127.0.0.1", RedeLan.PORTA)
+	_confere(not sem["ok"] and str(sem["codigo"]) == "RECUSOU", "Multiplayer: sem partida aberta no IP, diz que o computador respondeu mas a partida não está aberta (%s)" % str(sem["codigo"]))
+	Rede.erro = ""
 	# HUD no lugar certo da tela (as âncoras dependem do HUD ocupar a tela inteira)
 	var tela := get_viewport().get_visible_rect().size
 	var rb: Rect2 = ui.hud.barra.get_global_rect()
@@ -1586,9 +1821,10 @@ func _foto(nome: String) -> void:
 
 
 func _capturar() -> Image:
-	var img: Image = DisplayServer.screen_get_image(DisplayServer.window_get_current_screen())
-	if img == null or img.is_empty() or img.get_size() != DisplayServer.window_get_size():
-		img = get_viewport().get_texture().get_image()
+	# a imagem que o Godot desenhou (a textura da tela); a cópia da janela do X às vezes vinha com o HUD deslocado para o lado
+	var img: Image = get_viewport().get_texture().get_image()
+	if img == null or img.is_empty():
+		img = DisplayServer.screen_get_image(DisplayServer.window_get_current_screen())
 	return img
 
 
@@ -1663,7 +1899,8 @@ func _fotos() -> void:
 	telas.mostrar("ajustes")
 	await _foto("00g_configuracoes_mira")
 	telas.mostrar("multi")
-	await _foto("00h_multiplayer_em_breve")
+	await _quadros(20)
+	await _foto("00h_multiplayer")
 	# a criação do personagem (etapa 3): o Sobrevivente no palco, de perto; o cabelo; a mulher de corpo inteiro; o lobby depois
 	telas.abrir_criacao()
 	await _quadros(45)
@@ -1924,4 +2161,8 @@ func _fotos() -> void:
 	await _quadros(5)
 	await _foto("19_morte")
 	renascer(false)
+	# a partida em rede (etapa 4): o outro jogo (sem tela, rodando junto na nuvem) entra na partida deste
+	var tr := TesteRede.new(self, "fotos", true)
+	add_child(tr)
+	await tr.fotos_principal()
 	get_tree().quit()

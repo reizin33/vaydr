@@ -68,6 +68,8 @@ var uso_t := -1.0        # comendo ou bebendo: a mão vai à boca
 var _roupa_t := 0.0
 var _dobra_a := 0.0      # o pulso da mão da primeira pessoa (para o lado do mindinho ou do polegar)
 var _dobra_f := 0.0      # (para a frente ou para trás)
+var golpe_n := 0         # quantos golpes já deu (a partida em rede manda: o boneco dele golpeia junto)
+var uso_n := 0           # quantas vezes comeu ou bebeu (idem)
 
 
 func _init(m: Node) -> void:
@@ -143,6 +145,11 @@ func alternar_camera(on = null) -> void:
 		luz_mao.transform = Transform3D(Basis.IDENTITY, Vector3(0.25, -0.2, -0.3))
 	if bool(Ajustes.v.get("terceira", false)) != terceira:
 		Ajustes.mudar("terceira", terceira)
+
+
+## para os zumbis: onde você está (o boneco de um amigo da partida em rede responde com a posição que chegou dele)
+func pos_alvo() -> Vector3:
+	return global_position
 
 
 ## de onde sai a mira: na primeira pessoa, a câmera; na terceira, o ponto da linha da mira na altura do ombro (o alcance
@@ -716,6 +723,7 @@ func atacar() -> void:
 	golpe = 1.0
 	golpe_t = 0.0
 	golpe_dur = maxf(0.3, cd * 0.85)
+	golpe_n += 1
 	main.sons.tocar("golpe", global_position, -8.0)
 	var h := mira(float(st.get("alcance", 1.9)) + 0.7)
 	if h.is_empty():
@@ -959,6 +967,7 @@ func consumir_slot(i: int) -> void:
 		_enjoar()
 	cd = 0.8
 	uso_t = 0.0
+	uso_n += 1
 	var verbo := "Bebeu" if str(d.get("tipo", "")) == "bebida" else ("Usou" if str(d.get("tipo", "")) == "cura" else "Comeu")
 	main.ui.aviso("%s: %s" % [verbo, d.get("nome", id)])
 	main.sons.tocar("comer", global_position, -4.0)

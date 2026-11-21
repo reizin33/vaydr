@@ -34,6 +34,8 @@ func _ready() -> void:
 	bancos["comer"] = [_ruido(0.35, 1500.0, 0.3, 6.0)]
 	bancos["agua"] = [_ruido(0.5, 900.0, 0.35, 4.0)]
 	bancos["clique"] = [_tom(0.05, 1200.0, 1100.0, 0.3, 60.0)]
+	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
+	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]
 
 
 func tocar(nome: String, onde: Vector3, db := 0.0) -> void:

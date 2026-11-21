@@ -2,9 +2,18 @@ class_name Zumbi
 extends CharacterBody3D
 ## Zumbi com o modelo e as animações do Mixamo (convertidos do VAYDR antigo): vaga mancando, caça quem vê ou ouve,
 ## corre à noite (os corredores), bate de perto e cai quando morre. Não sobe em fundação nem passa por parede.
+## Na partida em rede: no jogo de quem abriu, ele caça quem estiver mais perto (você ou um amigo); no jogo dos convidados ele é
+## um boneco (lan) que repete o que chega (onde está, para onde olha, se bate, se caiu), e o golpe nele vai para quem abriu.
 
 const CENA := "res://assets/personagens/zumbi.glb"
 var main: Node
+var uid := 0               # o número dele (o mesmo nos jogos da partida em rede)
+var lan := false           # boneco de um zumbi de quem abriu a partida (no jogo de um convidado)
+var lan_alvo := Vector3.ZERO
+var lan_yaw := 0.0
+var lan_st := -1           # 0 vaga, 1 caça, 2 golpe, 3 morto
+var lan_v := 0.0
+var lan_barrado := 0.0     # boneco segurado pela base de quem joga aqui (fica batendo na parede)
 var modelo: Node3D
 var anim: AnimationPlayer
 var vida := 100.0
@@ -56,8 +65,10 @@ func _ready() -> void:
 ## o que está entre o zumbi e o jogador (parede, porta, árvore...): vazio se nada
 func _bloqueio(j) -> Dictionary:
 	var a := global_position + Vector3(0, 1.3, 0)
-	var b: Vector3 = j.global_position + Vector3(0, 1.3, 0)
-	var fora: Array[RID] = [get_rid(), (j as CollisionObject3D).get_rid()]
+	var b: Vector3 = j.pos_alvo() + Vector3(0, 1.3, 0)
+	var fora: Array[RID] = [get_rid()]
+	if j is CollisionObject3D:
+		fora.append((j as CollisionObject3D).get_rid())
 	var q := PhysicsRayQueryParameters3D.create(a, b, 1, fora)
 	return get_world_3d().direct_space_state.intersect_ray(q)
 
@@ -67,34 +78,132 @@ func _tocar(n: String, vel := 1.0) -> void:
 		anim.play(n, 0.25, vel)
 
 
-func ferir(dano: float, de: Vector3) -> void:
+## quem: o id de quem bateu na partida em rede (0: aqui mesmo); quem mata leva o que o zumbi deixa
+func ferir(dano: float, de: Vector3, quem := 0) -> void:
+	if lan:
+		# boneco: quem abriu a partida aplica o golpe (ou a armadilha)
+		if estado != "morto":
+			Rede.hit_z(uid, dano, de)
+		return
 	if estado == "morto":
 		return
 	vida -= dano
 	estado = "caca"
 	velocity += (global_position - de).normalized() * 2.0
 	if vida <= 0.0:
-		morrer()
+		morrer(quem)
 
 
 func atrasar(t: float) -> void:
+	if lan:
+		Rede.efeito_z(uid, 0, t)
+		return
 	lento = maxf(lento, t)
 
 
 func prender(t: float) -> void:
+	if lan:
+		Rede.efeito_z(uid, 1, t)
+		return
 	preso_arm = maxf(preso_arm, t)
 
 
-func morrer() -> void:
+func morrer(quem := 0) -> void:
 	estado = "morto"
 	morto_t = 25.0
 	_tocar("sQueda")
 	collision_layer = 0
 	main.sons.tocar("morte_z", global_position, 0.0)
-	main.zumbi_morreu(self)
+	main.zumbi_morreu(self, quem)
+
+
+# ---------------------------------------------------------------- partida em rede
+## quem abriu manda: número, posição, para onde olha, estado, vida, velocidade e se é corredor
+func para_rede() -> PackedFloat32Array:
+	var st := 3 if estado == "morto" else (2 if golpe_t >= 0.0 else (1 if estado == "caca" else 0))
+	var p := global_position
+	return PackedFloat32Array([uid, p.x, p.y, p.z, rotation.y, st, clampf(vida / 100.0, 0.0, 1.0),
+		Vector2(velocity.x, velocity.z).length(), 1.0 if corredor else 0.0])
+
+
+## o boneco recebe o que chegou de quem abriu
+func rede(p: Vector3, yaw: float, st: int, hp: float, v: float) -> void:
+	lan_alvo = p
+	lan_yaw = yaw
+	lan_v = v
+	vida = hp * 100.0
+	if st == 3:
+		if estado != "morto":
+			estado = "morto"
+			golpe_t = -1.0
+			_tocar("sQueda")
+			collision_layer = 0
+			main.sons.tocar("morte_z", global_position, 0.0)
+		lan_st = st
+		return
+	if st == 2 and lan_st != 2:
+		golpe_t = 0.0
+		_tocar("sGolpe", 1.3)
+	if st >= 1 and lan_st == 0:
+		main.sons.tocar("grito_z", global_position, 2.0)
+	estado = "caca" if st >= 1 else "vaga"
+	lan_st = st
+
+
+## o boneco anda até onde quem abriu diz; a base de quem joga aqui segura (ele fica batendo na parede)
+func _boneco(dt: float) -> void:
+	if estado == "morto":
+		global_position = global_position.lerp(lan_alvo, minf(1.0, dt * 6.0))
+		return
+	var d := lan_alvo - global_position
+	var dh := Vector2(d.x, d.z).length()
+	var passo := d * minf(1.0, dt * 8.0)
+	var barrado := dh > 0.02 and dh < 25.0 and _parede_base(Vector3(passo.x, 0, passo.z))
+	lan_barrado = maxf(0.0, lan_barrado - dt)
+	if barrado:
+		lan_barrado = 1.5
+		global_position.y += passo.y
+	elif lan_barrado <= 0.0 and (dh > 5.0 or (golpe_t >= 0.0 and dh > 1.2)):
+		global_position = lan_alvo
+	else:
+		global_position += passo
+	rotation.y = lerp_angle(rotation.y, lan_yaw, 1.0 - exp(-10.0 * dt))
+	if golpe_t >= 0.0:
+		golpe_t += dt
+		if golpe_t > 1.2:
+			golpe_t = -1.0
+	if golpe_t < 0.0:
+		if lan_v > 3.0 and not barrado:
+			_tocar("sCorre", 1.0)
+		elif lan_v > 0.05 and not barrado:
+			_tocar("sFeridoAnda", lan_v / 1.1)
+		else:
+			_tocar("sFeridoParado")
+	gemido -= dt
+	if gemido <= 0.0:
+		gemido = randf_range(5.0, 12.0)
+		if main.jogador != null and global_position.distance_to(main.jogador.global_position) < 40.0:
+			main.sons.tocar("gemido", global_position, -4.0)
+
+
+## uma peça da base de quem joga aqui no caminho do boneco (a parede, a porta fechada)
+func _parede_base(passo: Vector3) -> bool:
+	if main.construcao == null or main.construcao.pecas.is_empty():
+		return false
+	var a := global_position + Vector3(0, 0.9, 0)
+	var b := a + passo.normalized() * (passo.length() + 0.35)
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1, [get_rid()])
+	var h := get_world_3d().direct_space_state.intersect_ray(q)
+	if h.is_empty():
+		return false
+	var c: Object = h["collider"]
+	return c.has_meta("peca") and main.construcao.peca_viva(int(c.get_meta("peca")))
 
 
 func _physics_process(dt: float) -> void:
+	if lan:
+		_boneco(dt)
+		return
 	if estado == "morto":
 		morto_t -= dt
 		velocity.x = 0
@@ -105,8 +214,9 @@ func _physics_process(dt: float) -> void:
 		if morto_t <= 0.0:
 			queue_free()
 		return
-	var j = main.jogador
-	var para: Vector3 = j.global_position - global_position
+	# o alvo: quem estiver mais perto (você ou, na partida em rede, um amigo que está no mundo)
+	var j = main.alvo_zumbi(self)
+	var para: Vector3 = j.pos_alvo() - global_position
 	var dist := Vector2(para.x, para.z).length()
 	var noite: bool = main.noite()
 	var ve := 24.0 if not noite else 34.0

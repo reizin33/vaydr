@@ -11,7 +11,8 @@ const CORES_MIRA := [Color(0.925, 0.894, 0.824), Color(0.55, 0.95, 0.45), Color(
 const NOMES_CORES := ["Clara", "Verde", "Amarela", "Vermelha", "Azul"]
 
 static var v := {"qualidade": 1, "escala": 100, "fps": false, "fov": 75, "tela_cheia": true, "comandos": true,
-	"volume": 80, "sens": 1.0, "inverter_y": false, "mira_cor": 0, "mira_tam": 3, "terceira": false, "corpo_anda": false}
+	"volume": 80, "sens": 1.0, "inverter_y": false, "mira_cor": 0, "mira_tam": 3, "terceira": false, "corpo_anda": false,
+	"lan_nome": "", "lan_ip": ""}
 
 
 static func carregar() -> void:

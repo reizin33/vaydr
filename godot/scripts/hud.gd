@@ -57,6 +57,7 @@ var veu_dano: ColorRect
 var veu_vida: ColorRect
 var seta_dano: Control
 var fps_lbl: Label
+var rede: HudRede
 var acerto_t := 0.0
 var dano_ang := 0.0
 var dano_t := 0.0
@@ -85,6 +86,9 @@ func _ready() -> void:
 	_folego()
 	_feed()
 	_mira()
+	# a partida em rede: quem está e o bate-papo (embaixo à esquerda, em cima dos comandos)
+	rede = HudRede.new(main)
+	add_child(rede)
 	fps_lbl = Estilo.rotulo_hud("", 12, Color(0.75, 0.9, 0.7), "ui", 700)
 	fps_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(fps_lbl)
@@ -265,7 +269,8 @@ func rumo_para(x: float, z: float) -> float:
 	return fposmod(rad_to_deg(atan2(x - j.global_position.x, -(z - j.global_position.z))), 360.0)
 
 
-## o que aparece marcado (minimapa e bússola): a cama ou o saco de dormir onde renasce e a mochila que ficou onde caiu
+## o que aparece marcado (minimapa e bússola): a cama ou o saco de dormir onde renasce, a mochila que ficou onde caiu e os
+## amigos da partida em rede
 func marcas() -> Array:
 	var r := []
 	var c = main.construcao
@@ -279,6 +284,9 @@ func marcas() -> Array:
 		if b is Dictionary and b.get("mochila", false) and b.has("no") and is_instance_valid(b["no"]):
 			var p2: Vector3 = (b["no"] as Node3D).global_position
 			r.append({"x": p2.x, "z": p2.z, "cor": Estilo.MUSGO, "ico": "mochila"})
+	# os amigos da partida em rede que estão num mundo (azul)
+	for q in Rede.no_mundo():
+		r.append({"x": q.alvo.x, "z": q.alvo.z, "cor": Estilo.AGUA, "ico": "grupo"})
 	return r
 
 
@@ -678,6 +686,9 @@ func _process(dt: float) -> void:
 	var baixa: float = clampf((35.0 - float(j.vida)) / 35.0, 0.0, 1.0) if j.vivo else 0.0
 	mv.set_shader_parameter("forca", baixa * (0.75 + 0.25 * sin(_t * 4.0)))
 	bt_lanterna.modulate = Estilo.BRASA if j.luz_mao.visible else Color(1, 1, 1)
+	if rede.visible:
+		var base_y: float = (teclas.get_global_rect().position.y - get_global_rect().position.y - 10.0) if teclas.visible else size.y - 44.0
+		rede.position = Vector2(16.0, base_y - rede.size.y)
 	_prompt()
 	_lento -= dt
 	if _lento <= 0.0:

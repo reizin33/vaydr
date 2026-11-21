@@ -11,10 +11,10 @@ extends CanvasLayer
 ## - Configurações por abas (Gráficos, Tela, Som, Mouse e mira, Controles) e o Pronto;
 ## - Personagem: a criação do personagem (TelaCriacao, criacao.gd), com o corpo de verdade no palco; o primeiro mundo de um
 ##   perfil passa por ela antes de começar;
-## - Multiplayer diz o que vem e em que etapa (sem botão que finja funcionar);
+## - Multiplayer: jogar junto na rede local (rede.gd): abrir a partida, entrar com o IP ou pela lista da rede, quem está;
 ## - no jogo: a pausa (Esc), o mapa grande (M), a tela de morte; e a passagem escura ao entrar no mundo.
 
-const VERSAO := "0.4.0"
+const VERSAO := "0.5.0"
 const DICAS := [
 	"Com uma pedra na mão já dá para bater nas árvores e tirar madeira mais rápido.",
 	"Aperte E para pegar, abrir, beber e revistar armários, gavetas e baús.",
@@ -77,6 +77,8 @@ var pz_mundo: Label
 var pz_onde: Label
 var pz_relogio: Label
 var pz_stats: HBoxContainer
+var pz_aviso: Label
+var pz_titulo: Label
 # morte
 var mt_texto: Label
 var mt_stats: HBoxContainer
@@ -112,9 +114,7 @@ func _ready() -> void:
 	_tela_lobby()
 	_tela_sozinho()
 	_tela_ajustes()
-	_tela_info("multi", "02", "Multiplayer", Estilo.AGUA, "O mesmo mundo com os amigos, por rede local.",
-		["Criar um mundo e chamar os amigos da mesma rede", "Entrar no mundo de um amigo", "Cada um com o próprio personagem, a sua mochila e o seu progresso"],
-		"Ainda não funciona: chega na etapa 4. Até lá, os seus mundos ficam em Jogar sozinho.")
+	_tela_multi()
 	cria = TelaCriacao.new(self)
 	raiz.add_child(cria)
 	telas["criacao"] = cria
@@ -292,6 +292,8 @@ func mostrar(nome: String) -> void:
 	atual = nome
 	for k in telas:
 		(telas[k] as Control).visible = k == nome
+	_prender_jogador()
+	Rede.procurando = nome == "multi"
 	match nome:
 		"login":
 			_montar_login()
@@ -301,6 +303,8 @@ func mostrar(nome: String) -> void:
 			_montar_sozinho()
 		"ajustes":
 			_montar_ajustes()
+		"multi":
+			_montar_multi()
 	_atualizar_perfis()
 	_mouse()
 
@@ -312,7 +316,15 @@ func esconder() -> void:
 	atual = ""
 	for k in telas:
 		(telas[k] as Control).visible = false
+	_prender_jogador()
+	Rede.procurando = false
 	_mouse()
+
+
+## com uma tela aberta o jogador não anda nem gira (sozinho o jogo já está parado; na partida em rede o mundo continua)
+func _prender_jogador() -> void:
+	if main.jogador != null and main.ui != null:
+		main.jogador.preso = atual != "" or main.ui.aberto or Rede.digitando
 
 
 func _mouse() -> void:
@@ -643,8 +655,8 @@ func _criar_perfil() -> void:
 const CAMINHOS := [
 	{"k": "sozinho", "n": "0 1", "tit": "Jogar sozinho", "sub": "Seus mundos, no seu ritmo. Cada mundo é uma partida separada.", "cor": Color(1.0, 0.541, 0.239),
 		"img": "res://assets/telas/lobby_sozinho.jpg", "ir": "Entrar"},
-	{"k": "multi", "n": "0 2", "tit": "Multiplayer", "sub": "O mesmo mundo com os amigos, por rede local.", "cor": Color(0.384, 0.722, 1.0),
-		"img": "res://assets/telas/lobby_multi.jpg", "ir": "Ver como vai ser", "tag": "EM BREVE"},
+	{"k": "multi", "n": "0 2", "tit": "Multiplayer", "sub": "Jogue com os amigos da mesma rede (ou pelo Radmin VPN).", "cor": Color(0.384, 0.722, 1.0),
+		"img": "res://assets/telas/lobby_multi.jpg", "ir": "Jogar junto", "tag": "REDE LOCAL"},
 	{"k": "pers", "n": "0 3", "tit": "Personagem", "sub": "Rosto, cabelo e corpo do seu sobrevivente.", "cor": Color(0.592, 0.78, 0.431),
 		"img": "res://assets/telas/lobby_pers.jpg", "ir": "Criar personagem"},
 	{"k": "ajustes", "n": "0 4", "tit": "Configurações", "sub": "Gráficos, resolução, som, sensibilidade, mira e controles.", "cor": Color(0.925, 0.894, 0.824),
@@ -820,6 +832,7 @@ func _montar_lobby() -> void:
 		ex.text = "Nenhum mundo ainda: comece o primeiro"
 	else:
 		ex.text = "%d mundo%s" % [ms.size(), "" if ms.size() == 1 else "s"]
+	(lobby_cartoes[1].get_meta("extra") as Label).text = Rede.resumo()
 	(lobby_cartoes[2].get_meta("extra") as Label).text = resumo_personagem(p)
 	(lobby_cartoes[2].get_meta("acao") as Label).text = ("EDITAR PERSONAGEM" if p.has("ap") else "CRIAR PERSONAGEM") + "   →"
 	(lobby_cartoes[3].get_meta("extra") as Label).text = "Gráficos: %s · Mouse: %.2f" % [Ajustes.QUALIDADES[clampi(int(Ajustes.v["qualidade"]), 0, 2)], float(Ajustes.v["sens"])]
@@ -879,6 +892,10 @@ func _tela_sozinho() -> void:
 	dir.add_theme_constant_override("separation", 10)
 	dir.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(dir)
+	sz_rede = Estilo.rotulo("", 13, Estilo.AGUA, "ui", 700)
+	sz_rede.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sz_rede.visible = false
+	dir.add_child(sz_rede)
 	var cab := HBoxContainer.new()
 	dir.add_child(cab)
 	var ct := Estilo.rotulo("SEUS MUNDOS", 12, Estilo.CINZA, "ui", 800, 3)
@@ -922,6 +939,9 @@ func _montar_sozinho() -> void:
 		var vazio := Estilo.rotulo("Você ainda não tem mundos. Aperte \"Novo mundo\" para começar o primeiro.", 14, Estilo.CINZA, "ui", 500)
 		vazio.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sz_lista.add_child(vazio)
+	sz_rede.visible = Rede.on
+	if Rede.on:
+		sz_rede.text = "EM REDE · %s. Escolha um mundo seu para jogar junto." % Rede.resumo()
 	var conta := telas["sozinho"].find_child("Conta", true, false) as Label
 	conta.text = "%d de %d" % [ms.size(), Perfis.MAX_MUNDOS]
 	(telas["sozinho"].find_child("Novo", true, false) as Button).disabled = ms.size() >= Perfis.MAX_MUNDOS
@@ -1281,41 +1301,317 @@ func _deslizar(mn: float, mx: float, passo: float, valor: float, fmt: String, ao
 	return h
 
 
-# ================================================================ multiplayer e personagem (o que vem e em que etapa)
-func _tela_info(nome: String, numero: String, titulo: String, cor: Color, sub: String, itens: Array, nota: String) -> void:
-	var t := _tela(nome)
-	_brilho(t)
-	_barra_topo(t, numero, titulo, cor, func(): mostrar("lobby"))
+# ================================================================ multiplayer: jogar junto na rede local
+var mp_nome: LineEdit
+var mp_abrir: Button
+var mp_ips: VBoxContainer
+var mp_ips_lista: VBoxContainer
+var mp_fw: HBoxContainer
+var mp_fw_txt: Label
+var mp_fw_bt: Button
+var mp_ip: LineEdit
+var mp_entrar: Button
+var mp_achados: VBoxContainer
+var mp_estado: Label
+var mp_jog: HFlowContainer
+var mp_jogar: Button
+var mp_sair: Button
+var sz_rede: Label
+
+
+## a tela do jogo antigo (63_lan.js): à esquerda o nome, abrir a partida (com os IPs para os amigos digitarem e o Firewall) e
+## entrar na de um amigo (pelo IP ou pela lista das partidas achadas na rede), o estado, quem está e o Escolher o mundo e
+## jogar; à direita a imagem do multiplayer
+func _tela_multi() -> void:
+	var t := _tela("multi")
+	_brilho(t, Vector2(0.3, 1.1), Vector2(0.55, 0.45), 0.22)
+	_barra_topo(t, "0 2", "Multiplayer", Estilo.AGUA, func(): mostrar("lobby"))
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 28)
+	t.add_child(h)
+	Estilo.encher(h, Vector2(0, 0), Vector2(1, 1), Vector2(44, 96), Vector2(-44, -28))
+	var rol := ScrollContainer.new()
+	rol.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rol.size_flags_stretch_ratio = 1.55
+	h.add_child(rol)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 14)
-	t.add_child(col)
-	Estilo.prender(col, 0.0, 0.0, 110, 150)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rol.add_child(col)
 	var tag := PanelContainer.new()
-	var tb := Estilo.caixa(Color(cor, 0.12), cor, 12, 12)
+	var tb := Estilo.caixa(Color(Estilo.AGUA, 0.12), Estilo.AGUA, 12, 12)
 	tb.content_margin_top = 5
 	tb.content_margin_bottom = 5
 	tag.add_theme_stylebox_override("panel", tb)
 	tag.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	tag.add_child(Estilo.rotulo("EM BREVE", 12, cor, "ui", 800, 3))
+	tag.add_child(Estilo.rotulo("REDE LOCAL · ATÉ %d JOGADORES" % RedeLan.MAX_JOGADORES, 12, Estilo.AGUA, "ui", 800, 3))
 	col.add_child(tag)
-	var s := Estilo.rotulo(sub, 28, Estilo.OSSO, "titulo", 700)
-	col.add_child(s)
-	for it in itens:
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override("separation", 12)
-		var pt := ColorRect.new()
-		pt.color = cor
-		pt.custom_minimum_size = Vector2(8, 8)
-		pt.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		h.add_child(pt)
-		h.add_child(Estilo.rotulo(str(it), 17, Estilo.OSSO, "ui", 600))
-		col.add_child(h)
-	var n := Estilo.rotulo(nota, 15, Estilo.CINZA, "ui", 600)
-	col.add_child(n)
-	var b := Estilo.botao("Voltar ao lobby")
-	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	b.pressed.connect(func(): mostrar("lobby"))
-	col.add_child(b)
+	col.add_child(Estilo.rotulo("JOGAR JUNTO", 44, Estilo.OSSO, "titulo", 700, 2))
+	var tx := Estilo.rotulo("Um abre a partida e os amigos entram com o IP dele, na mesma rede ou pelo Radmin VPN. Vocês se veem, conversam (Enter), " +
+		"ficam na mesma hora do dia, e os zumbis são os mesmos para todos: o jogo de quem abriu decide. A base, os baús e a mochila são de cada um.", 16, Color(0.765, 0.78, 0.733), "ui", 600)
+	tx.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(tx)
+	# o nome
+	var ln := VBoxContainer.new()
+	ln.add_theme_constant_override("separation", 6)
+	col.add_child(ln)
+	ln.add_child(Estilo.rotulo("SEU NOME NA PARTIDA", 12, Color(0.66, 0.75, 0.83), "ui", 800, 2))
+	mp_nome = LineEdit.new()
+	mp_nome.max_length = 20
+	mp_nome.custom_minimum_size = Vector2(320, 44)
+	mp_nome.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	mp_nome.add_theme_font_size_override("font_size", 17)
+	mp_nome.text_changed.connect(func(tt: String):
+		Rede.nome = RedeLan._nome_limpo(tt)
+		Ajustes.mudar("lan_nome", Rede.nome))
+	ln.add_child(mp_nome)
+	# as duas escolhas
+	var ops := HBoxContainer.new()
+	ops.add_theme_constant_override("separation", 12)
+	col.add_child(ops)
+	var a := _cartao_mp("Abrir a partida e chamar os amigos",
+		"O seu mundo vira o da partida. No Windows, na primeira vez, aparece o aviso para liberar o VAYDR no Firewall: clique em Sim.")
+	ops.add_child(a)
+	var av: VBoxContainer = a.get_child(0)
+	mp_abrir = Estilo.botao("Abrir a partida", true, 14)
+	mp_abrir.custom_minimum_size = Vector2(0, 46)
+	mp_abrir.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	mp_abrir.pressed.connect(func():
+		_clique()
+		Rede.hospedar())
+	av.add_child(mp_abrir)
+	mp_ips = VBoxContainer.new()
+	mp_ips.add_theme_constant_override("separation", 4)
+	mp_ips.visible = false
+	av.add_child(mp_ips)
+	mp_ips.add_child(Estilo.rotulo("Seus amigos digitam:", 13, Color(0.66, 0.75, 0.83), "ui", 600))
+	mp_ips_lista = VBoxContainer.new()
+	mp_ips_lista.add_theme_constant_override("separation", 2)
+	mp_ips.add_child(mp_ips_lista)
+	var rad := Estilo.rotulo("No Radmin VPN, use o IP que começa com 26.", 12, Color(0.66, 0.75, 0.83), "ui", 600)
+	mp_ips.add_child(rad)
+	mp_fw = HBoxContainer.new()
+	mp_fw.add_theme_constant_override("separation", 8)
+	mp_fw.visible = false
+	av.add_child(mp_fw)
+	mp_fw_txt = Estilo.rotulo("", 13, Estilo.GRAO, "ui", 600)
+	mp_fw_txt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mp_fw_txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mp_fw.add_child(mp_fw_txt)
+	mp_fw_bt = Estilo.botao("Liberar no Firewall", false, 12)
+	mp_fw_bt.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mp_fw_bt.pressed.connect(func():
+		_clique()
+		Rede.liberar(false))
+	mp_fw.add_child(mp_fw_bt)
+	var b := _cartao_mp("Entrar na partida de um amigo", "Digite o IP que aparece na tela de quem abriu, ou escolha uma partida achada na sua rede.")
+	ops.add_child(b)
+	var bv: VBoxContainer = b.get_child(0)
+	var lip := HBoxContainer.new()
+	lip.add_theme_constant_override("separation", 8)
+	bv.add_child(lip)
+	mp_ip = LineEdit.new()
+	mp_ip.placeholder_text = "192.168.0.12"
+	mp_ip.custom_minimum_size = Vector2(0, 46)
+	mp_ip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mp_ip.add_theme_font_size_override("font_size", 17)
+	mp_ip.text_submitted.connect(func(_tt): _entrar_ip())
+	lip.add_child(mp_ip)
+	mp_entrar = Estilo.botao("Entrar", false, 14)
+	mp_entrar.custom_minimum_size = Vector2(110, 46)
+	mp_entrar.pressed.connect(_entrar_ip)
+	lip.add_child(mp_entrar)
+	bv.add_child(Estilo.rotulo("PARTIDAS NA SUA REDE", 11, Color(0.56, 0.79, 1.0), "ui", 800, 2))
+	mp_achados = VBoxContainer.new()
+	mp_achados.add_theme_constant_override("separation", 6)
+	bv.add_child(mp_achados)
+	# o estado, quem está e as ações
+	mp_estado = Estilo.rotulo("", 15, Color(0.81, 0.91, 1.0), "ui", 700)
+	mp_estado.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mp_estado.custom_minimum_size = Vector2(0, 22)
+	col.add_child(mp_estado)
+	mp_jog = HFlowContainer.new()
+	mp_jog.add_theme_constant_override("h_separation", 6)
+	mp_jog.add_theme_constant_override("v_separation", 6)
+	col.add_child(mp_jog)
+	var ac := HBoxContainer.new()
+	ac.add_theme_constant_override("separation", 10)
+	col.add_child(ac)
+	mp_jogar = Estilo.botao("Escolher o mundo e jogar", true, 15)
+	mp_jogar.custom_minimum_size = Vector2(300, 52)
+	mp_jogar.pressed.connect(func():
+		_clique()
+		mostrar("sozinho"))
+	ac.add_child(mp_jogar)
+	mp_sair = Estilo.botao("Sair da partida", false, 14)
+	mp_sair.custom_minimum_size = Vector2(0, 52)
+	mp_sair.pressed.connect(func():
+		_clique()
+		Rede.desligar(false))
+	ac.add_child(mp_sair)
+	var nota := Estilo.rotulo("Cada um entra com o próprio personagem, a sua mochila e o seu mundo (que salva normal). O dia de cada mundo continua o seu; " +
+		"a hora e os zumbis são os de quem abriu. Com amigos na partida, a pausa e o mapa não param o jogo.", 13, Color(0.54, 0.565, 0.525), "ui", 600)
+	nota.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(nota)
+	# à direita: a imagem do multiplayer
+	var dir := Panel.new()
+	dir.add_theme_stylebox_override("panel", Estilo.caixa(Color(0.07, 0.08, 0.085), Color(0, 0, 0, 0), 18, 0))
+	dir.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	dir.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dir.size_flags_stretch_ratio = 1.0
+	h.add_child(dir)
+	var img := _foto("res://assets/telas/lobby_multi.jpg")
+	img.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dir.add_child(img)
+	var veu_i := ColorRect.new()
+	veu_i.set_anchors_preset(Control.PRESET_FULL_RECT)
+	veu_i.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	veu_i.material = _sombreado("""
+void fragment() {
+	COLOR = mix(vec4(0.078, 0.188, 0.306, 0.35), vec4(0.031, 0.047, 0.067, 0.78), UV.y);
+}""")
+	dir.add_child(veu_i)
+	var borda := Panel.new()
+	borda.set_anchors_preset(Control.PRESET_FULL_RECT)
+	borda.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	borda.add_theme_stylebox_override("panel", Estilo.caixa(Color(0, 0, 0, 0), Color(Estilo.AGUA, 0.25), 18, 0))
+	dir.add_child(borda)
+	var leg := VBoxContainer.new()
+	leg.add_theme_constant_override("separation", 6)
+	leg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dir.add_child(leg)
+	Estilo.encher(leg, Vector2(0, 1), Vector2(1, 1), Vector2(24, -24), Vector2(-24, -24))
+	leg.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	for par in [["Enter", "bate-papo"], ["/ir", "vai até quem abriu"], ["Porta", "%d (UDP e TCP)" % RedeLan.PORTA]]:
+		var lh := HBoxContainer.new()
+		lh.add_theme_constant_override("separation", 8)
+		lh.add_child(Estilo.tecla(par[0], 11))
+		lh.add_child(Estilo.rotulo(par[1], 13, Color(0.81, 0.86, 0.9), "ui", 600))
+		leg.add_child(lh)
+	Rede.mudou.connect(_rede_mudou)
+
+
+func _cartao_mp(titulo: String, texto: String) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", Estilo.caixa(Color(0.071, 0.118, 0.165, 0.55), Color(Estilo.AGUA, 0.38), 14, 18))
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 9)
+	p.add_child(v)
+	var tt := Estilo.rotulo(titulo, 17, Color(0.894, 0.949, 1.0), "ui", 800)
+	tt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(tt)
+	var sb := Estilo.rotulo(texto, 14, Color(0.66, 0.75, 0.83), "ui", 600)
+	sb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(sb)
+	return p
+
+
+func _clique() -> void:
+	if main.sons != null and main.jogador != null:
+		main.sons.tocar("clique", main.jogador.global_position, -8.0)
+
+
+func _entrar_ip() -> void:
+	_clique()
+	Rede.entrar(mp_ip.text)
+
+
+func _rede_mudou() -> void:
+	if atual == "multi":
+		_montar_multi()
+	elif atual == "lobby" and lobby_cartoes.size() > 1:
+		(lobby_cartoes[1].get_meta("extra") as Label).text = Rede.resumo()
+		(lobby_cartoes[1].get_meta("extra") as Label).visible = lobby_sel == 1
+
+
+func _montar_multi() -> void:
+	if not mp_nome.has_focus():
+		mp_nome.text = Rede.nome_jogo()
+	if mp_ip.text == "" and not mp_ip.has_focus():
+		mp_ip.text = str(Ajustes.v.get("lan_ip", ""))
+	var on: bool = Rede.on
+	var anf: bool = Rede.anfitriao()
+	var ocupado: bool = on or Rede._conectando
+	mp_nome.editable = not ocupado
+	mp_abrir.disabled = ocupado
+	mp_entrar.disabled = ocupado
+	mp_ip.editable = not ocupado
+	# os IPs de quem abriu
+	mp_ips.visible = anf
+	for c in mp_ips_lista.get_children():
+		c.queue_free()
+	if anf:
+		if Rede.ips.is_empty():
+			mp_ips_lista.add_child(Estilo.rotulo("(sem rede: conecte o PC na rede ou no Radmin)", 15, Estilo.GRAO, "ui", 700))
+		for ip in Rede.ips:
+			var lh := HBoxContainer.new()
+			lh.add_theme_constant_override("separation", 10)
+			lh.add_child(Estilo.rotulo(str(ip), 22, Color(1.0, 0.81, 0.54), "ui", 800, 1))
+			var cp := _pilula("COPIAR")
+			cp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			cp.pressed.connect(func():
+				DisplayServer.clipboard_set(str(ip))
+				cp.text = "COPIADO")
+			lh.add_child(cp)
+			mp_ips_lista.add_child(lh)
+	# o Firewall (só no Windows)
+	var fw := str(Rede.fw)
+	mp_fw.visible = OS.get_name() == "Windows" and (anf or fw == "pedindo") and fw != ""
+	mp_fw_txt.text = {"ok": "Firewall do Windows: o VAYDR está liberado.", "pedindo": "Esperando o aviso do Windows…"}.get(fw, "O Firewall do Windows pode estar barrando os amigos.")
+	mp_fw_txt.add_theme_color_override("font_color", Color(0.66, 0.88, 0.63) if fw == "ok" else Estilo.GRAO)
+	mp_fw_bt.visible = fw != "ok"
+	mp_fw_bt.disabled = fw == "pedindo"
+	# as partidas achadas na rede
+	for c in mp_achados.get_children():
+		c.queue_free()
+	if Rede.achados.is_empty() or ocupado:
+		var vz := Estilo.rotulo("Procurando partidas abertas na rede…" if not ocupado else "—", 13, Color(0.54, 0.565, 0.525), "ui", 600)
+		mp_achados.add_child(vz)
+	else:
+		for k in Rede.achados:
+			var e: Dictionary = Rede.achados[k]
+			var lh := HBoxContainer.new()
+			lh.add_theme_constant_override("separation", 10)
+			var info := Estilo.rotulo("%s  ·  %d de %d  ·  %s" % [e["nome"], int(e["n"]), int(e["max"]), e["ip"]], 14, Color(0.894, 0.949, 1.0), "ui", 700)
+			info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			info.clip_text = true
+			lh.add_child(info)
+			var outra: bool = str(e["versao"]) != Rede.versao
+			var be := Estilo.botao("Entrar" if not outra else "Versão " + str(e["versao"]), false, 12)
+			be.disabled = outra
+			var alvo := str(e["ip"]) + ("" if int(e["porta"]) == RedeLan.PORTA else ":%d" % int(e["porta"]))
+			be.pressed.connect(func():
+				mp_ip.text = alvo
+				_entrar_ip())
+			lh.add_child(be)
+			mp_achados.add_child(lh)
+	# o estado
+	var txt: String = Rede.erro
+	if txt == "":
+		if on:
+			txt = "Partida aberta. Agora escolha o mundo e jogue: os amigos entram quando quiserem." if anf \
+				else "Você entrou na partida de %s. Agora escolha um mundo seu e jogue." % Rede.host_nome
+		else:
+			txt = Rede.status
+	mp_estado.text = txt
+	mp_estado.add_theme_color_override("font_color", Color(1.0, 0.71, 0.63) if Rede.erro != "" else Color(0.81, 0.91, 1.0))
+	# quem está
+	for c in mp_jog.get_children():
+		c.queue_free()
+	if on:
+		for n in Rede.nomes():
+			var ch := PanelContainer.new()
+			var cb := Estilo.caixa(Color(0.384, 0.722, 1.0, 0.16), Color(0, 0, 0, 0), 14, 12)
+			cb.content_margin_top = 5
+			cb.content_margin_bottom = 5
+			ch.add_theme_stylebox_override("panel", cb)
+			ch.add_child(Estilo.rotulo(str(n), 13, Color(0.894, 0.949, 1.0), "ui", 700))
+			mp_jog.add_child(ch)
+	mp_jogar.visible = on
+	mp_sair.visible = on or Rede._conectando
 
 
 # ================================================================ como jogar e créditos
@@ -1327,6 +1623,7 @@ const AJUDA := [
 	["A noite", "Às 19h escurece e os zumbis correm. Fique perto do fogo ou se tranque na base. Uma cama ou um saco de dormir marcam onde você renasce."],
 	["Morrer", "O que você carregava fica numa mochila no chão, marcada em verde no minimapa e na bússola. O que está no baú não se perde."],
 	["Salvar", "O jogo salva sozinho a cada 2 minutos, quando você fecha e no F5. Cada mundo do perfil é salvo separado."],
+	["Jogar junto", "No lobby, Multiplayer: um abre a partida e os amigos entram com o IP dele (mesma rede ou Radmin VPN). Enter abre o bate-papo e /ir leva até quem abriu. A hora e os zumbis são os de quem abriu; a base e a mochila são de cada um."],
 ]
 
 
@@ -1400,8 +1697,10 @@ func _tela_pausa() -> void:
 	col.add_theme_constant_override("separation", 6)
 	t.add_child(col)
 	Estilo.encher(col, Vector2(0, 0), Vector2(0, 1), Vector2(64, 22), Vector2(520, -16))
-	col.add_child(Estilo.rotulo("JOGO PARADO", 12, Estilo.BRASA, "ui", 800, 3))
-	col.add_child(Estilo.rotulo("PAUSADO", 64, Estilo.OSSO, "titulo", 700, 3))
+	pz_aviso = Estilo.rotulo("JOGO PARADO", 12, Estilo.BRASA, "ui", 800, 3)
+	col.add_child(pz_aviso)
+	pz_titulo = Estilo.rotulo("PAUSADO", 64, Estilo.OSSO, "titulo", 700, 3)
+	col.add_child(pz_titulo)
 	var linha := ColorRect.new()
 	linha.color = Estilo.BRASA
 	linha.custom_minimum_size = Vector2(70, 3)
@@ -1543,7 +1842,8 @@ func pausa() -> void:
 	if not main.em_jogo or not main.jogador.vivo:
 		return
 	main.ui.abrir(false)
-	get_tree().paused = true
+	# na partida em rede com amigos o mundo não para (os outros continuam jogando, e os zumbis também)
+	get_tree().paused = not Rede.em_partida()
 	main.salvar_jogo()
 	var nome_p := str(Perfis.atual.get("nome", ""))
 	pz_mundo.text = ("SOBREVIVENTE: %s  ·  %s" % [nome_p, str(main.mundo_atual.get("nome", "Mundo"))]).to_upper() if nome_p != "" \
@@ -1556,6 +1856,11 @@ func pausa() -> void:
 	(telas["pausa"].find_child("Sub", true, false) as Label).text = "Dia %d  ·  %s" % [int(main.dia), falta]
 	telas["pausa"].find_child("Relogio", true, false).queue_redraw()
 	_stats(pz_stats)
+	# na partida em rede com amigos o jogo não para: a tela diz isso
+	var rede: bool = Rede.em_partida()
+	pz_aviso.text = "EM REDE · O MUNDO CONTINUA" if rede else "JOGO PARADO"
+	pz_aviso.add_theme_color_override("font_color", Estilo.AGUA if rede else Estilo.BRASA)
+	pz_titulo.text = "MENU" if rede else "PAUSADO"
 	mostrar("pausa")
 
 
@@ -1624,7 +1929,7 @@ func abrir_mapa(de: String) -> void:
 	_volta_mapa = de
 	if de == "":
 		main.ui.abrir(false)
-		get_tree().paused = true
+		get_tree().paused = not Rede.em_partida()
 	(mapa as MapaGrande).centrar()
 	mostrar("mapa")
 
@@ -1744,6 +2049,8 @@ func _process(dt: float) -> void:
 		return
 	if Input.is_action_just_pressed("tela_cheia"):
 		Ajustes.mudar("tela_cheia", not bool(Ajustes.v["tela_cheia"]), main)
+	if Rede.digitando or Rede.chat_acabou_de_fechar():
+		return
 	if Input.is_action_just_pressed("sair"):
 		_esc()
 	elif Input.is_action_just_pressed("mapa"):

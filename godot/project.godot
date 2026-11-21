@@ -9,6 +9,10 @@ run/main_scene="res://cenas/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+Rede="*res://scripts/rede.gd"
+
 [display]
 
 window/size/viewport_width=1280

@@ -80,13 +80,36 @@ jobs:
           grep -E "^FALHA|^TESTE FALHOU|SCRIPT ERROR|Parse Error|Invalid |at: " teste.log | awk '!visto[$0]++' | head -24 | while IFS= read -r l; do echo "::error title=Teste::${l//%/%25}"; done
           grep -q "TESTE OK" teste.log
 
+      # a partida em rede de verdade: dois jogos neste computador, quem abre e quem entra (cada um confere o seu lado)
+      - name: Teste da rede (dois jogos)
+        if: ${{ always() }}
+        run: |
+          set +e
+          if [ ! -f jogo_abriu ]; then echo "o jogo nem abriu no teste (erro de script?): sem o teste da rede"; exit 1; fi
+          timeout 480 ./godot-bin --headless --path godot -- --teste-rede anfitriao > rede_anf.log 2>&1 &
+          A=$!
+          sleep 4
+          timeout 470 ./godot-bin --headless --path godot -- --teste-rede convidado > rede_conv.log 2>&1
+          wait $A
+          for f in rede_anf.log rede_conv.log; do echo "===== $f ====="; awk '!visto[$0]++ && n++ < 250' "$f"; done
+          echo "----- resumo -----"
+          grep -h -E "^(ok |FALHA|TESTE)" rede_anf.log rede_conv.log
+          grep -h -E "^FALHA|TESTE REDE.*FALHOU|SCRIPT ERROR|Parse Error|Invalid |at: " rede_anf.log rede_conv.log | awk '!visto[$0]++' | head -24 | while IFS= read -r l; do echo "::error title=Rede::${l//%/%25}"; done
+          grep -q "TESTE REDE ANFITRIAO OK" rede_anf.log && grep -q "TESTE REDE CONVIDADO OK" rede_conv.log
+
       - name: Fotos (OpenGL por software)
         if: ${{ always() && (github.event_name == 'push' || inputs.fotos) }}
         run: |
           set +e
           if [ ! -f jogo_abriu ]; then echo "o jogo nem abriu no teste (erro de script?): sem fotos"; exit 0; fi
           export LIBGL_ALWAYS_SOFTWARE=1
+          # o amigo das fotos da partida em rede (outro jogo, sem tela): entra na partida que o jogo das fotos abre no fim
+          timeout 2700 ./godot-bin --headless --path godot -- --fotos-rede convidado > rede_fotos.log 2>&1 &
           timeout 2700 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
+          sleep 2
+          kill %1 2>/dev/null
+          echo "===== amigo das fotos ====="
+          awk '!visto[$0]++ && n++ < 120' rede_fotos.log
           ls -la godot/fotos || true
 
       # as fotos saem no próprio registro (em base64), para conferir sem baixar o artefato
@@ -120,6 +143,9 @@ jobs:
             godot/fotos/
             importar.log
             teste.log
+            rede_anf.log
+            rede_conv.log
+            rede_fotos.log
             fotos.log
             exportar.log
           retention-days: 14

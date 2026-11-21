@@ -688,6 +688,11 @@ func _virar(dt: float, ent: Dictionary, sp: float, correndo: bool, agindo: bool)
 	if trava:
 		global_rotation = Vector3(0, yaw, 0)
 		return
+	if ent.has("yaw_corpo"):
+		# o boneco de outro jogador (partida em rede): para onde o corpo dele olha chega pronto, e quem segura o corpo vira
+		# (o pivô do boneco também deita quando ele cai)
+		yaw = float(ent["yaw_corpo"])
+		return
 	var cam_yaw: float = ent.get("yaw", yaw)
 	var vel: Vector3 = ent.get("vel", Vector3.ZERO)
 	var alvo := yaw
