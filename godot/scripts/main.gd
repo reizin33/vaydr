@@ -1,9 +1,12 @@
 extends Node3D
-## VAYDR no Godot (protótipo 0.1): monta o mundo, o céu e o dia, o jogador, a tela, a construção e os zumbis.
-## Modos para os testes da nuvem: "-- --teste" (sem tela, confere coleta, fabricação, construção e zumbi) e
+## VAYDR no Godot: monta o mapa do jogo antigo (relevo, água e maré, prédios, casas, bairros, ruas, colisão, a mata e o
+## saque), o céu e o dia, o jogador, a tela, a construção e os zumbis (os de cada lugar do mapa e os que andam pela mata).
+## Modos para os testes da nuvem: "-- --teste" (sem tela, confere o mapa, coleta, fabricação, construção e zumbi) e
 ## "-- --fotos" (tira as fotos de conferência em fotos/).
 
 var terreno: Terreno
+var malhas_mapa: MalhasMapa
+var colisao: ColisaoMapa
 var mundo: Mundo
 var grama: Grama
 var construcao: Construcao
@@ -20,7 +23,9 @@ var dia := 1
 var zumbis: Array = []
 var spawn_t := 3.0
 var modo_teste := false   # nos testes da nuvem: não mexe no mouse nem na janela
-const SPAWN := Vector3(0, 0, 6)
+var lugares_z := {}       # zumbis de cada lugar do mapa: id -> {ativo, zumbis, volta}
+var _lugares_t := 0.0
+const SPAWN := Vector3(8, 0, 44)   # onde o jogo antigo começa: na mata, ao sul da clareira
 const SEG_POR_HORA := 50.0
 
 
@@ -29,12 +34,30 @@ func _ready() -> void:
 	modo_teste = "--teste" in args or "--fotos" in args
 	_teclas()
 	_ambiente()
+	var t0 := Time.get_ticks_msec()
 	terreno = Terreno.new()
+	terreno.name = "Terreno"
 	add_child(terreno)
 	terreno.montar()
+	var t1 := Time.get_ticks_msec()
+	malhas_mapa = MalhasMapa.new()
+	malhas_mapa.name = "Mapa"
+	add_child(malhas_mapa)
+	malhas_mapa.montar()
+	var t2 := Time.get_ticks_msec()
+	colisao = ColisaoMapa.new(terreno)
+	colisao.name = "Colisao"
+	add_child(colisao)
+	colisao.montar()
+	var t3 := Time.get_ticks_msec()
 	mundo = Mundo.new(terreno)
+	mundo.name = "Mundo"
 	add_child(mundo)
-	mundo.montar()
+	mundo.montar(colisao)
+	var t4 := Time.get_ticks_msec()
+	print("mapa: relevo %d ms, malhas %d ms (%d mil vértices), colisão %d ms (%d formas), mata e saque %d ms" % [
+		t1 - t0, t2 - t1, malhas_mapa.n_vertices / 1000, t3 - t2, colisao.n_formas, t4 - t3])
+	mundo.tirar_fotos()
 	grama = Grama.new(terreno)
 	add_child(grama)
 	sons = Sons.new()
@@ -50,12 +73,11 @@ func _ready() -> void:
 	ui = UI.new(self)
 	add_child(ui)
 	# começo: mão vazia (nada de item de graça); tudo sai de coleta, caixa e fabricação
-	_zumbis_vila()
 	if "--teste" in args:
-		_vigia(240.0, "TESTE")
+		_vigia(360.0, "TESTE")
 		_teste.call_deferred()
 	elif "--fotos" in args:
-		_vigia(800.0, "FOTOS")
+		_vigia(1500.0, "FOTOS")
 		_fotos.call_deferred()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -169,14 +191,20 @@ func _process(dt: float) -> void:
 		if antes < 6.0 and hora >= 6.0:
 			ui.aviso("Amanheceu: dia %d" % dia, 5.0)
 	_ciclo()
-	# zumbis: alguns de dia, muitos de noite; nascem longe e fora da vista
+	terreno.mare(hora)
+	# zumbis: os de cada lugar (vila, posto, fazenda, sítios...) aparecem quando você chega perto; fora isso, alguns
+	# andam pela mata e pela cidade (mais de noite), nascendo longe e fora da vista
+	if not modo_teste:
+		_zumbis_dos_lugares(dt)
 	spawn_t -= dt
 	if spawn_t <= 0.0:
 		spawn_t = 12.0
 		zumbis = zumbis.filter(func(z): return is_instance_valid(z))
-		var vivos := zumbis.filter(func(z): return z.estado != "morto").size()
-		var teto := 14 if noite() else 7
-		if vivos < teto and jogador.vivo:
+		var soltos := zumbis.filter(func(z): return z.estado != "morto" and not z.has_meta("lugar")).size()
+		var teto := 10 if noite() else 5
+		if na_cidade(jogador.global_position):
+			teto += 4
+		if soltos < teto and jogador.vivo:
 			_nascer_perto()
 	if Input.is_action_just_pressed("mochila") and jogador.vivo:
 		ui.abrir(not ui.aberto)
@@ -191,11 +219,11 @@ func _process(dt: float) -> void:
 func aplicar_qualidade(q: int) -> void:
 	var cfg: Dictionary = [
 		{"msaa": Viewport.MSAA_DISABLED, "escala": 0.75, "sombra": 2048, "dist": 40.0, "brilho": false, "mata": 0.55, "longe": 420.0, "neblina": 0.0085,
-			"capim": 56, "capim_passo": 0.9},
+			"capim": 56, "capim_passo": 0.9, "predios": 0.75},
 		{"msaa": Viewport.MSAA_DISABLED, "escala": 1.0, "sombra": 2048, "dist": 75.0, "brilho": true, "mata": 0.8, "longe": 650.0, "neblina": 0.0055,
-			"capim": 90, "capim_passo": 0.8},
+			"capim": 90, "capim_passo": 0.8, "predios": 1.0},
 		{"msaa": Viewport.MSAA_2X, "escala": 1.0, "sombra": 4096, "dist": 110.0, "brilho": true, "mata": 1.0, "longe": 900.0, "neblina": 0.0042,
-			"capim": 120, "capim_passo": 0.75},
+			"capim": 120, "capim_passo": 0.75, "predios": 1.35},
 	][clampi(q, 0, 2)]
 	var vp := get_viewport()
 	vp.msaa_3d = cfg["msaa"]
@@ -206,35 +234,86 @@ func aplicar_qualidade(q: int) -> void:
 	amb.fog_density = cfg["neblina"]
 	jogador.cam.far = cfg["longe"]
 	mundo.alcance(cfg["mata"])
+	malhas_mapa.alcance(cfg["predios"])
 	grama.densidade(cfg["capim"], cfg["capim_passo"])
 
 
-func _zumbis_vila() -> void:
-	for i in 6:
-		var p := Vector3(Terreno.VILA.x + randf_range(-25, 25), 0, Terreno.VILA.y + randf_range(-25, 25))
-		_nascer(p, false)
+func na_cidade(p: Vector3) -> bool:
+	return Terreno.CIDADE.grow(20.0).has_point(Vector2(p.x, p.z))
+
+
+## a altura do chão de verdade num ponto (o que estiver embaixo de "de_cima": calçada, piso, ponte ou o chão de terra)
+func chao_em(x: float, z: float, de_cima := 90.0) -> Dictionary:
+	var q := PhysicsRayQueryParameters3D.create(Vector3(x, de_cima, z), Vector3(x, -40.0, z), 1)
+	var h := get_world_3d().direct_space_state.intersect_ray(q)
+	if h.is_empty():
+		return {"y": terreno.h(x, z), "terra": true}
+	return {"y": (h["position"] as Vector3).y, "terra": h["collider"] == terreno.corpo_chao}
 
 
 func _nascer(p: Vector3, corre: bool) -> Zumbi:
 	var z := Zumbi.new(self, corre)
 	add_child(z)
-	z.global_position = Vector3(p.x, terreno.h(p.x, p.z) + 0.2, p.z)
+	var y: float = chao_em(p.x, p.z, terreno.h(p.x, p.z) + 2.5)["y"]
+	z.global_position = Vector3(p.x, y + 0.15, p.z)
 	zumbis.append(z)
 	return z
 
 
+## nasce um zumbi longe e fora da vista: no chão de terra ou na rua (nunca em cima de telhado, dentro d'água ou fora do mapa)
 func _nascer_perto() -> void:
-	for t in 12:
+	for t in 14:
 		var a := randf() * TAU
 		var r := randf_range(32.0, 55.0)
 		var p := jogador.global_position + Vector3(cos(a), 0, sin(a)) * r
-		if absf(p.x) > 225 or absf(p.z) > 225 or terreno.h(p.x, p.z) < Terreno.AGUA + 0.3:
+		if not terreno.dentro(p.x, p.z) or terreno.tipo_agua(p.x, p.z) != 0:
+			continue
+		var c := chao_em(p.x, p.z)
+		if absf(float(c["y"]) - terreno.h(p.x, p.z)) > 0.6:
 			continue
 		var frente := -jogador.cam.global_transform.basis.z
-		if frente.dot((p - jogador.global_position).normalized()) > 0.5 and t < 8:
+		if frente.dot((p - jogador.global_position).normalized()) > 0.5 and t < 9:
 			continue
 		_nascer(p, noite() and randf() < 0.4)
 		return
+
+
+## os zumbis de cada lugar do mapa (os mesmos pontos do jogo antigo): aparecem quando você chega a 120 m e somem quando
+## você vai para longe (os que não estão caçando); o lugar se enche de novo 4 minutos depois
+func _zumbis_dos_lugares(dt: float) -> void:
+	_lugares_t -= dt
+	if _lugares_t > 0.0:
+		return
+	_lugares_t = 1.5
+	var pj := Vector2(jogador.global_position.x, jogador.global_position.z)
+	for id in mundo.zspawn:
+		var pts: Array = mundo.zspawn[id]
+		if pts.is_empty():
+			continue
+		var c := Vector2.ZERO
+		for q in pts:
+			c += Vector2(float(q[0]), float(q[1]))
+		c /= float(pts.size())
+		var d := pj.distance_to(c)
+		if not lugares_z.has(id):
+			lugares_z[id] = {"ativo": false, "zumbis": [], "volta": 0.0}
+		var L: Dictionary = lugares_z[id]
+		L["volta"] = maxf(0.0, float(L["volta"]) - 1.5)
+		if not L["ativo"] and d < 120.0 and float(L["volta"]) <= 0.0 and jogador.vivo:
+			L["ativo"] = true
+			var zs := []
+			for q in pts:
+				var z := _nascer(Vector3(float(q[0]), 0, float(q[1])), noite() and randf() < 0.3)
+				z.set_meta("lugar", id)
+				zs.append(z)
+			L["zumbis"] = zs
+		elif L["ativo"] and d > 220.0:
+			L["ativo"] = false
+			L["volta"] = 240.0
+			for z in L["zumbis"]:
+				if is_instance_valid(z) and z.estado != "caca":
+					z.queue_free()
+			L["zumbis"] = []
 
 
 func zumbi_morreu(_z) -> void:
@@ -259,7 +338,10 @@ func texto_mira() -> String:
 		return ""
 	var c: Object = h["collider"]
 	if c.has_meta("caixa"):
-		return "E  Revistar a caixa" if mundo.caixas[c.get_meta("caixa")]["cheia"] else "Caixa vazia"
+		var cx: Dictionary = mundo.caixas[c.get_meta("caixa")]
+		return ("E  " + str(cx["nome"])) if cx["cheia"] else "Vazio (volta a ter coisa depois)"
+	if c.has_meta("agua"):
+		return "E  Beber água: " + str(mundo.aguas[c.get_meta("agua")]["nome"])
 	if c.has_meta("porta"):
 		return "E  Fechar a porta" if construcao.portas[c.get_meta("porta")]["aberta"] else "E  Abrir a porta"
 	if c.has_meta("bau"):
@@ -268,7 +350,9 @@ func texto_mira() -> String:
 		var r: Dictionary = mundo.recursos[c.get_meta("recurso")]
 		match r["tipo"]:
 			"planta":
-				return "E  Colher fibra"
+				return "E  Colher fibra" + (" (tem frutinha)" if r.get("fruta", false) else "")
+			"solto":
+				return "E  Pegar " + str({"pedra": "a pedra", "galho": "o galho", "cogumelo": "o cogumelo", "fibra": "a fibra"}.get(r["nome"], r["nome"]))
 			"arvore", "tronco":
 				return "Madeira (bata com o machado)"
 			"pedra":
@@ -375,25 +459,87 @@ func _peca_mirando(b0: Dictionary, n_peca: int, de: Vector3, alvo_local: Vector3
 	return true
 
 
+## um lugar livre e quase plano de "lado" metros perto de "centro" (para a base de teste e as fotos): sem árvore, pedra,
+## parede nem água
+func _lugar_livre(centro: Vector2, lado: float, evita := Vector2(99999, 99999)) -> Vector3:
+	var sp := get_world_3d().direct_space_state
+	var q := PhysicsShapeQueryParameters3D.new()
+	var caixa := BoxShape3D.new()
+	caixa.size = Vector3(lado, 4.0, lado)
+	q.shape = caixa
+	q.collision_mask = 1
+	var fora: Array[RID] = [terreno.corpo_chao.get_rid()]
+	q.exclude = fora
+	for k in 400:
+		var a := k * 2.39996
+		var r := 1.0 + k * 0.45
+		var p := centro + Vector2(cos(a), sin(a)) * r
+		if p.distance_to(evita) < lado + 4.0 or not terreno.dentro(p.x, p.y) or terreno.tipo_agua(p.x, p.y) != 0:
+			continue
+		var ys := []
+		var m := lado * 0.5
+		for d in [Vector2(-m, -m), Vector2(m, -m), Vector2(-m, m), Vector2(m, m), Vector2.ZERO]:
+			ys.append(terreno.h(p.x + d.x, p.y + d.y))
+		if ys.max() - ys.min() > 1.0:
+			continue
+		q.transform = Transform3D(Basis(), Vector3(p.x, terreno.h(p.x, p.y) + 2.3, p.y))
+		if sp.intersect_shape(q, 1).is_empty():
+			return Vector3(p.x, terreno.h(p.x, p.y), p.y)
+	return Vector3(centro.x, terreno.h(centro.x, centro.y), centro.y)
+
+
+## a beira de terra de um lago ou rio: anda do meio da água para fora até achar chão seco com 3 m de terra depois
+func _beira(centro: Vector2) -> Dictionary:
+	var melhor := {}
+	for k in 16:
+		var a := k * TAU / 16.0
+		var d := Vector2(cos(a), sin(a))
+		var achou_agua := false
+		for n in 120:
+			var p := centro + d * (n * 0.5)
+			var t := terreno.tipo_agua(p.x, p.y)
+			if t == 1:
+				achou_agua = true
+				continue
+			if not achou_agua:
+				continue
+			var seco := true
+			for m in 6:
+				var q := p + d * (m * 0.5)
+				if terreno.tipo_agua(q.x, q.y) != 0:
+					seco = false
+			if seco and terreno.h(p.x, p.y) > terreno.nivel_agua(p.x - d.x, p.y - d.y) + 0.05:
+				if melhor.is_empty() or n < int(melhor["n"]):
+					melhor = {"p": p, "d": d, "n": n}
+			break
+	return melhor
+
+
 func _teste() -> void:
 	print("TESTE VAYDR Godot: começo")
 	await _quadros(5)
 	var F := Construcao.FUND
-	var n_arv := 0
-	var n_ped := 0
-	var n_pla := 0
+	# o mapa do jogo antigo
+	_confere(terreno.W == 801 and terreno.H == 681 and terreno.alturas.size() == 801 * 681, "relevo do jogo antigo: %d x %d m" % [terreno.W, terreno.H])
+	_confere(malhas_mapa.nos.size() >= 300 and malhas_mapa.n_vertices > 1500000, "prédios, casas, bairros, ruas e o resto: %d malhas, %d mil vértices" % [malhas_mapa.nos.size(), malhas_mapa.n_vertices / 1000])
+	_confere(colisao.n_formas > 5000 and colisao.brenha.size() > 1000, "colisão do mapa: %d formas (%d sem desenho ficaram de fora), borda de mato com %d pontos" % [colisao.n_formas, colisao.n_sem_desenho, colisao.brenha.size()])
+	var n := {"arvore": 0, "pedra": 0, "planta": 0, "solto": 0, "tronco": 0}
 	for r in mundo.recursos:
-		match r["tipo"]:
-			"arvore":
-				n_arv += 1
-			"pedra":
-				n_ped += 1
-			"planta":
-				n_pla += 1
-	_confere(n_arv > 300 and n_ped > 40 and n_pla > 200, "mundo: %d árvores, %d pedras, %d plantas, %d caixas" % [n_arv, n_ped, n_pla, mundo.caixas.size()])
+		n[r["tipo"]] = int(n.get(r["tipo"], 0)) + 1
+	_confere(n["arvore"] > 7000 and n["pedra"] > 250 and n["planta"] > 900 and n["solto"] > 700 and n["tronco"] > 50,
+		"mata do jogo antigo: %d árvores, %d pedras, %d moitas, %d coisas no chão, %d troncos caídos" % [n["arvore"], n["pedra"], n["planta"], n["solto"], n["tronco"]])
+	_confere(mundo.caixas.size() > 700 and mundo.aguas.size() >= 9, "%d móveis e baús para revistar, %d poços e barris" % [mundo.caixas.size(), mundo.aguas.size()])
+	_confere(mundo.zspawn.size() >= 10, "zumbis de %d lugares do mapa" % mundo.zspawn.size())
 	_confere(jogador.inv.conta("bandagem") == 0 and jogador.item_mao().is_empty(), "começa de mão vazia (sem item de graça)")
-	# andar e pular de verdade (pelas teclas)
-	_por_em(Vector3(0, terreno.h(0, 10) + 0.2, 10))
+	_confere(Vector2(jogador.global_position.x, jogador.global_position.z).distance_to(Vector2(SPAWN.x, SPAWN.z)) < 2.0, "começa onde o jogo antigo começa (8, 44)")
+	# a maré sobe e desce
+	terreno.mare(0.0)
+	var m0 := terreno.nivel_mar
+	terreno.mare(3.1)
+	_confere(terreno.nivel_mar > m0 + 0.5, "maré: o mar sobe (%.2f -> %.2f m)" % [m0, terreno.nivel_mar])
+	# andar e pular de verdade (pelas teclas), num lugar livre da clareira
+	var livre := _lugar_livre(Vector2(0, 0), 14.0)
+	_por_em(Vector3(livre.x, livre.y + 0.2, livre.z + 4.0))
 	await _quadros(20)
 	_olhar(jogador.global_position + Vector3(0, 1.6, -10))
 	var p0 := jogador.global_position
@@ -407,32 +553,65 @@ func _teste() -> void:
 	Input.action_release("pular")
 	_confere(jogador.global_position.y > y0 + 0.4, "pular (subiu %.2f m)" % (jogador.global_position.y - y0))
 	await _quadros(40)
-	# coleta de verdade: o jogador vai até uma árvore e bate com a mão
+	# degrau de 30 cm (meio-fio): sobe andando, sem pular
+	var dg := StaticBody3D.new()
+	var dgs := CollisionShape3D.new()
+	var dgb := BoxShape3D.new()
+	dgb.size = Vector3(3.0, 0.3, 3.0)
+	dgs.shape = dgb
+	dg.add_child(dgs)
+	add_child(dg)
+	_por_em(Vector3(livre.x, livre.y + 0.1, livre.z + 3.0))
+	await _quadros(15)
+	var chao0 := jogador.global_position.y
+	dg.global_position = Vector3(livre.x, chao0 + 0.15, livre.z + 0.4)
+	_olhar(jogador.global_position + Vector3(0, 1.6, -10))
+	await _quadros(4)
+	await _segurar("frente", 50)
+	await _quadros(10)
+	_confere(jogador.global_position.y > chao0 + 0.25, "sobe degrau de 30 cm andando (%.2f m)" % (jogador.global_position.y - chao0))
+	dg.queue_free()
+	await _quadros(5)
+	# o chão da cidade e o andar de cima de um prédio seguram (não cai pelo chão)
+	_por_em(Vector3(250, 1.2, 12))
+	await _quadros(45)
+	_confere(jogador.global_position.y > -0.3 and jogador.global_position.y < 0.8 and jogador.vivo, "rua da cidade segura (y %.2f)" % jogador.global_position.y)
+	_por_em(Vector3(216.1, 3.47 + 0.6, 28.2))
+	await _quadros(45)
+	_confere(absf(jogador.global_position.y - 3.47) < 0.4, "1º andar do Edifício Aurora segura (y %.2f, piso 3,47)" % jogador.global_position.y)
+	# coleta de verdade: o jogador vai até a árvore mais perto do começo e bate com a mão
 	var arv: Dictionary = {}
+	var dmin := 1e9
 	for r in mundo.recursos:
-		if r["tipo"] == "arvore" and Vector2(r["pos"].x, r["pos"].z).distance_to(Vector2(jogador.global_position.x, jogador.global_position.z)) < 80:
-			arv = r
-			break
-	if arv.is_empty():
-		arv = mundo.recursos[0]
+		if r["tipo"] == "arvore":
+			var dd: float = Vector2(r["pos"].x, r["pos"].z).distance_to(Vector2(livre.x, livre.z))
+			if dd < dmin:
+				dmin = dd
+				arv = r
 	var pa: Vector3 = arv["pos"]
-	_por_em(pa + Vector3(1.4, 0.3, 0))
+	var raio_a: float = (((arv["corpo"] as StaticBody3D).get_child(0) as CollisionShape3D).shape as CylinderShape3D).radius
+	var lado_a := Vector3(livre.x - pa.x, 0, livre.z - pa.z).normalized()
+	var junto := pa + lado_a * (raio_a + 0.9)
+	_por_em(Vector3(junto.x, terreno.h(junto.x, junto.z) + 0.3, junto.z))
 	await _quadros(10)
 	_olhar(pa + Vector3(0, 1.3, 0))
 	await _quadros(3)
-	var m0 := jogador.inv.conta("madeira")
+	var md0 := jogador.inv.conta("madeira")
 	for i in 4:
 		jogador.cd = 0.0
 		jogador.atacar()
 		await _quadros(2)
-	var com_mao := jogador.inv.conta("madeira") - m0
+	var com_mao := jogador.inv.conta("madeira") - md0
 	_confere(com_mao > 0, "coleta: bater na árvore com a mão deu madeira (%d em 4 golpes)" % com_mao)
-	# pedra com a mão
+	# pedra com a mão: a pedra mais perto
 	var ped: Dictionary = {}
+	dmin = 1e9
 	for r in mundo.recursos:
-		if r["tipo"] == "pedra" and Vector2(r["pos"].x, r["pos"].z).length() < 150:
-			ped = r
-			break
+		if r["tipo"] == "pedra":
+			var dd2: float = Vector2(r["pos"].x, r["pos"].z).distance_to(Vector2(livre.x, livre.z))
+			if dd2 < dmin:
+				dmin = dd2
+				ped = r
 	var pno: MeshInstance3D = ped["no"]
 	var caixa_p: AABB = pno.get_aabb()
 	var pc_w: Vector3 = pno.global_transform * caixa_p.get_center()
@@ -447,6 +626,27 @@ func _teste() -> void:
 		jogador.atacar()
 		await _quadros(2)
 	_confere(jogador.inv.conta("pedra") > s0, "coleta: bater na pedra deu pedra (%d)" % (jogador.inv.conta("pedra") - s0))
+	# pegar coisa do chão (E)
+	var solto: Dictionary = {}
+	var isolto := -1
+	dmin = 1e9
+	for k in mundo.recursos.size():
+		var r: Dictionary = mundo.recursos[k]
+		if r["tipo"] == "solto":
+			var dd3: float = Vector2(r["pos"].x, r["pos"].z).distance_to(Vector2(livre.x, livre.z))
+			if dd3 < dmin:
+				dmin = dd3
+				solto = r
+				isolto = k
+	var ps: Vector3 = solto["pos"]
+	_por_em(Vector3(ps.x + 1.0, terreno.h(ps.x + 1.0, ps.z) + 0.3, ps.z))
+	await _quadros(10)
+	_olhar(ps + Vector3(0, 0.15, 0))
+	await _quadros(3)
+	var item_s: String = solto["item"]
+	var antes_s := jogador.inv.conta(item_s)
+	jogador.usar()
+	_confere(jogador.inv.conta(item_s) > antes_s and float(mundo.recursos[isolto]["vida"]) <= 0.0, "E pega %s do chão (+%d %s)" % [solto["nome"], jogador.inv.conta(item_s) - antes_s, item_s])
 	# fabricação
 	jogador.inv.por("madeira", 600)
 	jogador.inv.por("pedra", 100)
@@ -463,7 +663,7 @@ func _teste() -> void:
 	if im >= 0:
 		jogador.selecionar(im)
 		_confere(jogador.ferramenta_no != null, "machado aparece na mão")
-		_por_em(pa + Vector3(1.4, 0.3, 0))
+		_por_em(Vector3(junto.x, terreno.h(junto.x, junto.z) + 0.3, junto.z))
 		await _quadros(10)
 		_olhar(pa + Vector3(0, 1.3, 0))
 		await _quadros(3)
@@ -472,7 +672,7 @@ func _teste() -> void:
 		jogador.atacar()
 		var com_machado := jogador.inv.conta("madeira") - m1
 		_confere(com_machado > com_mao / 4.0 * 2.0, "machado: %d de madeira num golpe (mão: %d em 4)" % [com_machado, com_mao])
-	# construção: base 2x2 na clareira, paredes, porta, janela, piso e escada
+	# construção: base 2x2 num lugar livre perto da clareira, paredes, porta, janela, piso e escada
 	var ip := -1
 	for i in Inventario.ESPACOS:
 		if jogador.inv.slots[i] != null and jogador.inv.slots[i]["id"] == "plano":
@@ -482,7 +682,7 @@ func _teste() -> void:
 		ip = 0
 	jogador.selecionar(ip)
 	_confere(construcao.ativo, "plano na mão liga a construção")
-	_por_em(Vector3(10, terreno.h(10, 20) + 0.3, 20))
+	_por_em(Vector3(livre.x, livre.y + 0.3, livre.z + 1.0))
 	await _quadros(8)
 	_olhar(jogador.global_position + Vector3(0, -0.2, -4.0))
 	await _quadros(3)
@@ -590,31 +790,82 @@ func _teste() -> void:
 			ui.abrir(false)
 		_na_mao("lanterna")
 		_confere(jogador.luz_mao.visible, "lanterna acende na mão")
-	# caixa da vila
-	var L: Array = mundo.revistar(0)
-	_confere(L.size() > 0 and not mundo.caixas[0]["cheia"], "caixa da vila tem coisa e fica vazia depois (%s)" % str(L))
-	# água do lago
-	var beira := Vector3.ZERO
+	# móveis dos prédios: o que tem dentro sai da tabela do jogo antigo; depois de revistado fica vazio
+	var ic := -1
+	var achou: Array = []
 	for k in 60:
-		var dd := 20.0 + k * 0.5
-		var q := Vector2(Terreno.LAGO.x + dd, Terreno.LAGO.y)
-		if terreno.h(q.x, q.y) > Terreno.AGUA + 0.15:
-			beira = Vector3(q.x, terreno.h(q.x, q.y), q.y)
+		var L2: Array = mundo.revistar(k)
+		if not L2.is_empty():
+			ic = k
+			achou = L2
 			break
-	if beira != Vector3.ZERO:
-		_por_em(beira + Vector3(0.3, 0.2, 0))
+	_confere(ic >= 0 and not mundo.caixas[ic]["cheia"] and mundo.revistar(ic).is_empty(),
+		"revistar móvel: %s deu %s e ficou vazio" % [mundo.caixas[maxi(ic, 0)]["nome"] + " (" + str(mundo.caixas[maxi(ic, 0)]["tabela"]) + ")", str(achou)])
+	# revistar pela mira (E) um móvel do 1º andar do Edifício Aurora
+	var ia := -1
+	for k in mundo.caixas.size():
+		var cx: Dictionary = mundo.caixas[k]
+		var pc: Vector3 = cx["pos"]
+		if cx["cheia"] and pc.y > 3.0 and pc.y < 4.0 and pc.x > 213.0 and pc.x < 227.0 and pc.z > 19.0 and pc.z < 37.0:
+			ia = k
+			break
+	if ia >= 0:
+		var pcx: Vector3 = mundo.caixas[ia]["pos"]
+		var frente_c := Vector3(220.0 - pcx.x, 0, 28.0 - pcx.z).normalized()
+		var de_c := pcx + frente_c * 1.3
+		_por_em(Vector3(de_c.x, pcx.y + 0.1, de_c.z))
+		await _quadros(10)
+		_olhar(pcx + Vector3(0, 0.5, 0))
+		await _quadros(3)
+		var txt := texto_mira()
+		jogador.usar()
+		_confere(not mundo.caixas[ia]["cheia"], "revistar com E dentro do prédio (mira: \"%s\")" % txt)
+	else:
+		_confere(false, "achar móvel no 1º andar do Edifício Aurora")
+	# água do lago (a beira de terra mais perto do meio)
+	var bl := _beira(Vector2(66, 104))
+	if not bl.is_empty():
+		var pb: Vector2 = bl["p"]
+		var db: Vector2 = bl["d"]
+		_por_em(Vector3(pb.x, terreno.h(pb.x, pb.y) + 0.2, pb.y))
 		await _quadros(15)
-		_olhar(Vector3(beira.x - 2.5, Terreno.AGUA, beira.z))
+		var alvo_b := pb - db * 2.5
+		_olhar(Vector3(alvo_b.x, terreno.nivel_agua(alvo_b.x, alvo_b.y), alvo_b.y))
 		jogador.sede = 40.0
 		jogador.usar()
 		_confere(jogador.sede > 60.0, "beber água no lago (sede %d)" % int(jogador.sede))
 	else:
 		_confere(false, "achar a beira do lago")
+	# poço: E bebe
+	var pp: Vector3 = mundo.aguas[1]["pos"]
+	_por_em(Vector3(pp.x + 1.6, terreno.h(pp.x + 1.6, pp.z) + 0.3, pp.z))
+	await _quadros(10)
+	_olhar(pp + Vector3(0, 0.6, 0))
+	jogador.sede = 40.0
+	jogador.usar()
+	_confere(jogador.sede > 60.0, "beber no %s (sede %d)" % [mundo.aguas[1]["nome"], int(jogador.sede)])
 	_confere(jogador.fome < 100.0 and jogador.sede < 100.0, "fome e sede caem com o tempo")
-	# zumbi: nasce perto, caça, bate e morre com os golpes
-	_por_em(Vector3(-20, terreno.h(-20, 30) + 0.3, 30))
+	# zumbis da vila: aparecem quando você chega perto e somem quando vai embora
+	_por_em(Vector3(40, terreno.h(40, -40) + 0.3, -40))
+	await _quadros(3)
+	_lugares_t = 0.0
+	_zumbis_dos_lugares(0.1)
+	var nv: int = (lugares_z.get("vila", {}).get("zumbis", []) as Array).size()
+	_confere(nv >= 8, "chegou na vila: %d zumbis apareceram nos pontos do jogo antigo" % nv)
+	_por_em(Vector3(livre.x, livre.y + 0.3, livre.z + 30.0))
+	await _quadros(3)
+	_por_em(Vector3(-60, terreno.h(-60, 150) + 0.3, 150))
+	await _quadros(3)
+	_lugares_t = 0.0
+	_zumbis_dos_lugares(0.1)
+	await _quadros(3)
+	_confere(not lugares_z["vila"]["ativo"], "foi embora: os zumbis da vila sumiram (voltam depois)")
+	# zumbi: nasce perto, caça, bate e morre com os golpes (noutro lugar livre)
+	var livre2 := _lugar_livre(Vector2(-20, 30), 8.0, Vector2(livre.x, livre.z))
+	_por_em(Vector3(livre2.x, livre2.y + 0.3, livre2.z + 1.5))
 	jogador.vida = 100.0
-	var z := _nascer(Vector3(-20, 0, 27.5), false)
+	await _quadros(5)
+	var z := _nascer(Vector3(livre2.x, 0, livre2.z - 1.0), false)
 	await _quadros(150)
 	_confere(z.estado == "caca", "zumbi viu e caçou o jogador")
 	_confere(jogador.vida < 100.0, "zumbi bateu (vida %d)" % int(jogador.vida))
@@ -633,7 +884,8 @@ func _teste() -> void:
 	_confere(caiu and (construcao.baus[n_baus]["inv"] as Inventario).conta("pedra") >= 37, "a mochila caiu no chão com as coisas")
 	renascer()
 	await _quadros(5)
-	_confere(jogador.vivo and jogador.inv.conta("madeira") == 0, "renasceu na clareira de mão vazia")
+	_confere(jogador.vivo and jogador.inv.conta("madeira") == 0 and Vector2(jogador.global_position.x, jogador.global_position.z).distance_to(Vector2(SPAWN.x, SPAWN.z)) < 2.0,
+		"renasceu no começo, de mão vazia")
 	if construcao.sacos.size() > 0:
 		jogador.ferir(999.0)
 		await _quadros(3)
@@ -650,7 +902,7 @@ func _teste() -> void:
 
 
 func _foto(nome: String) -> void:
-	await _quadros(24)
+	await _quadros(10)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://fotos"))
@@ -662,50 +914,95 @@ func _foto(nome: String) -> void:
 
 ## põe a câmera num ponto do chão olhando para o alvo (relativo: a altura do alvo conta a partir do chão de lá)
 func _cam(pos: Vector3, alvo: Vector3, relativo := true) -> void:
-	_por_em(Vector3(pos.x, terreno.h(pos.x, pos.z) + 0.2, pos.z))
+	var y: float = chao_em(pos.x, pos.z, terreno.h(pos.x, pos.z) + 2.5)["y"]
+	_por_em(Vector3(pos.x, y + 0.2, pos.z))
 	await _quadros(3)
 	if relativo:
 		alvo.y += terreno.h(alvo.x, alvo.z)
 	_olhar(alvo)
 
 
+## câmera solta no ar (o jogador fica parado lá em cima só para a foto)
+func _cam_alto(pos: Vector3, alvo: Vector3) -> void:
+	jogador.set_physics_process(false)
+	_por_em(pos)
+	await _quadros(2)
+	_olhar(alvo)
+
+
 func _fotos() -> void:
-	await _quadros(60)
+	await _quadros(30)
 	hora = 9.5
-	await _cam(Vector3(0, 0, 14), Vector3(0, 2.5, -60))
-	await _foto("1_clareira")
+	print("fotos das espécies prontas: ", mundo.fotos_prontas)
+	# começo do jogo: na mata ao sul da clareira
+	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
+	await _foto("01_comeco_na_mata")
 	jogador.inv.por("pedra", 120)
 	jogador.inv.por("fibra", 30)
 	jogador.inv.por("madeira", 260)
 	jogador.inv.por("machado", 1)
 	ui.abrir(true)
-	await _foto("7_mochila")
+	await _foto("02_mochila")
 	ui.abrir(false)
 	jogador.inv = Inventario.new()
 	jogador.inv.mudou.connect(jogador._atualizar_mao)
 	jogador.inv.mudou.connect(ui.atualizar)
 	ui.atualizar()
-	await _cam(Vector3(-40, 0, -70), Vector3(-80, 2.0, -120))
-	await _foto("2_mata")
-	await _cam(Vector3(40, 0, -20), Vector3(Terreno.VILA.x, 2.0, Terreno.VILA.y))
-	await _foto("3_vila")
-	# machado na mão, de frente para uma árvore
+	await _cam(Vector3(14, 0, 16), Vector3(-6, 2.0, -8))
+	await _foto("03_clareira")
+	# a estrada de asfalto chegando na cidade
+	await _cam(Vector3(140, 0, 6), Vector3(220, 6.0, 10))
+	await _foto("04_estrada_para_a_cidade")
+	# avenida da cidade (prédios dos dois lados)
+	await _cam(Vector3(205, 0, 12), Vector3(300, 8.0, 14))
+	await _foto("05_avenida_da_cidade")
+	# dentro do Edifício Aurora (portaria, térreo)
+	_por_em(Vector3(214.5, 0.4, 20.6))
+	await _quadros(4)
+	_olhar(Vector3(218.0, 1.4, 24.0))
+	await _foto("06_dentro_do_predio")
+	# Morro do Sabiá (sul da cidade) e Cidade Alta (norte)
+	await _cam(Vector3(250, 0, 84), Vector3(255, 6.0, 135))
+	await _foto("07_morro_do_sabia")
+	await _cam(Vector3(230, 0, -70), Vector3(230, 4.0, -150))
+	await _foto("08_cidade_alta")
+	# porto e mar
+	await _cam(Vector3(326, 0, 34), Vector3(390, 4.0, 30))
+	await _foto("09_porto_e_mar")
+	# vila e lago
+	await _cam(Vector3(40, 0, -60), Vector3(62, 2.0, -76))
+	await _foto("10_vila")
+	await _cam(Vector3(30, 0, 100), Vector3(66, 0.5, 104))
+	await _foto("11_lago")
+	# o mapa visto do alto
+	await _cam_alto(Vector3(60, 140, 190), Vector3(220, 0, -20))
+	await _foto("12_mapa_do_alto")
+	jogador.set_physics_process(true)
+	# machado na mão, de frente para uma árvore perto do começo
+	var livre := _lugar_livre(Vector2(0, 0), 14.0)
 	jogador.inv.por("machado", 1)
 	for i in Inventario.BARRA:
 		if jogador.inv.slots[i] != null and jogador.inv.slots[i]["id"] == "machado":
 			jogador.selecionar(i)
+	var arv: Dictionary = {}
+	var dmin := 1e9
 	for r in mundo.recursos:
-		if r["tipo"] == "arvore" and Vector2(r["pos"].x, r["pos"].z).length() < 90:
-			var pa: Vector3 = r["pos"]
-			_por_em(pa + Vector3(1.8, 0.3, 0.6))
-			await _quadros(6)
-			_olhar(pa + Vector3(0, 1.5, 0))
-			break
-	await _foto("8_machado_na_mao")
+		if r["tipo"] == "arvore":
+			var dd: float = Vector2(r["pos"].x, r["pos"].z).distance_to(Vector2(livre.x, livre.z))
+			if dd < dmin:
+				dmin = dd
+				arv = r
+	var pa: Vector3 = arv["pos"]
+	var lado_a := Vector3(livre.x - pa.x, 0, livre.z - pa.z).normalized()
+	var junto := pa + lado_a * 2.2
+	_por_em(Vector3(junto.x, terreno.h(junto.x, junto.z) + 0.3, junto.z))
+	await _quadros(6)
+	_olhar(pa + Vector3(0, 1.5, 0))
+	await _foto("13_machado_na_mao")
 	jogador.inv.tirar("machado", 1)
-	# uma base pequena montada pelo próprio sistema de construção
+	# uma base pequena montada pelo próprio sistema de construção, num lugar livre perto da clareira
 	jogador.inv.por("madeira", 900)
-	_por_em(Vector3(12, terreno.h(12, 22) + 0.3, 22))
+	_por_em(Vector3(livre.x, livre.y + 0.3, livre.z + 1.0))
 	await _quadros(5)
 	_olhar(jogador.global_position + Vector3(0, -0.5, -4.0))
 	await _quadros(2)
@@ -733,13 +1030,7 @@ func _fotos() -> void:
 		_nascer(b0["xf"] * Vector3(8.0, 0, 6.0), false)
 		_nascer(b0["xf"] * Vector3(6.0, 0, 10.0), false)
 		await _cam(fora, centro, false)
-		await _foto("4_base_fim_de_tarde")
-		# dentro da base, olhando a escada
-		hora = 12.0
-		_por_em(b0["xf"] * Vector3(0.6, F + 0.05, 3.6))
-		await _quadros(6)
-		_olhar(b0["xf"] * Vector3(3.0, F + 1.2, 0.0))
-		await _foto("9_escada_por_dentro")
+		await _foto("14_base_fim_de_tarde")
 		hora = 21.5
 		jogador.inv.por("fogueira", 1)
 		_por_em(b0["xf"] * Vector3(-4.0, 0.3, 1.5))
@@ -749,14 +1040,15 @@ func _fotos() -> void:
 		await _quadros(2)
 		construcao.por_fogueira(jogador)
 		await _cam(b0["xf"] * Vector3(-9.0, 0, -2.0), b0["xf"] * Vector3(-3.0, 1.0, 1.5), false)
-		await _foto("5_noite_fogueira")
+		await _foto("15_noite_fogueira")
 	jogador.selecionar(5)
 	hora = 10.0
 	for z in zumbis:
 		if is_instance_valid(z):
 			z.queue_free()
-	var zz := _nascer(Vector3(30, 0, 40), false)
+	var livre2 := _lugar_livre(Vector2(-20, 30), 8.0, Vector2(livre.x, livre.z))
+	var zz := _nascer(Vector3(livre2.x, 0, livre2.z - 1.5), false)
 	zz.estado = "vaga"
-	await _cam(Vector3(30, 0, 44.5), Vector3(30, 1.2, 40))
-	await _foto("6_zumbi")
+	await _cam(Vector3(livre2.x, 0, livre2.z + 3.0), Vector3(livre2.x, 1.2, livre2.z - 1.5))
+	await _foto("16_zumbi")
 	get_tree().quit()

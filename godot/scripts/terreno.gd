@@ -1,98 +1,254 @@
 class_name Terreno
 extends Node3D
-## Chão do mapa: uma grade de 2 em 2 m (512 x 512 m), com morros, a clareira do começo, a vila, o lago e as serras na borda.
-## A malha é desenhada com um shader que mistura grama, chão de mata, folhas e pedra (texturas da Poly Haven, CC0).
+## O chão do mapa do VAYDR: o mesmo mapa do jogo antigo, tirado de lá pelos tools/exportar (relevo de 1 m em 801 x 681 m,
+## a cor do chão de cada lugar, os pisos de asfalto, terra e concreto perto da clareira, o quanto cada ponto é mata, o rio,
+## o lago e o mar). A malha vai em pedaços de 64 m com quatro níveis de detalhe (1, 2, 4 e 8 m), cada um com uma "saia" na
+## borda para não abrir fresta entre pedaços de nível diferente. A colisão é um campo de alturas só.
 
-const TAM := 512.0
-const PASSO := 2.0
-const N := 257
-const AGUA := 0.35
+const PASTA := "res://dados/mapa/"
+const PEDACO := 64
+const AGUA := -0.9        # nível médio do mar
+# lugares do mapa (os mesmos do jogo antigo)
 const CLAREIRA := Vector2(0, 0)
-const VILA := Vector2(70, -55)
-const LAGO := Vector2(-80, 70)
+const VILA := Vector2(62, -72)
+const LAGO := Vector2(66, 104)
+const INICIO := Vector2(8, 44)          # onde o jogo começa: no meio da mata, ao sul da clareira
+const CIDADE := Rect2(172, -84, 164, 178)
 
-var ruido := FastNoiseLite.new()
-var ruido2 := FastNoiseLite.new()
+var X0 := -200.0
+var Z0 := -340.0
+var W := 801
+var H := 681
+var P := 1.0
 var alturas := PackedFloat32Array()
+var agua_nivel := PackedFloat32Array()
+var agua_tipo := PackedByteArray()
+var mar_base := -0.9
+var mar_amp := 0.72
+var mar_periodo := 12.4   # horas do jogo
+var splat_h := 180.0
 var mat: ShaderMaterial
 var corpo_chao: StaticBody3D
-var sombra_img: Image     # chão mais escuro debaixo das árvores (sombra de mata, 1 ponto a cada 2 m)
-
-
-func _init() -> void:
-	ruido.seed = 1977
-	ruido.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	ruido.frequency = 0.006
-	ruido.fractal_octaves = 4
-	ruido2.seed = 51
-	ruido2.frequency = 0.02
-	ruido2.fractal_octaves = 3
-
-
-## altura do chão (a mesma conta da malha e da colisão)
-func h(x: float, z: float) -> float:
-	var y := ruido.get_noise_2d(x, z) * 16.0 + ruido2.get_noise_2d(x, z) * 2.5 + 6.0
-	# clareira do começo e vila: chão mais plano
-	y = lerpf(y, 4.0, _plano(x, z, CLAREIRA, 26.0, 46.0))
-	y = lerpf(y, 5.5, _plano(x, z, VILA, 34.0, 58.0))
-	# lago: uma bacia abaixo do nível da água
-	var dl := Vector2(x, z).distance_to(LAGO)
-	y = lerpf(y, -3.0, 1.0 - smoothstep(18.0, 42.0, dl))
-	# serras na borda (fecham o mapa)
-	var b: float = maxf(absf(x), absf(z))
-	y += smoothstep(200.0, 252.0, b) * 38.0
-	return y
-
-
-func _plano(x: float, z: float, c: Vector2, r0: float, r1: float) -> float:
-	return 1.0 - smoothstep(r0, r1, Vector2(x, z).distance_to(c))
+var tex_altura: ImageTexture
+var tex_cor: ImageTexture
+var tex_mata: ImageTexture
+var tex_pisos: ImageTexture
+var mar: MeshInstance3D
+var nivel_mar := -0.9
+var normais := PackedVector3Array()
 
 
 func montar() -> void:
-	alturas.resize(N * N)
-	for j in N:
-		for i in N:
-			var x := -TAM / 2.0 + i * PASSO
-			var z := -TAM / 2.0 + j * PASSO
-			alturas[j * N + i] = h(x, z)
-	_malha()
-	_colisao()
-	_agua()
-
-
-func _vtx(i: int, j: int) -> Vector3:
-	return Vector3(-TAM / 2.0 + i * PASSO, alturas[j * N + i], -TAM / 2.0 + j * PASSO)
-
-
-func _malha() -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for j in N:
-		for i in N:
-			var p := _vtx(i, j)
-			var hl := alturas[j * N + maxi(i - 1, 0)]
-			var hr := alturas[j * N + mini(i + 1, N - 1)]
-			var hd := alturas[maxi(j - 1, 0) * N + i]
-			var hu := alturas[mini(j + 1, N - 1) * N + i]
-			st.set_normal(Vector3(hl - hr, 2.0 * PASSO, hd - hu).normalized())
-			st.set_uv(Vector2(p.x, p.z))
-			st.add_vertex(p)
-	for j in N - 1:
-		for i in N - 1:
-			var a := j * N + i
-			st.add_index(a)
-			st.add_index(a + 1)
-			st.add_index(a + N)
-			st.add_index(a + 1)
-			st.add_index(a + N + 1)
-			st.add_index(a + N)
-	st.generate_tangents()
-	var mi := MeshInstance3D.new()
-	mi.name = "Chao"
-	mi.mesh = st.commit()
+	_carregar()
+	_normais()
 	mat = _material()
-	mi.material_override = mat
-	add_child(mi)
+	_malhas()
+	_colisao()
+	_agua_doce()
+	_mar()
+
+
+func _carregar() -> void:
+	var meta: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(PASTA + "mapa.json"))
+	X0 = float(meta["X0"])
+	Z0 = float(meta["Z0"])
+	W = int(meta["W"])
+	H = int(meta["H"])
+	P = float(meta["P"])
+	mar_base = float(meta["mar"]["base"])
+	mar_amp = float(meta["mar"]["amp"])
+	mar_periodo = float(meta["mar"]["periodo"])
+	splat_h = float(meta["splat"]["H"])
+	alturas = FileAccess.get_file_as_bytes(PASTA + "relevo.f32").to_float32_array()
+	agua_nivel = FileAccess.get_file_as_bytes(PASTA + "agua.f32").to_float32_array()
+	agua_tipo = FileAccess.get_file_as_bytes(PASTA + "agua_tipo.u8")
+	tex_cor = ImageTexture.create_from_image(Image.create_from_data(W, H, false, Image.FORMAT_RGBA8, FileAccess.get_file_as_bytes(PASTA + "cor.rgba8")))
+	tex_mata = ImageTexture.create_from_image(Image.create_from_data(W, H, false, Image.FORMAT_L8, FileAccess.get_file_as_bytes(PASTA + "mata.u8")))
+	var sp := int(meta["splat"]["S"])
+	var img_p := Image.create_from_data(sp, sp, false, Image.FORMAT_RGBA8, FileAccess.get_file_as_bytes(PASTA + "pisos.rgba8"))
+	img_p.generate_mipmaps()
+	tex_pisos = ImageTexture.create_from_image(img_p)
+	var img_h := Image.create_from_data(W, H, false, Image.FORMAT_RF, alturas.to_byte_array())
+	img_h.convert(Image.FORMAT_RH)
+	tex_altura = ImageTexture.create_from_image(img_h)
+
+
+## altura do chão (a mesma divisão em triângulos da malha: diagonal do canto (i, j) ao (i+1, j+1))
+func h(x: float, z: float) -> float:
+	var fx := (x - X0) / P
+	var fz := (z - Z0) / P
+	if fx <= 0.0 or fz <= 0.0 or fx >= W - 1 or fz >= H - 1:
+		return alturas[clampi(int(fz), 0, H - 1) * W + clampi(int(fx), 0, W - 1)]
+	var i := int(fx)
+	var j := int(fz)
+	var u := fx - i
+	var v := fz - j
+	var a := alturas[j * W + i]
+	var b := alturas[j * W + i + 1]
+	var c := alturas[(j + 1) * W + i]
+	var d := alturas[(j + 1) * W + i + 1]
+	if v >= u:
+		return a + (d - c) * u + (c - a) * v
+	return a + (b - a) * u + (d - b) * v
+
+
+func dentro(x: float, z: float) -> bool:
+	return x > X0 + 2.0 and z > Z0 + 2.0 and x < X0 + (W - 3) * P and z < Z0 + (H - 3) * P
+
+
+## tipo de água no ponto: 0 nada, 1 rio ou lago, 2 mar
+func tipo_agua(x: float, z: float) -> int:
+	var i := clampi(int(round((x - X0) / P)), 0, W - 1)
+	var j := clampi(int(round((z - Z0) / P)), 0, H - 1)
+	return agua_tipo[j * W + i]
+
+
+## nível da água no ponto (ou -999 se não tem água)
+func nivel_agua(x: float, z: float) -> float:
+	var t := tipo_agua(x, z)
+	if t == 2:
+		return nivel_mar
+	if t == 1:
+		var i := clampi(int(round((x - X0) / P)), 0, W - 1)
+		var j := clampi(int(round((z - Z0) / P)), 0, H - 1)
+		return agua_nivel[j * W + i]
+	return -999.0
+
+
+## o ponto está dentro da água (rio, lago ou mar)?
+func na_agua(p: Vector3) -> bool:
+	var n := nivel_agua(p.x, p.z)
+	return n > -900.0 and p.y < n + 0.2 and h(p.x, p.z) < n
+
+
+func _normais() -> void:
+	normais.resize(W * H)
+	for j in H:
+		var j0 := maxi(j - 1, 0)
+		var j1 := mini(j + 1, H - 1)
+		for i in W:
+			var i0 := maxi(i - 1, 0)
+			var i1 := mini(i + 1, W - 1)
+			var dx := (alturas[j * W + i1] - alturas[j * W + i0]) / ((i1 - i0) * P)
+			var dz := (alturas[j1 * W + i] - alturas[j0 * W + i]) / ((j1 - j0) * P)
+			normais[j * W + i] = Vector3(-dx, 1.0, -dz).normalized()
+
+
+## malha em pedaços de 64 m, cada um com 4 níveis de detalhe (passo 1, 2, 4 e 8 m)
+func _malhas() -> void:
+	var niveis := [[1, 0.0, 110.0], [2, 110.0, 230.0], [4, 230.0, 470.0], [8, 470.0, 0.0]]
+	var cj := 0
+	while cj < H - 1:
+		var ci := 0
+		while ci < W - 1:
+			for nv in niveis:
+				var mi := MeshInstance3D.new()
+				mi.mesh = _pedaco(ci, cj, int(nv[0]))
+				mi.material_override = mat
+				mi.visibility_range_begin = nv[1]
+				mi.visibility_range_end = nv[2]
+				mi.visibility_range_begin_margin = 4.0
+				mi.visibility_range_end_margin = 4.0
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if int(nv[0]) <= 2 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				add_child(mi)
+			ci += PEDACO
+		cj += PEDACO
+
+
+func _pedaco(ci: int, cj: int, passo: int) -> ArrayMesh:
+	var i1 := mini(ci + PEDACO, W - 1)
+	var j1 := mini(cj + PEDACO, H - 1)
+	var xs := []
+	var i := ci
+	while i < i1:
+		xs.append(i)
+		i += passo
+	xs.append(i1)
+	var zs := []
+	var j := cj
+	while j < j1:
+		zs.append(j)
+		j += passo
+	zs.append(j1)
+	var nx := xs.size()
+	var nz := zs.size()
+	var vs := PackedVector3Array()
+	var ns := PackedVector3Array()
+	var ids := PackedInt32Array()
+	vs.resize(nx * nz)
+	ns.resize(nx * nz)
+	for b in nz:
+		var jj: int = zs[b]
+		for a in nx:
+			var ii: int = xs[a]
+			vs[b * nx + a] = Vector3(X0 + ii * P, alturas[jj * W + ii], Z0 + jj * P)
+			ns[b * nx + a] = normais[jj * W + ii]
+	ids.resize((nx - 1) * (nz - 1) * 6)
+	var q := 0
+	for b in nz - 1:
+		for a in nx - 1:
+			var p00 := b * nx + a
+			var p01 := p00 + nx
+			ids[q] = p00
+			ids[q + 1] = p01 + 1
+			ids[q + 2] = p01
+			ids[q + 3] = p00
+			ids[q + 4] = p00 + 1
+			ids[q + 5] = p01 + 1
+			q += 6
+	# saia: uma tira para baixo em volta do pedaço (esconde a fresta entre níveis de detalhe)
+	if passo > 1:
+		var bordas := []
+		for a in nx:
+			bordas.append(a)
+		for b in range(1, nz):
+			bordas.append(b * nx + nx - 1)
+		for a in range(nx - 2, -1, -1):
+			bordas.append((nz - 1) * nx + a)
+		for b in range(nz - 2, 0, -1):
+			bordas.append(b * nx)
+		bordas.append(0)
+		var base := vs.size()
+		for k in bordas.size():
+			var q: int = bordas[k]
+			vs.append(vs[q] - Vector3(0, 1.5 * passo, 0))
+			ns.append(ns[q])
+		for k in bordas.size() - 1:
+			var q0: int = bordas[k]
+			var q1: int = bordas[k + 1]
+			var s0 := base + k
+			var s1 := base + k + 1
+			ids.append_array([q0, s1, q1, q0, s0, s1, q0, q1, s1, q0, s1, s0])
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = vs
+	arr[Mesh.ARRAY_NORMAL] = ns
+	arr[Mesh.ARRAY_INDEX] = ids
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
+
+
+func _colisao() -> void:
+	var corpo := StaticBody3D.new()
+	corpo.name = "ChaoColisao"
+	corpo.set_meta("chao", true)
+	var cs := CollisionShape3D.new()
+	var hm := HeightMapShape3D.new()
+	hm.map_width = W
+	hm.map_depth = H
+	var d := PackedFloat32Array()
+	d.resize(W * H)
+	for k in W * H:
+		d[k] = alturas[k] / P
+	hm.map_data = d
+	cs.shape = hm
+	cs.scale = Vector3(P, P, P)
+	# o campo de alturas fica centrado na origem do nó: põe o centro no meio do mapa
+	cs.position = Vector3(X0 + (W - 1) * P * 0.5, 0.0, Z0 + (H - 1) * P * 0.5)
+	corpo.add_child(cs)
+	add_child(corpo)
+	corpo_chao = corpo
 
 
 func _material() -> ShaderMaterial:
@@ -100,57 +256,85 @@ func _material() -> ShaderMaterial:
 	sh.code = """
 shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx;
+uniform sampler2D mapa_cor : source_color, filter_linear;
+uniform sampler2D mapa_mata : filter_linear;
+uniform sampler2D mapa_pisos : filter_linear_mipmap;
+uniform vec4 mapa_ret;
+uniform float pisos_h = 180.0;
 uniform sampler2D t_grama : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D n_grama : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D t_mata : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D n_mata : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D t_folhas : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D n_folhas : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D t_rocha : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D n_rocha : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D ruido : filter_linear_mipmap, repeat_enable;
-uniform sampler2D sombra_mata : filter_linear, repeat_disable;
-uniform float agua = 0.35;
-uniform float tam_mapa = 512.0;
+uniform vec3 med_grama;
+uniform vec3 med_mata;
+uniform vec3 med_folhas;
+uniform vec3 med_rocha;
+varying vec3 wpos;
 varying vec3 wn;
-varying float wy;
+
 void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wn = NORMAL;
-	wy = VERTEX.y;
 }
+
 vec3 duas(sampler2D t, vec2 uv, float tam) {
 	return mix(texture(t, uv / tam).rgb, texture(t, uv / (tam * 3.7) + 0.37).rgb, 0.35);
 }
+
 void fragment() {
-	vec2 uv = UV;
-	float n1 = texture(ruido, uv * 0.0035).r;
-	float n2 = texture(ruido, uv * 0.027 + 0.5).r;
-	float inc = 1.0 - wn.y;
-	float wr = smoothstep(0.16, 0.3, inc + (n2 - 0.5) * 0.12);
-	float wm = smoothstep(0.45, 0.62, n1 + (n2 - 0.5) * 0.3);
-	float wf = smoothstep(0.58, 0.74, n2) * (1.0 - wm * 0.5);
-	float wb = 1.0 - smoothstep(agua + 0.1, agua + 1.2, wy);
-	vec3 c = duas(t_grama, uv, 2.0) * vec3(0.92, 1.12, 0.78);
-	vec3 nm = texture(n_grama, uv / 2.0).rgb;
-	c = mix(c, duas(t_mata, uv, 3.2), wm);
-	nm = mix(nm, texture(n_mata, uv / 3.2).rgb, wm);
-	c = mix(c, duas(t_folhas, uv, 2.4) * 0.85, wf);
-	nm = mix(nm, texture(n_folhas, uv / 2.4).rgb, wf);
-	c = mix(c, duas(t_mata, uv, 3.2) * vec3(0.62, 0.58, 0.52), wb);
-	c = mix(c, duas(t_rocha, uv, 1.8) * vec3(0.58, 0.56, 0.53), wr);
-	nm = mix(nm, texture(n_rocha, uv / 1.8).rgb, wr);
-	float sm = texture(sombra_mata, (uv + tam_mapa * 0.5) / tam_mapa).r;
-	c = mix(c * vec3(0.55, 0.58, 0.5), c, sm);
-	ALBEDO = c * (0.85 + 0.3 * n1);
+	vec2 w = wpos.xz;
+	vec2 um = (w - mapa_ret.xy) / mapa_ret.zw;
+	vec4 base = texture(mapa_cor, um);
+	float mata = texture(mapa_mata, um).r;
+	vec4 pis = vec4(0.0);
+	if (abs(w.x) < pisos_h && abs(w.y) < pisos_h) {
+		pis = texture(mapa_pisos, (w + pisos_h) / (2.0 * pisos_h));
+	}
+	float n1 = texture(ruido, w * 0.0035).r;
+	float n2 = texture(ruido, w * 0.027 + 0.5).r;
+	float inc = 1.0 - normalize(wn).y;
+	float wr = smoothstep(0.2, 0.42, inc + (n2 - 0.5) * 0.1);
+	// textura do chão: grama no aberto, chão de mata dentro da mata, manchas de folha seca, pedra nas encostas
+	vec3 tg = duas(t_grama, w, 2.0) / med_grama;
+	vec3 tm = duas(t_mata, w, 3.2) / med_mata;
+	vec3 tf = duas(t_folhas, w, 2.4) / med_folhas;
+	vec3 tr = duas(t_rocha, w, 1.8) / med_rocha;
+	float wf = smoothstep(0.55, 0.75, n2) * mata;
+	vec3 tx = mix(tg, tm, smoothstep(0.35, 0.75, mata));
+	tx = mix(tx, tf, wf);
+	vec3 nm = mix(texture(n_grama, w / 2.0).rgb, texture(n_mata, w / 3.2).rgb, smoothstep(0.35, 0.75, mata));
+	// estradas: terra batida e asfalto (o mapa de pisos do jogo antigo) e a terra que ele marcava no chão
+	float terra = max(pis.g, base.a);
+	tx = mix(tx, tm * 0.95, terra);
+	tx = mix(tx, vec3(0.55 + 0.25 * n2), pis.r);
+	tx = mix(tx, vec3(0.8 + 0.2 * n2), pis.b);
+	tx = mix(tx, tr, wr);
+	nm = mix(nm, texture(n_rocha, w / 1.8).rgb, wr);
+	vec3 c = base.rgb * clamp(tx, vec3(0.2), vec3(2.2));
+	// a pedra fica com a cor dela (a cor do chão antigo pintava a encosta de verde)
+	c = mix(c, duas(t_rocha, w, 1.8) * 0.62, wr * 0.75);
+	ALBEDO = c * (0.9 + 0.2 * n1);
 	NORMAL_MAP = nm;
-	NORMAL_MAP_DEPTH = 1.2;
-	ROUGHNESS = mix(0.95, 0.8, wr);
+	NORMAL_MAP_DEPTH = 1.0;
+	ROUGHNESS = mix(0.95, 0.85, wr);
 }
 """
 	var m := ShaderMaterial.new()
 	m.shader = sh
+	m.set_shader_parameter("mapa_cor", tex_cor)
+	m.set_shader_parameter("mapa_mata", tex_mata)
+	m.set_shader_parameter("mapa_pisos", tex_pisos)
+	m.set_shader_parameter("mapa_ret", Vector4(X0 - 0.5 * P, Z0 - 0.5 * P, W * P, H * P))
+	m.set_shader_parameter("pisos_h", splat_h)
 	for k in ["grama", "mata", "folhas", "rocha"]:
-		m.set_shader_parameter("t_" + k, load("res://assets/tex/%s_cor.jpg" % k))
+		var t: Texture2D = load("res://assets/tex/%s_cor.jpg" % k)
+		m.set_shader_parameter("t_" + k, t)
+		m.set_shader_parameter("med_" + k, _media(t))
+	for k in ["grama", "mata", "rocha"]:
 		m.set_shader_parameter("n_" + k, load("res://assets/tex/%s_nrm.jpg" % k))
 	var nt := NoiseTexture2D.new()
 	nt.width = 256
@@ -163,89 +347,105 @@ void fragment() {
 	fn.fractal_octaves = 3
 	nt.noise = fn
 	m.set_shader_parameter("ruido", nt)
-	m.set_shader_parameter("agua", AGUA)
-	m.set_shader_parameter("tam_mapa", TAM)
-	sombra_img = Image.create_empty(N, N, false, Image.FORMAT_L8)
-	sombra_img.fill(Color(1, 1, 1))
-	m.set_shader_parameter("sombra_mata", ImageTexture.create_from_image(sombra_img))
 	return m
 
 
-## escurece o chão em volta de cada árvore (chamado pela mata depois de plantar tudo)
-func sombrear(arvores: Array) -> void:
-	for a in arvores:
-		var p: Vector3 = a[0]
-		var r: float = a[1]
-		var ci := int(round((p.x + TAM / 2.0) / PASSO))
-		var cj := int(round((p.z + TAM / 2.0) / PASSO))
-		var n := int(ceil(r / PASSO))
-		for dj in range(-n, n + 1):
-			for di in range(-n, n + 1):
-				var i := ci + di
-				var j := cj + dj
-				if i < 0 or j < 0 or i >= N or j >= N:
-					continue
-				var d := Vector2(di, dj).length() * PASSO / r
-				if d >= 1.0:
-					continue
-				var v := sombra_img.get_pixel(i, j).r
-				sombra_img.set_pixel(i, j, Color(v * (0.55 + 0.45 * d), 0, 0))
-	mat.set_shader_parameter("sombra_mata", ImageTexture.create_from_image(sombra_img))
+## cor média (em luz linear) de uma textura: o shader divide por ela para a textura só dar o desenho e a cor vir do mapa
+func _media(t: Texture2D) -> Vector3:
+	var img := t.get_image()
+	if img == null:
+		return Vector3(0.2, 0.2, 0.2)
+	if img.is_compressed():
+		img.decompress()
+	img.resize(8, 8, Image.INTERPOLATE_BILINEAR)
+	var s := Vector3.ZERO
+	for y in 8:
+		for x in 8:
+			var c := img.get_pixel(x, y).srgb_to_linear()
+			s += Vector3(c.r, c.g, c.b)
+	s /= 64.0
+	return Vector3(maxf(s.x, 0.01), maxf(s.y, 0.01), maxf(s.z, 0.01))
 
 
-func _colisao() -> void:
-	var corpo := StaticBody3D.new()
-	corpo.name = "ChaoColisao"
-	corpo.set_meta("chao", true)
-	var cs := CollisionShape3D.new()
-	var hm := HeightMapShape3D.new()
-	hm.map_width = N
-	hm.map_depth = N
-	var d := PackedFloat32Array()
-	d.resize(N * N)
-	for k in N * N:
-		d[k] = alturas[k] / PASSO
-	hm.map_data = d
-	cs.shape = hm
-	cs.scale = Vector3(PASSO, PASSO, PASSO)
-	corpo.add_child(cs)
-	add_child(corpo)
-	corpo_chao = corpo
-
-
-func _agua() -> void:
+## rio e lago: um quadrado por célula de água na altura dela (as do lado se encostam; um pouco maiores para cobrir a margem)
+func _agua_doce() -> void:
+	var vs := PackedVector3Array()
+	var ids := PackedInt32Array()
+	for j in H:
+		for i in W:
+			var k := j * W + i
+			if agua_tipo[k] != 1:
+				continue
+			var y := agua_nivel[k]
+			var x := X0 + i * P
+			var z := Z0 + j * P
+			var e := P * 0.5 + 0.35
+			var b := vs.size()
+			vs.append_array([Vector3(x - e, y, z - e), Vector3(x + e, y, z - e), Vector3(x + e, y, z + e), Vector3(x - e, y, z + e)])
+			ids.append_array([b, b + 1, b + 2, b, b + 2, b + 3])
+	if vs.is_empty():
+		return
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = vs
+	arr[Mesh.ARRAY_INDEX] = ids
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	var mi := MeshInstance3D.new()
-	mi.name = "Lago"
+	mi.name = "RioLago"
+	mi.mesh = m
+	mi.material_override = _mat_agua(Color(0.1, 0.2, 0.18), 0.82)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+
+
+## o mar: um plano grande a leste (até o horizonte) que sobe e desce com a maré
+func _mar() -> void:
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(110, 110)
-	pm.subdivide_width = 20
-	pm.subdivide_depth = 20
-	mi.mesh = pm
-	mi.position = Vector3(LAGO.x, AGUA, LAGO.y)
+	pm.size = Vector2(1400, 1600)
+	pm.subdivide_width = 70
+	pm.subdivide_depth = 80
+	mar = MeshInstance3D.new()
+	mar.name = "Mar"
+	mar.mesh = pm
+	mar.position = Vector3(250.0 + 700.0, mar_base, 0.0)
+	mar.material_override = _mat_agua(Color(0.05, 0.16, 0.2), 0.9)
+	mar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mar)
+
+
+func _mat_agua(cor: Color, alfa: float) -> ShaderMaterial:
 	var sh := Shader.new()
 	sh.code = """
 shader_type spatial;
 render_mode blend_mix, depth_draw_always, cull_disabled, specular_schlick_ggx;
-uniform vec3 cor_rasa : source_color = vec3(0.16, 0.28, 0.27);
-uniform vec3 cor_funda : source_color = vec3(0.04, 0.09, 0.11);
+uniform vec3 cor : source_color = vec3(0.08, 0.18, 0.2);
+uniform float alfa = 0.85;
+varying vec3 wp;
 void vertex() {
-	VERTEX.y += sin(VERTEX.x * 0.6 + TIME * 1.1) * 0.03 + cos(VERTEX.z * 0.5 + TIME * 0.9) * 0.03;
+	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	VERTEX.y += sin(wp.x * 0.11 + wp.z * 0.03 - TIME * 1.1) * 0.06 + sin(wp.x * 0.05 - wp.z * 0.07 - TIME * 0.7) * 0.05;
 }
 void fragment() {
 	float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
-	ALBEDO = mix(cor_funda, cor_rasa, 0.35) + fr * 0.25;
-	ROUGHNESS = 0.06;
+	float r = sin(wp.x * 1.7 + TIME * 1.3) * sin(wp.z * 1.9 - TIME * 1.1);
+	NORMAL_MAP = normalize(vec3(0.5 + 0.06 * r, 0.5 + 0.06 * cos(wp.x * 1.3 - TIME), 1.0));
+	ALBEDO = cor + fr * 0.2;
+	ROUGHNESS = 0.05;
 	METALLIC = 0.0;
-	SPECULAR = 0.6;
-	ALPHA = mix(0.78, 0.95, fr);
+	SPECULAR = 0.65;
+	ALPHA = mix(alfa, 0.97, fr);
 }
 """
 	var m := ShaderMaterial.new()
 	m.shader = sh
-	mi.material_override = m
-	add_child(mi)
+	m.set_shader_parameter("cor", cor)
+	m.set_shader_parameter("alfa", alfa)
+	return m
 
 
-## o ponto está na água do lago?
-func na_agua(p: Vector3) -> bool:
-	return Vector2(p.x, p.z).distance_to(LAGO) < 50.0 and p.y < AGUA + 0.2 and h(p.x, p.z) < AGUA
+## maré: o mar sobe e desce (ciclo de ~12 horas do jogo, como no jogo antigo)
+func mare(hora: float) -> void:
+	nivel_mar = mar_base + mar_amp * sin(TAU * hora / mar_periodo)
+	if mar:
+		mar.position.y = nivel_mar

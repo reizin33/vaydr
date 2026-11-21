@@ -159,6 +159,8 @@ func _physics_process(dt: float) -> void:
 	if not is_on_floor():
 		velocity.y -= 20.0 * dt
 	move_and_slide()
+	if vel > 0.05 and is_on_wall() and is_on_floor():
+		Jogador.degrau(self, dir * vel * dt)
 	if dir.length() > 0.1 and (vel > 0.05 or estado == "caca"):
 		var giro := atan2(-dir.x, -dir.z)
 		rotation.y = lerp_angle(rotation.y, giro, 1.0 - exp(-8.0 * dt))

@@ -154,6 +154,9 @@ func _physics_process(dt: float) -> void:
 		velocity.y -= GRAV * dt
 		queda_v = minf(queda_v, velocity.y)
 	move_and_slide()
+	# meio-fio, soleira e degrau (até 55 cm, como no jogo antigo): sobe andando
+	if is_on_wall() and is_on_floor() and Vector2(alvo.x, alvo.z).length() > 0.5:
+		Jogador.degrau(self, Vector3(alvo.x, 0, alvo.z) * dt)
 	# cabeça: altura agachado, balanço do passo, tremor
 	var hs := Vector2(velocity.x, velocity.z).length()
 	cabeca.position.y = lerpf(cabeca.position.y, 1.05 if agachado else 1.62, 1.0 - exp(-10.0 * dt))
@@ -228,13 +231,13 @@ func atacar() -> void:
 	if c.has_meta("recurso"):
 		var i: int = c.get_meta("recurso")
 		var rec: Dictionary = main.mundo.recursos[i]
-		var fator: float = d.get(rec["item"], 0.2) if rec["tipo"] != "planta" else 1.0
+		var fator: float = d.get(rec["item"], 0.2) if rec["tipo"] not in ["planta", "solto"] else 1.0
 		var r: Array = main.mundo.bater(i, d["dano"], fator)
 		if not r.is_empty():
 			var sobra := inv.por(r[0], r[1])
 			main.ui.aviso("+%d %s" % [r[1] - sobra, Dados.nome(r[0])])
 			if rec["tipo"] == "planta":
-				_frutinha()
+				_frutinha(0.85 if rec.get("fruta", false) else 0.15)
 		main.sons.tocar("madeira" if rec["item"] == "madeira" else ("pedra" if rec["item"] == "pedra" else "planta"), h["position"], 0.0)
 		main.efeitos.lascas(h["position"], h["normal"], rec["item"])
 	elif c.has_meta("zumbi"):
@@ -267,28 +270,71 @@ func usar() -> void:
 			var b: Dictionary = main.construcao.baus[c.get_meta("bau")]
 			main.ui.abrir_bau(b["inv"], "Sua mochila (caiu quando você morreu)" if b.get("mochila", false) else "Baú")
 			return
+		if c.has_meta("agua"):
+			sede = minf(100.0, sede + 30.0)
+			main.ui.aviso("Você bebeu água (%s)" % main.mundo.aguas[c.get_meta("agua")]["nome"])
+			main.sons.tocar("agua", global_position, -4.0)
+			return
 		if c.has_meta("recurso"):
 			var i: int = c.get_meta("recurso")
-			if main.mundo.recursos[i]["tipo"] == "planta":
+			var rec: Dictionary = main.mundo.recursos[i]
+			if rec["tipo"] in ["planta", "solto"]:
 				var r: Array = main.mundo.bater(i, 1.0, 1.0)
 				if not r.is_empty():
-					inv.por(r[0], r[1])
-					main.ui.aviso("+%d %s" % [r[1], Dados.nome(r[0])])
-					main.sons.tocar("planta", h["position"], 0.0)
-					main.efeitos.lascas(h["position"], h["normal"], "fibra")
-					_frutinha()
+					var sobra := inv.por(r[0], r[1])
+					main.ui.aviso("+%d %s" % [r[1] - sobra, Dados.nome(r[0])])
+					main.sons.tocar("planta" if rec["tipo"] == "planta" else "caixa", h["position"], -3.0)
+					if rec["tipo"] == "planta":
+						main.efeitos.lascas(h["position"], h["normal"], "fibra")
+						_frutinha(0.85 if rec.get("fruta", false) else 0.15)
 				return
-	# beber no lago
-	var o := cam.global_position - cam.global_transform.basis.z * 1.5
-	if main.terreno.na_agua(Vector3(o.x, Terreno.AGUA, o.z)) and global_position.distance_to(Vector3(o.x, Terreno.AGUA, o.z)) < 3.5:
+	# beber no rio ou no lago (o mar é salgado): a água tem que estar logo ali na frente, para onde você olha
+	for dist in [1.0, 1.5, 2.0, 2.5, 3.0]:
+		var o: Vector3 = cam.global_position - cam.global_transform.basis.z * dist
+		var nivel: float = main.terreno.nivel_agua(o.x, o.z)
+		if nivel < -900.0 or absf(global_position.y - nivel) > 2.5:
+			continue
+		if main.terreno.tipo_agua(o.x, o.z) == 2:
+			main.ui.aviso("Água do mar é salgada: não mata a sede")
+			return
 		sede = minf(100.0, sede + 25.0)
-		main.ui.aviso("Você bebeu água do lago")
+		main.ui.aviso("Você bebeu água do rio")
 		main.sons.tocar("agua", global_position, -4.0)
+		return
+
+
+## sobe um degrau de até "alt" m (meio-fio, soleira, degrau de escada): se um pouco mais alto dá para seguir andando
+## e lá na frente tem chão, o corpo vai para cima dele. Serve para o jogador e para os zumbis.
+static func degrau(c: CharacterBody3D, mov: Vector3, alt := 0.55) -> bool:
+	var hz := Vector3(mov.x, 0.0, mov.z)
+	if hz.length() < 0.0005:
+		return false
+	hz = hz.normalized() * maxf(hz.length(), 0.12)
+	var xf := c.global_transform
+	var sobe := Vector3(0, alt, 0)
+	var col := KinematicCollision3D.new()
+	if c.test_move(xf, sobe, col):
+		sobe = col.get_travel()
+		if sobe.y < 0.12:
+			return false
+	var alto := xf.translated(sobe)
+	if c.test_move(alto, hz):
+		return false
+	var frente := alto.translated(hz)
+	if not c.test_move(frente, -sobe - Vector3(0, 0.05, 0), col):
+		return false
+	if col.get_normal().y < 0.7:
+		return false
+	var y := frente.origin.y + col.get_travel().y
+	if y - xf.origin.y < 0.02:
+		return false
+	c.global_position = Vector3(frente.origin.x, y + 0.01, frente.origin.z)
+	return true
 
 
 ## às vezes a planta tem frutinha (comida que dá para achar no mato)
-func _frutinha() -> void:
-	if randf() < 0.35:
+func _frutinha(chance := 0.35) -> void:
+	if randf() < chance:
 		var n := randi_range(1, 3)
 		inv.por("fruta", n)
 		main.ui.aviso("+%d %s" % [n, Dados.nome("fruta")])

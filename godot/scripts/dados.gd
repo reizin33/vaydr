@@ -11,6 +11,7 @@ const ITENS := {
 	"agua": {"nome": "Garrafa d'água", "max": 10, "tipo": "comida", "sede": 35.0, "cor": Color(0.4, 0.6, 0.85)},
 	"bandagem": {"nome": "Bandagem", "max": 10, "tipo": "cura", "vida": 20.0, "cor": Color(0.9, 0.9, 0.85)},
 	"fruta": {"nome": "Frutinha do mato", "max": 30, "tipo": "comida", "fome": 9.0, "sede": 4.0, "cor": Color(0.62, 0.15, 0.3)},
+	"cogumelo": {"nome": "Cogumelo", "max": 20, "tipo": "comida", "fome": 6.0, "sede": 1.0, "cor": Color(0.78, 0.7, 0.58)},
 	"machado": {"nome": "Machado", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/machado.glb", "dano": 22.0, "madeira": 1.0, "pedra": 0.25, "tempo": 0.75},
 	"picareta": {"nome": "Picareta", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/picareta.glb", "dano": 20.0, "madeira": 0.3, "pedra": 1.0, "tempo": 0.85},
 	"facao": {"nome": "Facão", "max": 1, "tipo": "ferramenta", "modelo": "res://assets/ferramentas/facao.glb", "dano": 30.0, "madeira": 0.45, "pedra": 0.1, "tempo": 0.5},

@@ -2,8 +2,9 @@ class_name Grama
 extends MultiMeshInstance3D
 ## Capim denso em volta de quem joga: uma grade de touceiras que anda junto com a câmera (sempre "encaixada" na grade,
 ## para nada escorregar). Cada touceira sorteia o próprio lugar, giro e tamanho pela posição no mundo, então o capim
-## fica sempre igual no mesmo lugar. A altura vem de uma textura do relevo e o capim some onde o chão é pedra, terra
-## de mata, folha seca ou água. Custa pouco: são 6 triângulos por touceira.
+## fica sempre igual no mesmo lugar. A altura vem da textura do relevo do mapa. Onde o capim pode nascer vem de
+## dados/mapa/grama.u8 (tools/exportar/mascara_grama.py: nada de capim na água, na areia, na estrada, na rua, na calçada
+## e dentro das casas); dentro da mata ele fica ralo, em manchas, e some nas encostas de pedra. 6 triângulos por touceira.
 
 var terreno: Terreno
 var lado := 100           # touceiras por lado da grade
@@ -21,13 +22,12 @@ func _ready() -> void:
 	mat_g = ShaderMaterial.new()
 	mat_g.shader = _shader()
 	mat_g.set_shader_parameter("folhas", _textura_folhas())
-	mat_g.set_shader_parameter("altura", _textura_altura())
+	mat_g.set_shader_parameter("altura", terreno.tex_altura)
+	mat_g.set_shader_parameter("mapa_mata", terreno.tex_mata)
+	mat_g.set_shader_parameter("pode", _textura_pode())
 	mat_g.set_shader_parameter("ruido", terreno.mat.get_shader_parameter("ruido"))
-	mat_g.set_shader_parameter("sombra_mata", terreno.mat.get_shader_parameter("sombra_mata"))
-	mat_g.set_shader_parameter("tam", Terreno.TAM)
-	mat_g.set_shader_parameter("n_alt", float(Terreno.N))
-	mat_g.set_shader_parameter("passo_alt", Terreno.PASSO)
-	mat_g.set_shader_parameter("agua", Terreno.AGUA)
+	mat_g.set_shader_parameter("mapa_ret", Vector4(terreno.X0 - 0.5 * terreno.P, terreno.Z0 - 0.5 * terreno.P, terreno.W * terreno.P, terreno.H * terreno.P))
+	mat_g.set_shader_parameter("passo_alt", terreno.P)
 	material_override = mat_g
 	densidade(lado, passo_g)
 
@@ -104,15 +104,14 @@ func _textura_folhas() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-## o relevo numa textura (meio-float), para o shader pôr cada touceira na altura do chão
-func _textura_altura() -> ImageTexture:
-	var n := Terreno.N
-	var img := Image.create_empty(n, n, false, Image.FORMAT_RF)
-	for j in n:
-		for i in n:
-			img.set_pixel(i, j, Color(terreno.alturas[j * n + i], 0, 0))
-	img.convert(Image.FORMAT_RH)
-	return ImageTexture.create_from_image(img)
+## onde o capim pode nascer (uma célula por metro do mapa)
+func _textura_pode() -> ImageTexture:
+	var dados := FileAccess.get_file_as_bytes("res://dados/mapa/grama.u8")
+	if dados.size() != terreno.W * terreno.H:
+		dados = PackedByteArray()
+		dados.resize(terreno.W * terreno.H)
+		dados.fill(255)
+	return ImageTexture.create_from_image(Image.create_from_data(terreno.W, terreno.H, false, Image.FORMAT_L8, dados))
 
 
 func _shader() -> Shader:
@@ -122,22 +121,25 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_disabled;
 uniform sampler2D folhas : source_color, filter_linear_mipmap, repeat_disable;
 uniform sampler2D altura : filter_linear, repeat_disable;
+uniform sampler2D mapa_mata : filter_linear, repeat_disable;
+uniform sampler2D pode : filter_linear, repeat_disable;
 uniform sampler2D ruido : filter_linear_mipmap, repeat_enable;
-uniform sampler2D sombra_mata : filter_linear, repeat_disable;
-uniform float tam = 512.0;
-uniform float n_alt = 257.0;
-uniform float passo_alt = 2.0;
+uniform vec4 mapa_ret;
+uniform float passo_alt = 1.0;
 uniform float passo = 0.8;
 uniform float raio = 38.0;
-uniform float agua = 0.35;
 varying float tom;
 
 float sorte(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+vec2 no_mapa(vec2 w) {
+	return (w - mapa_ret.xy) / mapa_ret.zw;
+}
+
 float h_em(vec2 w) {
-	return texture(altura, ((w + tam * 0.5) / passo_alt + 0.5) / n_alt).r;
+	return texture(altura, no_mapa(w)).r;
 }
 
 void vertex() {
@@ -148,18 +150,19 @@ void vertex() {
 	float r3 = sorte(cel + 41.9);
 	float r4 = sorte(cel + 73.1);
 	vec2 w = cel * passo + (vec2(r1, r2) - 0.5) * passo;
-	// onde tem capim: chão de grama (nem pedra, nem terra de mata, nem folha seca, nem água)
+	// onde tem capim: o mapa diz onde pode; na mata, ralo e em manchas; nada nas encostas de pedra
 	float h = h_em(w);
 	float hx = h_em(w + vec2(passo_alt, 0.0)) - h_em(w - vec2(passo_alt, 0.0));
 	float hz = h_em(w + vec2(0.0, passo_alt)) - h_em(w - vec2(0.0, passo_alt));
 	float inc = 1.0 - normalize(vec3(-hx, 2.0 * passo_alt, -hz)).y;
 	float n1 = texture(ruido, w * 0.0035).r;
 	float n2 = texture(ruido, w * 0.027 + 0.5).r;
-	float wm = smoothstep(0.45, 0.62, n1 + (n2 - 0.5) * 0.3);
-	float wf = smoothstep(0.58, 0.74, n2) * (1.0 - wm * 0.5);
+	float mata = texture(mapa_mata, no_mapa(w)).r;
+	float mancha = smoothstep(0.42, 0.62, n1 + (n2 - 0.5) * 0.3);
+	float wf = smoothstep(0.58, 0.74, n2) * mata;
 	float wr = smoothstep(0.12, 0.24, inc);
-	float sm = texture(sombra_mata, (w + tam * 0.5) / tam).r;
-	float dens = (1.0 - wr) * (1.0 - wm * 0.9) * (1.0 - wf * 0.8) * mix(0.35, 1.0, sm) * step(agua + 0.35, h);
+	float livre = smoothstep(0.55, 0.95, texture(pode, no_mapa(w)).r);
+	float dens = livre * (1.0 - wr) * (1.0 - wf * 0.8) * mix(1.0, 0.12 + 0.6 * mancha, mata);
 	float dist = distance(w, CAMERA_POSITION_WORLD.xz);
 	float some = 1.0 - smoothstep(raio * 0.7, raio, dist);
 	float esc = mix(0.6, 1.15, r4) * some * step(r3 * 0.9 + 0.05, dens);
