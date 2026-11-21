@@ -58,10 +58,13 @@ jobs:
           ./godot-bin --headless --path godot --import 2>&1 | tee importar.log | tail -40
           if grep -E "SCRIPT ERROR|Parse Error|ERROR: Failed" importar.log; then echo "erros na importação"; fi
 
+      # a saída vai inteira para o arquivo; no registro aparece cada linha uma vez só (erro repetido não enche o registro)
       - name: Teste sem tela
         run: |
           set +e
-          timeout 600 ./godot-bin --headless --path godot -- --teste 2>&1 | tee teste.log
+          timeout 300 ./godot-bin --headless --path godot -- --teste 2>&1 | tee teste.log | awk '!visto[$0]++ && n++ < 600'
+          echo "----- resumo -----"
+          grep -E "^(ok |FALHA|TESTE)" teste.log
           grep -q "TESTE OK" teste.log
 
       - name: Fotos (OpenGL por software)
@@ -69,8 +72,19 @@ jobs:
         run: |
           set +e
           export LIBGL_ALWAYS_SOFTWARE=1
-          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | tail -60
+          timeout 840 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
           ls -la godot/fotos || true
+
+      # as fotos saem no próprio registro (em base64), para conferir sem baixar o artefato
+      - name: Fotos no registro
+        if: always()
+        run: |
+          for f in godot/fotos/*.jpg; do
+            [ -f "$f" ] || continue
+            echo "FOTO-INICIO $(basename "$f") $(stat -c %s "$f")"
+            base64 -w 3000 "$f" | sed 's/^/FOTO|/'
+            echo "FOTO-FIM $(basename "$f")"
+          done
 
       - name: Exportar para Windows
         if: always()
@@ -79,6 +93,9 @@ jobs:
           mkdir -p out
           ./godot-bin --headless --path godot --export-release "Windows Desktop" ../out/VAYDR-prototipo.exe 2>&1 | tee exportar.log | tail -30
           ls -la out
+          echo "----- o que mais pesa no pacote -----"
+          du -ak godot/.godot/imported | sort -n | tail -25
+          du -sk godot/.godot/imported
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

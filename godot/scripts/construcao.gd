@@ -91,7 +91,7 @@ func _calcular() -> Dictionary:
 	if id == "fundacao":
 		if base == null:
 			var y: float = main.terreno.h(p.x, p.z)
-			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y, p.z))
+			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y + FUND, p.z))
 			return {"xf": xf, "ok": p.distance_to(j.global_position) < 10.0 and _plano(xf), "chave": "c|%d|%d|%d|0" % [pecas.size() + 1000, 0, 0], "nova": true}
 		var c := _cela(base, p)
 		var xf := _xf_cela(base, c.x, c.y, 0)
@@ -113,7 +113,8 @@ func _calcular() -> Dictionary:
 		var c2 := _cela(base, p)
 		var xf2 := _xf_cela(base, c2.x, c2.y, maxi(andar, 1))
 		var chave2 := "c|%d|%d|%d|%d" % [base["id"], c2.x, c2.y, maxi(andar, 1)]
-		return {"xf": xf2, "ok": not ocupado.has(chave2) and _tem_apoio(base, c2, maxi(andar, 1)), "chave": chave2}
+		var sem_escada := not ocupado.has("e|%d|%d|%d|%d" % [base["id"], c2.x, c2.y, maxi(andar, 1) - 1])
+		return {"xf": xf2, "ok": not ocupado.has(chave2) and sem_escada and _tem_apoio(base, c2, maxi(andar, 1)), "chave": chave2}
 	if id == "escada":
 		var c3 := _cela(base, p)
 		var xf3 := _xf_cela(base, c3.x, c3.y, andar)
@@ -159,7 +160,7 @@ func _base_perto(p: Vector3):
 	var md := 12.0
 	for b in bases:
 		var loc: Vector3 = b["inv"] * p
-		var d := Vector2(loc.x, loc.z).length() - b["raio"]
+		var d: float = Vector2(loc.x, loc.z).length() - float(b["raio"])
 		if d < md:
 			md = d
 			melhor = b
@@ -193,7 +194,7 @@ func _tem_apoio(base: Dictionary, c: Vector2i, andar: int) -> bool:
 func _plano(xf: Transform3D) -> bool:
 	var ys := []
 	for v in [Vector3(-1.4, 0, -1.4), Vector3(1.4, 0, -1.4), Vector3(-1.4, 0, 1.4), Vector3(1.4, 0, 1.4)]:
-		var w := xf * v
+		var w: Vector3 = xf * (v as Vector3)
 		ys.append(main.terreno.h(w.x, w.z))
 	return ys.max() - ys.min() < 1.4
 
@@ -203,7 +204,8 @@ func colocar(id: String, xf: Transform3D, chave: String) -> void:
 		return
 	if id == "fundacao" and alvo.get("nova", false):
 		# base nova: a grade nasce desta fundação (no alto do chão, para não ficar enterrada)
-		var b := {"id": bases.size(), "xf": Transform3D(xf.basis, xf.origin), "y": xf.origin.y + FUND, "y_loc": FUND, "raio": M * 0.8}
+		var b := {"id": bases.size(), "xf": Transform3D(xf.basis, xf.origin - Vector3(0, FUND, 0)), "y": xf.origin.y, "y_loc": FUND,
+			"raio": M * 0.8, "yaw": xf.basis.get_euler().y}
 		b["inv"] = b["xf"].affine_inverse()
 		bases.append(b)
 		chave = "c|%d|0|0|0" % b["id"]
@@ -244,7 +246,7 @@ func _malha(id: String) -> Mesh:
 		"piso":
 			bm.size = Vector3(M, 0.2, M)
 		"escada":
-			bm.size = Vector3(1.4, ALT, M - 0.2)
+			bm.size = Vector3(M - 0.1, ALT, M - 0.1)
 		_:
 			bm.size = Vector3(M, ALT, 0.22)
 	return bm
@@ -277,10 +279,47 @@ func _no(id: String, xf: Transform3D) -> Node3D:
 			folha.set_meta("porta", portas.size())
 			portas.append({"dob": dob, "aberta": false})
 		"escada":
-			for s in 10:
-				var t := float(s) / 10.0
-				_bloco(no, Vector3(1.4, 0.12, 0.29), Vector3(0, ALT * (t + 0.1) - 0.06, M / 2.0 - 0.3 - t * (M - 0.5)))
+			# escada em U dentro da cela: sobe pela esquerda até o patamar do fundo e volta pela direita até o andar de
+			# cima. Os degraus são só desenho; quem segura o pé são duas rampas lisas (sobem a 37°, dá para andar).
+			var meia := ALT / 2.0
+			var deg := 8
+			var passo_z := 2.0 / deg
+			var alt_d := meia / deg
+			for s in deg:
+				var topo_a := (s + 1) * alt_d
+				_visual(no, Vector3(1.4, topo_a, passo_z), Vector3(-0.75, topo_a / 2.0, 1.45 - (s + 0.5) * passo_z))
+				var topo_b := meia + (s + 1) * alt_d
+				_visual(no, Vector3(1.4, topo_b, passo_z), Vector3(0.75, topo_b / 2.0, -0.55 + (s + 0.5) * passo_z))
+			_bloco(no, Vector3(2.9, meia, 0.9), Vector3(0, meia / 2.0, -1.0))
+			var ang := atan2(meia, 2.0)
+			var comp := Vector2(2.0, meia).length()
+			_rampa(no, Vector3(1.4, 0.1, comp), Transform3D(Basis(Vector3.RIGHT, ang), Vector3(-0.75, meia / 2.0 - 0.05, 0.45)))
+			_rampa(no, Vector3(1.4, 0.1, comp), Transform3D(Basis(Vector3.RIGHT, -ang), Vector3(0.75, meia + meia / 2.0 - 0.05, 0.45)))
+			_rampa(no, Vector3(1.4, meia, 2.0), Transform3D(Basis(), Vector3(0.75, meia / 2.0, 0.45)))   # embaixo do lance de cima
 	return no
+
+
+## só o desenho (sem colisão)
+func _visual(pai: Node3D, tam: Vector3, pos: Vector3) -> void:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = tam
+	mi.mesh = bm
+	mi.material_override = mat_madeira
+	mi.position = pos
+	pai.add_child(mi)
+
+
+## só a colisão (rampa da escada)
+func _rampa(pai: Node3D, tam: Vector3, xf: Transform3D) -> void:
+	var sb := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = tam
+	cs.shape = bs
+	sb.add_child(cs)
+	sb.transform = xf
+	pai.add_child(sb)
 
 
 func _bloco(pai: Node3D, tam: Vector3, pos: Vector3) -> StaticBody3D:
