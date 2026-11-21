@@ -1559,23 +1559,55 @@ func _foto(nome: String) -> void:
 		print("foto %s: janela estava %s" % [nome, DisplayServer.window_get_size()])
 		DisplayServer.window_set_size(Vector2i(1280, 720))
 		await _quadros(6)
-	# no Linux sem placa de vídeo (llvmpipe), com o brilho (glow) ligado, às vezes um pedaço de baixo do quadro sai deslocado
-	# para o lado (na tela e na textura); sem o brilho não acontece: a foto sai sem ele (no PC de verdade ele continua)
-	var brilho := amb.glow_enabled
-	amb.glow_enabled = false
 	await _quadros(10)
-	await RenderingServer.frame_post_draw
-	await RenderingServer.frame_post_draw
-	var img: Image = DisplayServer.screen_get_image(DisplayServer.window_get_current_screen())
-	var tam_ok := img != null and not img.is_empty() and img.get_size() == DisplayServer.window_get_size()
-	if not tam_ok:
-		img = get_viewport().get_texture().get_image()
-	amb.glow_enabled = brilho
+	# no Linux sem placa de vídeo (llvmpipe), de vez em quando um quadro sai com um pedaço trocado (deslocado para o lado ou
+	# de outro quadro), na tela e na textura. Tira três seguidas e fica com uma das duas mais parecidas entre si (o defeito
+	# não se repete igual em dois quadros; o mato balançando e um zumbi andando mudam pouco)
+	var caps: Array = []
+	for k in 3:
+		await RenderingServer.frame_post_draw
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		caps.append(_capturar())
+	var img: Image = caps[2]
+	var melhor := 2.0
+	for par in [[0, 1], [1, 2], [0, 2]]:
+		var d := _diferenca(caps[par[0]], caps[par[1]])
+		if d < melhor:
+			melhor = d
+			img = caps[par[0]]
+	if melhor > 0.08:
+		print("foto %s: as três ficaram diferentes (%.0f%%)" % [nome, melhor * 100.0])
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://fotos"))
 	img.save_jpg(ProjectSettings.globalize_path("res://fotos/%s.jpg" % nome), 0.86)
 	var dc := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
 	var pr := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
 	print("foto %s: %d chamadas de desenho, %d mil triângulos, %d fps (software)" % [nome, dc, pr / 1000, Engine.get_frames_per_second()])
+
+
+func _capturar() -> Image:
+	var img: Image = DisplayServer.screen_get_image(DisplayServer.window_get_current_screen())
+	if img == null or img.is_empty() or img.get_size() != DisplayServer.window_get_size():
+		img = get_viewport().get_texture().get_image()
+	return img
+
+
+## quanto duas fotos diferem: a fração dos quadradinhos (64 x 36) com a luz bem diferente
+func _diferenca(a: Image, b: Image) -> float:
+	if a == null or b == null or a.is_empty() or b.is_empty():
+		return 1.0
+	var pa := a.duplicate() as Image
+	var pb := b.duplicate() as Image
+	pa.resize(64, 36, Image.INTERPOLATE_BILINEAR)
+	pb.resize(64, 36, Image.INTERPOLATE_BILINEAR)
+	var ruins := 0
+	for y in 36:
+		for x in 64:
+			var ca := pa.get_pixel(x, y)
+			var cb := pb.get_pixel(x, y)
+			if absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b) > 0.3:
+				ruins += 1
+	return float(ruins) / (64.0 * 36.0)
 
 
 ## põe a câmera num ponto do chão olhando para o alvo (relativo: a altura do alvo conta a partir do chão de lá)

@@ -206,8 +206,12 @@ func _atualizar_mao() -> void:
 		var cena: PackedScene = load(Dados.modelo(id))
 		ferramenta_no = cena.instantiate()
 		mao_item.add_child(ferramenta_no)
-		for mi in ferramenta_no.find_children("*", "MeshInstance3D", true, false):
-			(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for no in ferramenta_no.find_children("*", "MeshInstance3D", true, false):
+			var mi := no as MeshInstance3D
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# na frente de tudo (o jogo antigo limpava a profundidade antes de desenhar a mão): não atravessa parede nem mato
+			for k in mi.mesh.get_surface_count():
+				mi.set_surface_override_material(k, _mat_na_frente(mi.get_active_material(k)))
 	corpo.segurar(id)
 	_luz()
 	main.construcao.ativar(id == "plano")
@@ -239,6 +243,9 @@ void vertex() {
 	vec3 n = NORMAL;
 	float n1 = n.y * cf - n.z * sf;
 	NORMAL = vec3(n.x * ca + n1 * sa, -n.x * sa + n1 * ca, n.y * sf + n.z * cf);
+	// na frente de tudo, como o item (a profundidade no pedaço mais perto da câmera)
+	POSITION = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+	POSITION.z = (0.95 + 0.05 * (POSITION.z / POSITION.w)) * POSITION.w;
 }
 void fragment() {
 	vec3 c = texture(pele, UV).rgb;
@@ -257,6 +264,55 @@ void fragment() {
 	SPECULAR = 0.35;
 }
 """
+## o material do item da primeira pessoa: o mesmo do modelo (textura, cor, aspereza), mas desenhado na frente de tudo
+const SHADER_NA_FRENTE := """
+shader_type spatial;
+uniform sampler2D tex : source_color, filter_linear_mipmap;
+uniform vec4 cor : source_color = vec4(1.0);
+uniform float rug = 0.8;
+uniform float met = 0.0;
+uniform float tem_tex = 0.0;
+void vertex() {
+	// a profundidade vai para o pedaço mais perto da câmera (de 0,9 a 1, com a profundidade invertida do Godot): a mão e o
+	// item não entram na parede nem no mato, e entre eles continuam na ordem certa
+	POSITION = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+	POSITION.z = (0.95 + 0.05 * (POSITION.z / POSITION.w)) * POSITION.w;
+}
+void fragment() {
+	vec4 c = cor;
+	if (tem_tex > 0.5) {
+		c *= texture(tex, UV);
+	}
+	ALBEDO = c.rgb;
+	ROUGHNESS = rug;
+	METALLIC = met;
+}
+"""
+static var _mats_na_frente := {}
+static var _shader_na_frente: Shader = null
+
+
+func _mat_na_frente(m: Material) -> Material:
+	if not m is BaseMaterial3D:
+		return m
+	if _mats_na_frente.has(m):
+		return _mats_na_frente[m]
+	if _shader_na_frente == null:
+		_shader_na_frente = Shader.new()
+		_shader_na_frente.code = SHADER_NA_FRENTE
+	var b := m as BaseMaterial3D
+	var sm := ShaderMaterial.new()
+	sm.shader = _shader_na_frente
+	sm.set_shader_parameter("cor", b.albedo_color)
+	sm.set_shader_parameter("rug", b.roughness)
+	sm.set_shader_parameter("met", b.metallic)
+	if b.albedo_texture != null:
+		sm.set_shader_parameter("tex", b.albedo_texture)
+		sm.set_shader_parameter("tem_tex", 1.0)
+	_mats_na_frente[m] = sm
+	return sm
+
+
 ## a manga de cada peça do tronco na mão da primeira pessoa (MANGAS_FP do jogo antigo): longa ou dobrada, a cor e o punho
 const MANGAS := {"camisaLeve": ["dobrada", 0x2f3742, 0x262c35], "casacoPele": ["longa", 0x7a5638, 0xd6c29c],
 	"casacoGrande": ["longa", 0x6c4b2f, 0x4a3220], "camisaCouro": ["longa", 0x8a5a36, 0x5a3820]}
