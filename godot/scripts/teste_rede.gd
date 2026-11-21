@@ -178,8 +178,9 @@ func _anfitriao(p0: Vector3) -> void:
 	_confere(viu, "vê o convidado no lugar dele (a %.1f m de onde ele ficou)" % (Vector2(b.alvo.x - pc.x, b.alvo.z - pc.z).length() if b != null and is_instance_valid(b) else -1.0))
 	if b == null or not is_instance_valid(b):
 		return
-	var roupa := await _esperar(func(): return b.corpo.g == "homem" and (b.corpo.nos["peca_barba_cheia"] as MeshInstance3D).visible \
-		and (b.corpo.nos["roupa_camiseta"] as MeshInstance3D).visible, 20.0)
+	var vestido := func():
+		return b.corpo.g == "homem" and (b.corpo.nos["peca_barba_cheia"] as MeshInstance3D).visible and (b.corpo.nos["roupa_camiseta"] as MeshInstance3D).visible
+	var roupa := await _esperar(vestido, 20.0)
 	_confere(roupa, "o convidado aparece com o personagem dele (homem de barba) e a roupa que está vestindo (camiseta)")
 	await _quadros(30)
 	_confere(b.visible and b.corpo.estado != "", "o boneco do convidado anda com as animações (%s)" % b.corpo.estado)

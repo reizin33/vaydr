@@ -214,7 +214,7 @@ func entrar(txt: String) -> void:
 		erro = _motivo(str(r["codigo"]), ip, r.get("info", {}))
 		mudou.emit()
 		return
-	var sem_tcp := not r["ok"]
+	var sem_tcp: bool = not r["ok"]
 	status = "Conectando…" if not sem_tcp else "Procurando a partida em %s…" % ip
 	mudou.emit()
 	var p := ENetMultiplayerPeer.new()

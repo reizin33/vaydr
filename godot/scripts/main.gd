@@ -342,8 +342,9 @@ func _process(dt: float) -> void:
 		if not conv:
 			for q in jogadores_vivos():
 				var p: Vector3 = q["p"]
-				var soltos := zumbis.filter(func(z): return z.estado != "morto" and not z.has_meta("lugar") and not z.lan \
-					and Vector2(z.global_position.x - p.x, z.global_position.z - p.z).length() < 75.0).size()
+				var solto_perto := func(z):
+					return z.estado != "morto" and not z.has_meta("lugar") and not z.lan and Vector2(z.global_position.x - p.x, z.global_position.z - p.z).length() < 75.0
+				var soltos := zumbis.filter(solto_perto).size()
 				var teto := 10 if noite() else 5
 				if na_cidade(p):
 					teto += 4
