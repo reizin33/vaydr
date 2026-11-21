@@ -1,6 +1,8 @@
 extends Node3D
 ## VAYDR no Godot: monta o mapa do jogo antigo (relevo, água e maré, prédios, casas, bairros, ruas, colisão, a mata e o
 ## saque), o céu e o dia, o jogador, a tela, a construção e os zumbis (os de cada lugar do mapa e os que andam pela mata).
+## A montagem vai por etapas atrás da tela de carregamento (como no jogo antigo); depois vem o "Quem vai jogar?", o lobby
+## e o Jogar sozinho, e o mundo escolhido é carregado do seu arquivo (cada mundo de cada perfil é salvo separado).
 ## Modos para os testes da nuvem: "-- --teste" (sem tela, confere o mapa, coleta, fabricação, construção e zumbi) e
 ## "-- --fotos" (tira as fotos de conferência em fotos/).
 
@@ -24,6 +26,15 @@ var dia := 1
 var zumbis: Array = []
 var spawn_t := 3.0
 var modo_teste := false   # nos testes da nuvem: não mexe no mouse nem na janela
+var telas: Telas
+var pronto := false       # o mundo terminou de montar
+var em_jogo := false      # um mundo foi escolhido e está rodando (fora do lobby)
+var mundo_sujo := false   # já jogou um mundo nesta montagem (outro mundo pede montar de novo)
+var mundo_atual := {}
+var arq_salvo := ""
+var stats := {"zumbis": 0, "fabricados": 0}
+var _ini_sessao := 0
+var _tempo_base := 0.0
 var lugares_z := {}       # zumbis de cada lugar do mapa: id -> {ativo, zumbis, volta}
 var _lugares_t := 0.0
 const SPAWN := Vector3(8, 0, 44)   # onde o jogo antigo começa: na mata, ao sul da clareira
@@ -34,7 +45,17 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	modo_teste = "--teste" in args or "--fotos" in args
 	Dados.carregar()
+	Ajustes.carregar()
 	_teclas()
+	telas = Telas.new(self)
+	add_child(telas)
+	if not modo_teste:
+		# a tela de carregamento cobre tudo: o 3D só começa a ser desenhado quando o mundo é escolhido
+		get_viewport().disable_3d = true
+		Ajustes.tela_cheia(bool(Ajustes.v["tela_cheia"]))
+		telas.mostrar("carga")
+		telas.carga(0, "Montando o terreno", 2.0)
+		await _quadro()
 	_ambiente()
 	var t0 := Time.get_ticks_msec()
 	terreno = Terreno.new()
@@ -42,20 +63,24 @@ func _ready() -> void:
 	add_child(terreno)
 	terreno.montar()
 	var t1 := Time.get_ticks_msec()
+	await _etapa(1, "Levantando a cidade", 18.0)
 	malhas_mapa = MalhasMapa.new()
 	malhas_mapa.name = "Mapa"
 	add_child(malhas_mapa)
 	malhas_mapa.montar()
+	await _etapa(1, "Mobiliando as casas", 38.0)
 	objetos = ObjetosMapa.new()
 	objetos.name = "Objetos"
 	add_child(objetos)
 	objetos.montar()
 	var t2 := Time.get_ticks_msec()
+	await _etapa(1, "Paredes e chão firmes", 52.0)
 	colisao = ColisaoMapa.new(terreno)
 	colisao.name = "Colisao"
 	add_child(colisao)
 	colisao.montar()
 	var t3 := Time.get_ticks_msec()
+	await _etapa(2, "Plantando a mata", 64.0)
 	mundo = Mundo.new(terreno)
 	mundo.name = "Mundo"
 	add_child(mundo)
@@ -63,9 +88,11 @@ func _ready() -> void:
 	var t4 := Time.get_ticks_msec()
 	print("mapa: relevo %d ms, malhas e objetos %d ms (%d mil vértices, %d objetos), colisão %d ms (%d formas), mata e saque %d ms" % [
 		t1 - t0, t2 - t1, malhas_mapa.n_vertices / 1000, objetos.n_objetos, t3 - t2, colisao.n_formas, t4 - t3])
+	await _etapa(3, "Espalhando os lugares", 82.0)
 	mundo.tirar_fotos()
 	grama = Grama.new(terreno)
 	add_child(grama)
+	await _etapa(4, "Ligando os sons", 92.0)
 	sons = Sons.new()
 	add_child(sons)
 	efeitos = Efeitos.new()
@@ -78,26 +105,93 @@ func _ready() -> void:
 	jogador.morreu.connect(_morreu)
 	ui = UI.new(self)
 	add_child(ui)
+	Ajustes.aplicar(self)
+	pronto = true
 	# começo: mão vazia (nada de item de graça); tudo sai de coleta, caixa e fabricação
 	if "--teste" in args:
+		_entrar_teste()
 		_vigia(360.0, "TESTE")
 		_teste.call_deferred()
 	elif "--fotos" in args:
+		_entrar_teste()
 		_vigia(1500.0, "FOTOS")
 		_fotos.call_deferred()
 	else:
+		# o mundo fica parado (e sem o HUD) até alguém escolher um mundo no lobby
+		get_tree().paused = true
+		ui.visible = false
+		telas.carga_pronta()
+		await get_tree().create_timer(0.7).timeout
+		if Telas.mundo_pedido != "":
+			Perfis.carregar()
+			var m := Perfis.mundo(Perfis.atual, Telas.mundo_pedido)
+			Telas.mundo_pedido = ""
+			if not m.is_empty():
+				telas.jogar(m)
+				return
+		telas.entrada()
+
+
+## nos testes e nas fotos: entra direto num mundo de teste (arquivo à parte, sem mexer nos perfis)
+func _entrar_teste() -> void:
+	arq_salvo = "user://teste_mundo.json"
+	mundo_atual = {"id": "teste", "nome": "Mundo de teste", "arq": arq_salvo}
+	em_jogo = true
+	mundo_sujo = true
+
+
+func _quadro() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
+## avança a tela de carregamento (e deixa ela ser desenhada antes da próxima etapa)
+func _etapa(i: int, texto: String, pct: float) -> void:
+	if modo_teste:
+		return
+	telas.carga(i, texto, pct)
+	await _quadro()
+
+
+## entra no mundo escolhido no lobby: carrega o jogo salvo dele (ou começa do zero, de mão vazia)
+func comecar(m: Dictionary) -> void:
+	mundo_atual = m
+	arq_salvo = str(m.get("arq", ""))
+	_tempo_base = float(m.get("tempo", 0.0))
+	var tinha := carregar_jogo()
+	mundo_sujo = true
+	em_jogo = true
+	ui.visible = true
+	get_viewport().disable_3d = false
+	get_tree().paused = false
+	_ini_sessao = Time.get_ticks_msec()
+	_auto_t = 120.0
+	Ajustes.aplicar(self)
+	if not modo_teste:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		if not carregar_jogo():
-			ui.aviso("Pegue pedras, galhos e fibras do chão (E). Na mão, a cada 3 socos a árvore dá 1 madeira.", 9.0)
-			ui.aviso("Tab abre a mochila e a fabricação: comece pelo machado improvisado e pela picareta.", 10.0)
-		ui.aviso("Esc: menu (gráficos, mouse, salvar, sair). F5 salva.", 9.0)
+	if not tinha:
+		hora = 7.0
+		dia = 1
+		ui.aviso("Você acordou na mata, sem nada. Pegue pedras, galhos e fibras do chão (E).", 9.0)
+		ui.aviso("Na mão, a cada 3 socos a árvore dá 1 madeira. Tab abre a mochila e a fabricação.", 10.0)
+		salvar_jogo()
+	ui.aviso("Esc: pausa e configurações · M: mapa · F5 salva", 7.0)
+
+
+## salva e volta para o lobby (o mundo é montado de novo, limpo, para o próximo)
+func sair_para_lobby() -> void:
+	salvar_jogo()
+	Telas.ir_para = "lobby"
+	get_tree().paused = false
+	get_tree().reload_current_scene()
 
 
 func _teclas() -> void:
 	var mapa := {
 		"frente": [KEY_W], "tras": [KEY_S], "esquerda": [KEY_A], "direita": [KEY_D], "pular": [KEY_SPACE], "correr": [KEY_SHIFT],
 		"agachar": [KEY_CTRL, KEY_C], "usar": [KEY_E], "mochila": [KEY_TAB, KEY_I], "girar": [KEY_R], "sair": [KEY_ESCAPE], "aba_obra": [KEY_Q], "salvar": [KEY_F5],
-		"barra1": [KEY_1], "barra2": [KEY_2], "barra3": [KEY_3], "barra4": [KEY_4], "barra5": [KEY_5], "barra6": [KEY_6], "tela_cheia": [KEY_F11]}
+		"barra1": [KEY_1], "barra2": [KEY_2], "barra3": [KEY_3], "barra4": [KEY_4], "barra5": [KEY_5], "barra6": [KEY_6], "tela_cheia": [KEY_F11],
+		"mapa": [KEY_M], "lanterna": [KEY_F], "construir": [KEY_B], "comandos": [KEY_H]}
 	for a in mapa:
 		if not InputMap.has_action(a):
 			InputMap.add_action(a)
@@ -194,6 +288,17 @@ func _ciclo() -> void:
 
 
 func _process(dt: float) -> void:
+	if not pronto or not em_jogo:
+		return
+	# teclas do jogo: B constrói, F lanterna, H esconde os comandos
+	if jogador.vivo and not ui.aberto and telas.atual == "":
+		if Input.is_action_just_pressed("construir"):
+			jogador.construir()
+		if Input.is_action_just_pressed("lanterna"):
+			jogador.alternar_lanterna()
+		if Input.is_action_just_pressed("comandos"):
+			Ajustes.mudar("comandos", not bool(Ajustes.v["comandos"]))
+			ui.hud.mostrar_comandos(bool(Ajustes.v["comandos"]))
 	# o dia passa devagar (50 s por hora) e a noite mais rápido (25 s por hora): ~11 min de dia e ~5 de noite
 	var antes := hora
 	hora += dt / (SEG_POR_HORA * (0.5 if noite() else 1.0))
@@ -233,7 +338,7 @@ func _process(dt: float) -> void:
 			if jogador.vivo:
 				salvar_jogo()
 	# voltou de outra janela (Alt+Tab): um clique prende o mouse de novo
-	if not modo_teste and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE and not ui.aberto and not ui.menu_aberto and jogador.vivo \
+	if not modo_teste and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE and not ui.aberto and telas.atual == "" and jogador.vivo \
 			and Input.is_action_just_pressed("atacar"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -343,6 +448,7 @@ func _zumbis_dos_lugares(dt: float) -> void:
 
 ## o zumbi pode deixar alguma coisa no chão (a tabela "zumbi" do jogo antigo: pano, munição, sucata)
 func zumbi_morreu(z) -> void:
+	stats["zumbis"] = int(stats.get("zumbis", 0)) + 1
 	var L: Array = mundo.sortear("zumbi")
 	if not L.is_empty():
 		construcao.soltar_no_chao(z.global_position, L)
@@ -355,6 +461,7 @@ func fabricar(r: Dictionary) -> void:
 		ui.aviso(m)
 		return
 	sons.tocar("construir", jogador.global_position, -6.0)
+	stats["fabricados"] = int(stats.get("fabricados", 0)) + 1
 	ui.aviso("Fabricou: %s" % Fabricacao.nome(r))
 
 
@@ -428,21 +535,21 @@ func _morreu() -> void:
 		tinha = true
 	if tinha:
 		construcao.por_mochila(jogador.global_position, caida)
-	ui.mostrar_morte(true)
+	telas.morte(true, tinha)
 
 
 func renascer(no_saco := false) -> void:
-	ui.mostrar_morte(false)
+	telas.morte(false)
 	var p := Vector3(SPAWN.x, terreno.h(SPAWN.x, SPAWN.z) + 0.5, SPAWN.z)
 	if no_saco and construcao.sacos.size() > 0:
 		p = construcao.sacos[construcao.sacos.size() - 1] + Vector3(0, 0.6, 0)
 	jogador.renascer(p)
 	jogador.inv.mudou.connect(ui.atualizar)
 	ui.atualizar()
+	telas._mouse()
 
 
 # ======================= salvar e carregar =======================
-const ARQ_SALVO := "user://vaydr_mundo1.json"
 var _auto_t := 120.0
 
 
@@ -454,23 +561,32 @@ func salvar_jogo() -> bool:
 		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
-		"base": construcao.salvar(), "mundo": mundo.salvar()}
-	var f := FileAccess.open(ARQ_SALVO, FileAccess.WRITE)
+		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats}
+	if arq_salvo == "":
+		return false
+	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
+	var f := FileAccess.open(arq_salvo, FileAccess.WRITE)
 	if f == null:
 		return false
 	f.store_string(JSON.stringify(d))
 	f.close()
+	# o dia, a hora e o tempo jogado aparecem na lista de mundos do Jogar sozinho
+	if mundo_atual.has("criado"):
+		Perfis.anotar(mundo_atual, dia, hora, _tempo_base + float(Time.get_ticks_msec() - _ini_sessao) / 1000.0)
 	return true
 
 
 func carregar_jogo() -> bool:
-	if not FileAccess.file_exists(ARQ_SALVO):
+	if arq_salvo == "" or not FileAccess.file_exists(arq_salvo):
 		return false
-	var d = JSON.parse_string(FileAccess.get_file_as_string(ARQ_SALVO))
+	var d = JSON.parse_string(FileAccess.get_file_as_string(arq_salvo))
 	if typeof(d) != TYPE_DICTIONARY:
 		return false
 	dia = int(d.get("dia", 1))
 	hora = float(d.get("hora", 8.0))
+	var st = d.get("stats", {})
+	if st is Dictionary:
+		stats = {"zumbis": int(st.get("zumbis", 0)), "fabricados": int(st.get("fabricados", 0))}
 	var jd: Dictionary = d.get("jogador", {})
 	var j := jogador
 	if jd.has("pos"):
@@ -498,12 +614,12 @@ func carregar_jogo() -> bool:
 
 
 func apagar_salvo() -> void:
-	if FileAccess.file_exists(ARQ_SALVO):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ARQ_SALVO))
+	if arq_salvo != "" and FileAccess.file_exists(arq_salvo):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(arq_salvo))
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST and not modo_teste and jogador != null and jogador.vivo:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and not modo_teste and em_jogo and jogador != null and jogador.vivo:
 		salvar_jogo()
 
 
@@ -671,6 +787,58 @@ func _segura_ponto(no: Node, p: Vector2) -> String:
 	return ""
 
 
+## as telas: perfis e mundos (criar, renomear, apagar), o lobby, o Jogar sozinho, as configurações (mudam o jogo de
+## verdade), a pausa e o mapa grande, e o HUD (minimapa, bússola, lugar)
+func _teste_telas() -> void:
+	var antes := Perfis.lista().size()
+	var p := Perfis.novo_perfil("  Teste   das telas ")
+	_confere(str(p["nome"]) == "Teste das telas" and Perfis.lista().size() == antes + 1, "perfil novo (nome limpo: \"%s\")" % p["nome"])
+	var m1 := Perfis.novo_mundo(p)
+	var m2 := Perfis.novo_mundo(p)
+	_confere(str(m1["nome"]) == "Mundo 1" and str(m2["nome"]) == "Mundo 2" and str(m1["arq"]) != str(m2["arq"]), "dois mundos, cada um no seu arquivo")
+	Perfis.renomear_mundo(p, m2, "Base do rio")
+	telas.mostrar("lobby")
+	await _quadros(3)
+	_confere(telas.atual == "lobby" and telas.lobby_cartoes.size() == 4, "lobby com os 4 caminhos (Jogar sozinho, Multiplayer, Personagem, Configurações)")
+	telas.mostrar("sozinho")
+	await _quadros(3)
+	_confere(telas.sz_lista.get_child_count() == 2, "Jogar sozinho lista os 2 mundos")
+	Perfis.apagar_mundo(p, m1)
+	_confere((p["mundos"] as Array).size() == 1 and str(p["mundos"][0]["nome"]) == "Base do rio", "renomeou e apagou um mundo")
+	for aba in 5:
+		telas.aj_aba = aba
+		telas.mostrar("ajustes")
+		await _quadros(2)
+	_confere(telas.aj_corpo.get_child_count() > 0, "configurações: as 5 abas montam")
+	var fov0 := float(Ajustes.v["fov"])
+	Ajustes.mudar("fov", 92, self)
+	_confere(absf(jogador.cam.fov - 92.0) < 0.1, "configurações mudam o jogo (campo de visão %.0f°)" % jogador.cam.fov)
+	Ajustes.mudar("fov", fov0, self)
+	telas.esconder()
+	telas.pausa()
+	await _quadros(2)
+	_confere(telas.atual == "pausa" and get_tree().paused, "Esc: pausa (o jogo para)")
+	telas.voltar_ao_jogo()
+	telas.abrir_mapa("")
+	await _quadros(2)
+	_confere(telas.atual == "mapa" and get_tree().paused, "M: mapa grande")
+	telas.fechar_mapa()
+	await _quadros(2)
+	_confere(telas.atual == "" and not get_tree().paused, "fechou o mapa e voltou ao jogo")
+	Perfis.apagar_perfil(p)
+	# HUD: o nome do lugar embaixo do minimapa e a bússola
+	ui.hud._lento = 0.0
+	await _quadros(3)
+	_confere(ui.hud.lugar_lbl.text != "" and ui.hud.dia_nome.text.begins_with("DIA"), "HUD: lugar no minimapa (%s) e o relógio (%s %s)" % [ui.hud.lugar_lbl.text, ui.hud.dia_nome.text, ui.hud.dia_falta.text])
+	var g0 := jogador.rotation.y
+	jogador.rotation.y = 0.0
+	var norte: float = ui.hud.rumo()
+	jogador.rotation.y = -PI * 0.5
+	var leste: float = ui.hud.rumo()
+	jogador.rotation.y = g0
+	_confere(absf(norte) < 1.0 and absf(leste - 90.0) < 1.0, "bússola: olhando para -z é norte (%.0f°), para +x é leste (%.0f°)" % [norte, leste])
+
+
 func _teste() -> void:
 	print("TESTE VAYDR Godot: começo")
 	await _quadros(5)
@@ -687,6 +855,7 @@ func _teste() -> void:
 		mm.position = meio
 		mm.global_position = meio
 		mm.relative = Vector2(40, 12)
+		mm.screen_relative = Vector2(40, 12)
 		get_viewport().push_input(mm)
 	await _quadros(2)
 	jogador.mouse_preso_teste = false
@@ -694,6 +863,8 @@ func _teste() -> void:
 		"o mouse vira a câmera para o lado (%.0f°) e para baixo (%.0f°)" % [rad_to_deg(angle_difference(giro0, jogador.rotation.y)), rad_to_deg(jogador.cabeca.rotation.x - olhar0)])
 	jogador.rotation.y = giro0
 	jogador.cabeca.rotation.x = olhar0
+	# as telas do jogo antigo: perfis, lobby, Jogar sozinho, configurações, pausa, mapa
+	await _teste_telas()
 	var F := Construcao.FUND
 	# o mapa do jogo antigo
 	_confere(terreno.W >= 801 and terreno.H >= 681 and terreno.alturas.size() == terreno.W * terreno.H, "relevo do jogo antigo: %d x %d m (com a Serra Velha)" % [terreno.W, terreno.H])
@@ -745,6 +916,16 @@ func _teste() -> void:
 	Input.action_release("pular")
 	_confere(jogador.global_position.y > y0 + 0.4, "pular (subiu %.2f m)" % (jogador.global_position.y - y0))
 	await _quadros(40)
+	# correr gasta energia (o fôlego do HUD) e parado ela volta
+	jogador.energia = 100.0
+	Input.action_press("frente")
+	Input.action_press("correr")
+	await _quadros(90)
+	Input.action_release("correr")
+	Input.action_release("frente")
+	var gasto := jogador.energia
+	await _quadros(150)
+	_confere(gasto < 90.0 and jogador.energia > gasto + 5.0, "correr gasta energia (%.0f) e parado ela volta (%.0f)" % [gasto, jogador.energia])
 	# degrau de 30 cm (meio-fio): sobe andando, sem pular
 	var dg := StaticBody3D.new()
 	var dgs := CollisionShape3D.new()
@@ -1083,12 +1264,26 @@ func _teste() -> void:
 		_confere(construcao.sacos.size() == ns + 1, "saco de dormir no chão da base")
 		_na_mao("lanterna")
 		_confere(jogador.luz_mao.visible, "lanterna acende na mão")
+		_na_mao("plano")
+		var sel_plano := jogador.sel
+		jogador.selecionar((sel_plano + 1) % Inventario.BARRA)
+		jogador.construir()
+		_confere(jogador.sel == sel_plano and construcao.ativo, "B: põe o plano de construção na mão")
+		jogador.construir()
+		_confere(jogador.sel != sel_plano, "B de novo: volta para o item de antes")
+		# a lanterna fica na mochila (na mão vai o plano): o F acende e apaga
+		jogador.selecionar(sel_plano)
+		jogador.alternar_lanterna()
+		_confere(jogador.luz_mao.visible, "F: a lanterna da mochila acende sem estar na mão")
+		jogador.alternar_lanterna()
+		_confere(not jogador.luz_mao.visible, "F de novo: apaga")
+		_na_mao("lanterna")
 		# salvar e carregar: a mochila, a roupa, a base com o baú e o relógio voltam como estavam
 		var n_pecas := construcao.pecas.filter(func(q): return not q.get("caiu", false)).size()
 		var pedras := jogador.inv.conta("pedra")
 		var bau_tab: int = (construcao.baus[int(construcao.pecas[ibau]["bau"])]["inv"] as Inventario).conta("cogumelo") if ibau >= 0 else -1
 		hora = 15.25
-		_confere(salvar_jogo(), "jogo salvo em " + ARQ_SALVO)
+		_confere(salvar_jogo(), "jogo salvo em " + arq_salvo)
 		jogador.inv.tirar("pedra", pedras)
 		hora = 3.0
 		construcao.ferir_peca(ibau, 9999.0, Vector3.ZERO)
@@ -1198,7 +1393,7 @@ func _teste() -> void:
 	var n_baus := construcao.baus.size()
 	jogador.ferir(999.0)
 	await _quadros(3)
-	_confere(not jogador.vivo and ui.morte.visible, "morreu e apareceu a tela de morte")
+	_confere(not jogador.vivo and telas.atual == "morte", "morreu e apareceu a tela de morte")
 	var caiu: bool = construcao.baus.size() == n_baus + 1 and construcao.baus[n_baus].get("mochila", false)
 	_confere(caiu and (construcao.baus[n_baus]["inv"] as Inventario).conta("pedra") >= 37, "a mochila caiu no chão com as coisas")
 	renascer()
@@ -1258,6 +1453,39 @@ func _fotos() -> void:
 	await _quadros(30)
 	hora = 9.5
 	print("fotos das espécies prontas: ", mundo.fotos_prontas)
+	# as telas de entrada do jogo antigo (os perfis e os mundos são de mentira, só para a foto)
+	telas.mostrar("carga")
+	telas.carga(2, "Plantando a mata", 64.0)
+	await _foto("00a_carregamento")
+	var pa := Perfis.novo_perfil("Sobrevivente")
+	Perfis.novo_perfil("Visitante")
+	telas.mostrar("login")
+	await _foto("00b_quem_vai_jogar")
+	Perfis.escolher(pa)
+	var mf := Perfis.novo_mundo(pa)
+	Perfis.anotar(mf, 4, 16.5, 7400.0)
+	var fa := FileAccess.open(str(mf["arq"]), FileAccess.WRITE)
+	if fa:
+		fa.store_string("{}")
+		fa.close()
+	Perfis.novo_mundo(pa, "Base do rio")
+	telas.mostrar("lobby")
+	await _foto("00c_lobby")
+	telas._lobby_escolher(3)
+	await _quadros(30)
+	await _foto("00d_lobby_configuracoes")
+	telas.sz_sel = str(mf["id"])
+	telas.mostrar("sozinho")
+	await _foto("00e_jogar_sozinho")
+	telas.aj_aba = 0
+	telas.mostrar("ajustes")
+	await _foto("00f_configuracoes")
+	telas.aj_aba = 3
+	telas.mostrar("ajustes")
+	await _foto("00g_configuracoes_mira")
+	telas.mostrar("multi")
+	await _foto("00h_multiplayer_em_breve")
+	telas.esconder()
 	# começo do jogo: na mata ao sul da clareira
 	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
 	await _foto("01_comeco_na_mata")
@@ -1439,4 +1667,21 @@ func _fotos() -> void:
 	zz.estado = "vaga"
 	await _cam(Vector3(livre2.x, 0, livre2.z + 3.0), Vector3(livre2.x, 1.2, livre2.z - 1.5))
 	await _foto("16_zumbi")
+	# o HUD apanhando: a seta vermelha mostra de que lado veio o golpe, e as bordas ficam vermelhas
+	jogador.vida = 30.0
+	ui.dano(zz.global_position + Vector3(4, 0, 0))
+	await _foto("16b_apanhando")
+	jogador.vida = 100.0
+	# a pausa (Esc), o mapa grande (M) e a tela de morte
+	telas.pausa()
+	await _foto("17_pausa")
+	telas.voltar_ao_jogo()
+	telas.abrir_mapa("")
+	await _foto("18_mapa")
+	telas.fechar_mapa()
+	jogador.inv.por("pedra", 5)
+	jogador.ferir(999.0)
+	await _quadros(5)
+	await _foto("19_morte")
+	renascer(false)
 	get_tree().quit()

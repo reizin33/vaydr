@@ -44,6 +44,11 @@ var consertos := 0       # quantas vezes consertou (desbloqueia a receita da fit
 var soco_mad := 0.0      # socos na árvore (a cada 3, 1 madeira)
 var enjoo := 0.0         # dor de barriga (água suja, carne crua): segundos que faltam
 var bateria := 100.0     # carga da lanterna de mão
+var energia := 100.0     # fôlego: correr e pular gastam, andando e parado volta (como no jogo antigo)
+var cansado := false     # a energia acabou: só corre de novo depois de recuperar um pouco
+var _folego_t := 0.0     # tempo desde a última corrida (a energia só volta depois de um instante)
+var lanterna_ligada := false   # F liga a lanterna que está na mochila (sem precisar pôr na mão)
+var _antes_plano := 0    # o espaço que estava na mão antes do B (o B de novo volta para ele)
 
 
 func _init(m: Node) -> void:
@@ -100,7 +105,8 @@ func _input(ev: InputEvent) -> void:
 	if not vivo or preso:
 		return
 	if ev is InputEventMouseMotion and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or mouse_preso_teste):
-		var r: Vector2 = ev.relative
+		# screen_relative: o movimento do mouse na tela, igual em qualquer tamanho de janela (o relative muda com a escala)
+		var r: Vector2 = ev.screen_relative
 		rotate_y(-r.x * sens)
 		cabeca.rotation.x = clampf(cabeca.rotation.x - r.y * sens * (-1.0 if inverter_y else 1.0), -1.45, 1.45)
 
@@ -141,8 +147,48 @@ func _atualizar_mao() -> void:
 		ferramenta_no.rotation = Vector3(deg_to_rad(-70), deg_to_rad(10), deg_to_rad(0))
 		ferramenta_no.scale = Vector3.ONE * 0.9
 		mao.add_child(ferramenta_no)
-	luz_mao.visible = id == "lanterna" and bateria > 0.0
+	_luz()
 	main.construcao.ativar(id == "plano")
+
+
+## a lanterna acende com ela na mão ou ligada pelo F (estando na mochila), enquanto tiver pilha
+func _luz() -> void:
+	var na_mao: bool = str(item_mao().get("id", "")) == "lanterna"
+	if lanterna_ligada and inv.conta("lanterna") <= 0:
+		lanterna_ligada = false
+	luz_mao.visible = (na_mao or lanterna_ligada) and bateria > 0.0
+
+
+## F: liga e desliga a lanterna da mochila
+func alternar_lanterna() -> void:
+	if inv.conta("lanterna") <= 0:
+		main.ui.aviso("Você não tem lanterna (procure nas casas e no posto)")
+		return
+	if bateria <= 0.0:
+		main.ui.aviso("A lanterna está sem pilha (pilhas: Trocar pilhas)")
+		return
+	lanterna_ligada = not luz_mao.visible
+	if not lanterna_ligada and str(item_mao().get("id", "")) == "lanterna":
+		main.ui.aviso("A lanterna está na mão: troque de item para apagar")
+	_luz()
+	main.sons.tocar("clique", global_position, -14.0)
+
+
+## B: põe o plano de construção na mão (ou volta para o item de antes)
+func construir() -> void:
+	if str(item_mao().get("id", "")) == "plano":
+		selecionar(_antes_plano)
+		return
+	for i in Inventario.BARRA:
+		var s = inv.slots[i]
+		if s != null and str(s["id"]) == "plano":
+			_antes_plano = sel
+			selecionar(i)
+			return
+	if inv.conta("plano") > 0:
+		main.ui.aviso("Ponha o plano de construção na barra rápida (1 a 6) para construir")
+	else:
+		main.ui.aviso("Faça o plano de construção (Tab, Fabricar: 1 madeira e 2 fibras)")
 
 
 func _physics_process(dt: float) -> void:
@@ -176,7 +222,20 @@ func _physics_process(dt: float) -> void:
 		if dir.length() > 1.0:
 			dir = dir.normalized()
 		agachado = Input.is_action_pressed("agachar")
-	var corre := Input.is_action_pressed("correr") and not agachado and not preso
+	var quer_correr := Input.is_action_pressed("correr") and not agachado and not preso and dir.length() > 0.1
+	if energia <= 0.5:
+		cansado = true
+	elif energia >= 25.0:
+		cansado = false
+	var corre := quer_correr and not cansado
+	# energia: correndo gasta (uns 8 s de corrida), parado ou andando volta depois de um instante
+	if corre:
+		energia = maxf(0.0, energia - dt * 12.0)
+		_folego_t = 0.0
+	else:
+		_folego_t += dt
+		if _folego_t > 0.8:
+			energia = minf(100.0, energia + dt * (14.0 if dir.length() < 0.1 else 9.0))
 	var vel := AGACHA if agachado else (CORRE if corre else ANDA)
 	var alvo := dir * vel
 	var k := 12.0 if is_on_floor() else 2.5
@@ -187,8 +246,10 @@ func _physics_process(dt: float) -> void:
 			ferir((-queda_v - 11.0) * 6.0, false)
 			tremor = 0.35
 		queda_v = 0.0
-		if Input.is_action_just_pressed("pular") and not preso:
+		if Input.is_action_just_pressed("pular") and not preso and energia >= 6.0:
 			velocity.y = PULO
+			energia -= 6.0
+			_folego_t = 0.0
 	else:
 		velocity.y -= GRAV * dt
 		queda_v = minf(queda_v, velocity.y)
@@ -271,6 +332,7 @@ func atacar() -> void:
 	elif c.has_meta("zumbi"):
 		var z = c.get_meta("zumbi")
 		z.ferir(float(st.get("dano", 9.0)), global_position)
+		main.ui.acerto()
 		main.sons.tocar("acerto", h["position"], 0.0)
 		main.efeitos.sangue(h["position"], h["normal"])
 		if arma:
@@ -588,7 +650,8 @@ func _aprender_uma() -> String:
 	return Dados.nome(str(esc_r["faz"]))
 
 
-func ferir(dano: float, tremer := true) -> void:
+## de: de onde veio o golpe (a seta vermelha mostra o lado)
+func ferir(dano: float, tremer := true, de := Vector3.INF) -> void:
 	if not vivo:
 		return
 	# a roupa segura parte do golpe (não da fome, da sede ou da queda) e gasta com isso
@@ -604,7 +667,7 @@ func ferir(dano: float, tremer := true) -> void:
 	vida -= dano
 	if tremer:
 		tremor = 0.25
-		main.ui.dano()
+		main.ui.dano(de)
 		main.sons.tocar("dor", global_position, -2.0)
 	if vida <= 0.0:
 		vida = 0.0
@@ -621,6 +684,9 @@ func renascer(p: Vector3) -> void:
 	vivo = true
 	queda_v = 0.0
 	enjoo = 0.0
+	energia = 100.0
+	cansado = false
+	lanterna_ligada = false
 	inv = Inventario.new()
 	_ligar_inv()
 	ferramenta_id = "-"

@@ -1,15 +1,11 @@
 class_name UI
 extends CanvasLayer
-## Tela do jogo: mira, aviso do que a mira pega, relógio, avisos de coleta, barras (vida, fome, sede), barra de atalhos com
-## os ícones do jogo antigo, a barra da construção (com o plano na mão), a mochila (Tab) com a roupa, o detalhe do item e a
-## fabricação por abas (ou o baú aberto), o menu de pausa e a tela de morte.
+## Tela do jogo: o HUD do jogo antigo (hud.gd: minimapa, bússola, relógio, comandos, barra rápida, vida, fome, sede,
+## energia, avisos e mira), a barra da construção (com o plano na mão), a mochila (Tab) com a roupa, o detalhe do item e
+## a fabricação por abas (ou o baú aberto). A pausa, o mapa, a morte e as telas de entrada ficam em telas.gd.
 
 var main: Node
-var mira_lbl: Label
-var relogio: Label
-var avisos: VBoxContainer
-var barras := {}
-var barra_slots: Array = []
+var hud: Hud
 var painel: PanelContainer
 var grade: GridContainer
 var grade_barra: HBoxContainer
@@ -18,9 +14,6 @@ var lista_fab: VBoxContainer
 var abas_fab: HBoxContainer
 var aba_fab := "todas"
 var so_da := false
-var morte: PanelContainer
-var flash: ColorRect
-var bt_saco: Button
 var escolhido := -1
 var escolhido_dono := ""
 var bau_inv: Inventario = null
@@ -39,12 +32,6 @@ var obra_icones: HBoxContainer
 var obra_txt: Label
 var obra_aba: Label
 var aberto := false
-var menu: PanelContainer
-var menu_aberto := false
-var fps_lbl: Label
-var opcoes := {"qualidade": 1, "sens": 1.0, "fps": true, "tela_cheia": true}
-const CFG := "user://opcoes.cfg"
-const QUALIDADES := ["Baixo (PC fraco)", "Médio", "Alto"]
 const TAM := 56
 const NOMES_ROUPA := {"cabeca": "Cabeça", "rosto": "Rosto", "camiseta": "Camiseta", "tronco": "Tronco", "maos": "Mãos",
 	"cintura": "Cintura", "pernas": "Pernas", "pes": "Pés", "costas": "Costas"}
@@ -96,90 +83,17 @@ func _lbl(txt: String, tam := 16, cor := Color(0.92, 0.9, 0.84)) -> Label:
 
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_ALWAYS   # o menu de pausa funciona com o jogo parado
+	process_mode = Node.PROCESS_MODE_ALWAYS   # a mochila funciona com o jogo parado
 	var raiz := Control.new()
 	raiz.set_anchors_preset(Control.PRESET_FULL_RECT)
 	raiz.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	raiz.theme = Estilo.tema()
 	add_child(raiz)
-	flash = ColorRect.new()
-	flash.color = Color(0.6, 0.0, 0.0, 0.0)
-	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
-	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	raiz.add_child(flash)
-	# mira
-	var ponto := ColorRect.new()
-	ponto.color = Color(1, 1, 1, 0.85)
-	ponto.size = Vector2(4, 4)
-	ponto.mouse_filter = Control.MOUSE_FILTER_IGNORE   # no meio da tela: não pode segurar o movimento do mouse
-	_ancorar(ponto, Control.PRESET_CENTER, Rect2(-2, -2, 4, 4))
-	raiz.add_child(ponto)
-	mira_lbl = _lbl("", 17)
-	mira_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_ancorar(mira_lbl, Control.PRESET_CENTER, Rect2(-320, 26, 640, 30))
-	raiz.add_child(mira_lbl)
-	# relógio
-	relogio = _lbl("", 18)
-	relogio.position = Vector2(18, 14)
-	raiz.add_child(relogio)
-	fps_lbl = _lbl("", 14, Color(0.7, 0.9, 0.7))
-	fps_lbl.position = Vector2(18, 40)
-	raiz.add_child(fps_lbl)
-	# avisos de coleta
-	avisos = VBoxContainer.new()
-	_ancorar(avisos, Control.PRESET_TOP_RIGHT, Rect2(-350, 16, 330, 300))
-	avisos.alignment = BoxContainer.ALIGNMENT_BEGIN
-	avisos.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	raiz.add_child(avisos)
-	# barras
-	var caixa := VBoxContainer.new()
-	_ancorar(caixa, Control.PRESET_BOTTOM_RIGHT, Rect2(-250, -118, 230, 100))
-	caixa.add_theme_constant_override("separation", 6)
-	raiz.add_child(caixa)
-	for b in [["vida", "Vida", Color(0.78, 0.22, 0.2)], ["fome", "Fome", Color(0.86, 0.58, 0.2)], ["sede", "Sede", Color(0.3, 0.58, 0.88)]]:
-		var fundo := Panel.new()
-		fundo.add_theme_stylebox_override("panel", _estilo(Color(0.06, 0.06, 0.06, 0.72)))
-		fundo.custom_minimum_size = Vector2(230, 26)
-		var cheio := ColorRect.new()
-		cheio.color = b[2]
-		cheio.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var txt := _lbl(b[1], 14)
-		txt.position = Vector2(4, 2)
-		fundo.add_child(cheio)
-		fundo.add_child(txt)
-		caixa.add_child(fundo)
-		barras[b[0]] = {"fundo": fundo, "cheio": cheio, "txt": txt, "nome": b[1]}
-	# barra de atalhos
-	var hb := HBoxContainer.new()
-	_ancorar(hb, Control.PRESET_CENTER_BOTTOM, Rect2(-6 * 34, -80, 6 * 68, 64))
-	hb.add_theme_constant_override("separation", 6)
-	raiz.add_child(hb)
-	for i in Inventario.BARRA:
-		var s := _slot(i, true)
-		hb.add_child(s)
-		barra_slots.append(s)
+	# o HUD do jogo antigo (minimapa, bússola, relógio, comandos, barra rápida, vida, fome, sede, energia, avisos, mira)
+	hud = Hud.new(main)
+	raiz.add_child(hud)
 	_montar_obras(raiz)
 	_montar_mochila(raiz)
-	# morte
-	morte = PanelContainer.new()
-	morte.add_theme_stylebox_override("panel", _estilo(Color(0.12, 0.02, 0.02, 0.9)))
-	_ancorar(morte, Control.PRESET_CENTER, Rect2(-200, -80, 400, 160))
-	morte.visible = false
-	var mv := VBoxContainer.new()
-	mv.alignment = BoxContainer.ALIGNMENT_CENTER
-	morte.add_child(mv)
-	var t := _lbl("Você morreu", 28, Color(0.95, 0.75, 0.7))
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mv.add_child(t)
-	bt_saco = Button.new()
-	bt_saco.text = "Renascer no saco de dormir / na cama"
-	bt_saco.pressed.connect(func(): main.renascer(true))
-	mv.add_child(bt_saco)
-	var bt := Button.new()
-	bt.text = "Renascer na mata (começo)"
-	bt.pressed.connect(func(): main.renascer(false))
-	mv.add_child(bt)
-	raiz.add_child(morte)
-	_montar_menu(raiz)
 	main.jogador.inv.mudou.connect(atualizar)
 	atualizar()
 
@@ -187,19 +101,20 @@ func _ready() -> void:
 ## barra da construção: as peças da aba (Q troca), a escolhida em destaque, o custo e o que falta
 func _montar_obras(raiz: Control) -> void:
 	obra_painel = PanelContainer.new()
-	obra_painel.add_theme_stylebox_override("panel", _estilo(Color(0.05, 0.06, 0.05, 0.86)))
-	_ancorar(obra_painel, Control.PRESET_CENTER_BOTTOM, Rect2(-430, -196, 860, 108))
+	obra_painel.add_theme_stylebox_override("panel", Estilo.caixa_hud(12, 10))
 	obra_painel.visible = false
 	obra_painel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	raiz.add_child(obra_painel)
+	# em cima da barra rápida (que fica embaixo, no meio)
+	Estilo.prender(obra_painel, 0.5, 1.0, 0, -80, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
 	obra_painel.add_child(v)
 	var topo := HBoxContainer.new()
 	v.add_child(topo)
-	obra_aba = _lbl("", 15, Color(1.0, 0.85, 0.5))
+	obra_aba = Estilo.rotulo("", 13, Estilo.BRASA, "ui", 800, 2)
 	topo.add_child(obra_aba)
-	var dica := _lbl("   botão direito: próxima peça · Q: outra aba · R: gira · clique: constrói", 13, Color(0.7, 0.72, 0.68))
+	var dica := Estilo.rotulo("   botão direito: próxima peça · Q: outra aba · R: gira · clique: constrói · B: sai", 12, Estilo.CINZA, "ui", 600)
 	topo.add_child(dica)
 	obra_icones = HBoxContainer.new()
 	obra_icones.add_theme_constant_override("separation", 4)
@@ -212,11 +127,13 @@ func mostrar_obras(on: bool) -> void:
 	if obra_painel == null:
 		return
 	obra_painel.visible = on
+	if hud != null:
+		hud.modo_construcao(on)
 	if not on:
 		return
 	var c = main.construcao
 	var aba_d: Dictionary = Dados.ABAS_OBRA[c.aba]
-	obra_aba.text = "Construção · %s (%d/%d)" % [aba_d["nome"], c.aba + 1, Dados.ABAS_OBRA.size()]
+	obra_aba.text = ("CONSTRUÇÃO · %s (%d/%d)" % [aba_d["nome"], c.aba + 1, Dados.ABAS_OBRA.size()]).to_upper()
 	for k in obra_icones.get_children():
 		k.queue_free()
 	var t: Array = aba_d["t"]
@@ -403,190 +320,11 @@ func _mudar_aba(cid: String) -> void:
 	atualizar()
 
 
-# ---------------- menu de pausa (Esc): opções de gráfico, mouse, tela cheia, FPS e as teclas ----------------
-func _montar_menu(raiz: Control) -> void:
-	_carregar()
-	menu = PanelContainer.new()
-	menu.add_theme_stylebox_override("panel", _estilo(Color(0.05, 0.06, 0.05, 0.95)))
-	_ancorar(menu, Control.PRESET_CENTER, Rect2(-330, -290, 660, 580))
-	menu.visible = false
-	raiz.add_child(menu)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	menu.add_child(v)
-	v.add_child(_lbl("VAYDR  ·  protótipo no Godot", 24))
-	var cont := Button.new()
-	cont.text = "Continuar (Esc)"
-	cont.pressed.connect(abrir_menu.bind(false))
-	v.add_child(cont)
-	var hq := HBoxContainer.new()
-	hq.add_theme_constant_override("separation", 12)
-	v.add_child(hq)
-	var lq := _lbl("Gráficos", 16)
-	lq.custom_minimum_size = Vector2(170, 0)
-	hq.add_child(lq)
-	var ob := OptionButton.new()
-	for t in QUALIDADES:
-		ob.add_item(t)
-	ob.selected = int(opcoes["qualidade"])
-	ob.item_selected.connect(_mudou_qualidade)
-	hq.add_child(ob)
-	var hs := HBoxContainer.new()
-	hs.add_theme_constant_override("separation", 12)
-	v.add_child(hs)
-	var ls := _lbl("Sensibilidade do mouse", 16)
-	ls.custom_minimum_size = Vector2(170, 0)
-	hs.add_child(ls)
-	var sl := HSlider.new()
-	sl.min_value = 0.25
-	sl.max_value = 3.0
-	sl.step = 0.05
-	sl.value = float(opcoes["sens"])
-	sl.custom_minimum_size = Vector2(300, 24)
-	sl.value_changed.connect(_mudou_sens)
-	hs.add_child(sl)
-	var tc := CheckBox.new()
-	tc.text = "Tela cheia (F11)"
-	tc.button_pressed = bool(opcoes["tela_cheia"])
-	tc.toggled.connect(_mudou_tela)
-	tc.name = "TelaCheia"
-	v.add_child(tc)
-	var cf := CheckBox.new()
-	cf.text = "Mostrar FPS (quadros por segundo)"
-	cf.button_pressed = bool(opcoes["fps"])
-	cf.toggled.connect(_mudou_fps)
-	v.add_child(cf)
-	var teclas := _lbl("W A S D andar · Shift correr · Ctrl ou C agachar · Espaço pular\n" +
-		"Botão esquerdo bater / comer / usar o item · E pegar, abrir, beber, cozinhar · Tab mochila e fabricação\n" +
-		"1 a 6 ou rodinha: item na mão · com o plano: botão direito troca a peça, Q troca a aba, R gira · F5 salva", 14, Color(0.72, 0.74, 0.7))
-	teclas.autowrap_mode = TextServer.AUTOWRAP_WORD
-	teclas.custom_minimum_size = Vector2(620, 0)
-	v.add_child(teclas)
-	var hsv := HBoxContainer.new()
-	hsv.add_theme_constant_override("separation", 8)
-	v.add_child(hsv)
-	var salvar := Button.new()
-	salvar.text = "Salvar agora (F5)"
-	salvar.pressed.connect(_salvar_jogo)
-	hsv.add_child(salvar)
-	var novo := Button.new()
-	novo.text = "Começar de novo (apaga o jogo salvo)"
-	novo.pressed.connect(_novo_jogo)
-	hsv.add_child(novo)
-	var cred := Button.new()
-	cred.text = "Créditos dos modelos 3D"
-	v.add_child(cred)
-	var sair := Button.new()
-	sair.text = "Sair do jogo"
-	sair.pressed.connect(func(): get_tree().quit())
-	v.add_child(sair)
-	# créditos: os modelos escaneados com licença CC BY pedem o nome do autor na tela
-	var painel := PanelContainer.new()
-	painel.add_theme_stylebox_override("panel", _estilo(Color(0.04, 0.05, 0.04, 0.97)))
-	_ancorar(painel, Control.PRESET_CENTER, Rect2(-360, -300, 720, 600))
-	painel.visible = false
-	raiz.add_child(painel)
-	var vc := VBoxContainer.new()
-	vc.add_theme_constant_override("separation", 8)
-	painel.add_child(vc)
-	vc.add_child(_lbl("Créditos dos modelos 3D", 22))
-	var rolo := ScrollContainer.new()
-	rolo.custom_minimum_size = Vector2(680, 470)
-	vc.add_child(rolo)
-	var txt := _lbl(_creditos(), 14, Color(0.8, 0.82, 0.78))
-	txt.autowrap_mode = TextServer.AUTOWRAP_WORD
-	txt.custom_minimum_size = Vector2(660, 0)
-	rolo.add_child(txt)
-	var volta := Button.new()
-	volta.text = "Voltar"
-	volta.pressed.connect(func(): painel.visible = false)
-	vc.add_child(volta)
-	cred.pressed.connect(func(): painel.visible = true)
-	_aplicar_tudo()
-
-
-func _creditos() -> String:
-	var t := "Lugares escaneados (galpão, bunker, prédios, casa, ruína, carros, Base Militar):\n"
-	var o = JSON.parse_string(FileAccess.get_file_as_string("res://dados/mapa/objetos3d.json"))
-	if o is Dictionary and o.has("creditos"):
-		for k in o["creditos"]["lugares"]:
-			t += "  · %s\n" % str(o["creditos"]["lugares"][k])
-	t += "\nPeças de fachada e telhado da cidade: Post Apocalypse Kitbash (versão gratuita), de Oleg Ushenok\n"
-	t += "Árvores, plantas, pedras, móveis e objetos da rua: Poly Haven (CC0)\n"
-	t += "Zumbi e animações: Mixamo\n"
-	return t
-
-
-func _carregar() -> void:
-	var cf := ConfigFile.new()
-	if cf.load(CFG) == OK:
-		for k in opcoes:
-			opcoes[k] = cf.get_value("opcoes", k, opcoes[k])
-
-
-func _salvar() -> void:
-	var cf := ConfigFile.new()
-	for k in opcoes:
-		cf.set_value("opcoes", k, opcoes[k])
-	cf.save(CFG)
-
-
-func _aplicar_tudo() -> void:
-	main.aplicar_qualidade(int(opcoes["qualidade"]))
-	main.jogador.sens = 0.0022 * float(opcoes["sens"])
-	fps_lbl.visible = bool(opcoes["fps"])
-	if not main.modo_teste:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if opcoes["tela_cheia"] else DisplayServer.WINDOW_MODE_MAXIMIZED)
-
-
-func _mudou_qualidade(i: int) -> void:
-	opcoes["qualidade"] = i
-	main.aplicar_qualidade(i)
-	_salvar()
-
-
-func _mudou_sens(x: float) -> void:
-	opcoes["sens"] = x
-	main.jogador.sens = 0.0022 * x
-	_salvar()
-
-
-func _mudou_tela(on: bool) -> void:
-	opcoes["tela_cheia"] = on
-	if not main.modo_teste:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_MAXIMIZED)
-	_salvar()
-
-
-func _mudou_fps(on: bool) -> void:
-	opcoes["fps"] = on
-	fps_lbl.visible = on
-	_salvar()
-
-
-func abrir_menu(on: bool) -> void:
-	menu_aberto = on
-	menu.visible = on
-	get_tree().paused = on
-	main.jogador.preso = on or aberto
-	_mouse()
-
-
+## o mouse aparece com a mochila ou uma tela aberta; no jogo fica preso (a câmera vira com ele)
 func _mouse() -> void:
-	if main.modo_teste:
+	if main.modo_teste or not main.em_jogo:
 		return
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if (menu_aberto or aberto or morte.visible) else Input.MOUSE_MODE_CAPTURED
-
-
-func _salvar_jogo() -> void:
-	aviso("Jogo salvo" if main.salvar_jogo() else "Não deu para salvar")
-
-
-## apaga o jogo salvo e abre o mundo do começo
-func _novo_jogo() -> void:
-	main.apagar_salvo()
-	get_tree().paused = false
-	get_tree().reload_current_scene()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if (aberto or main.telas.atual != "") else Input.MOUSE_MODE_CAPTURED
 
 
 # ---------------------------------------------------------------- espaços (com o ícone do item, a quantidade e o desgaste)
@@ -914,8 +652,6 @@ func _pintar(p: PanelContainer) -> void:
 
 
 func atualizar() -> void:
-	for p in barra_slots:
-		_pintar(p)
 	if not aberto:
 		if main.construcao and main.construcao.ativo:
 			_texto_obra()
@@ -1025,64 +761,31 @@ func abrir(on: bool) -> void:
 		col_bau.visible = false
 	else:
 		_detalhe("jog", -1)
-	main.jogador.preso = on or menu_aberto
+	main.jogador.preso = on or main.telas.atual != ""
 	_mouse()
 	atualizar()
 
 
-func aviso(txt: String, tempo := 2.4) -> void:
-	var l := _lbl(txt, 16)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(330, 0)
-	avisos.add_child(l)
-	while avisos.get_child_count() > 7:
-		var velho := avisos.get_child(0)
-		avisos.remove_child(velho)
-		velho.queue_free()
-	var tw := create_tween()
-	tw.tween_interval(tempo)
-	tw.tween_property(l, "modulate:a", 0.0, 0.8)
-	tw.tween_callback(l.queue_free)
+## os avisos do que acontece (no canto de baixo, à direita, em cima da vida)
+func aviso(txt: String, tempo := 2.6) -> void:
+	if hud != null:
+		hud.aviso(txt, tempo)
 
 
-func dano() -> void:
-	flash.color.a = 0.35
-	var tw := create_tween()
-	tw.tween_property(flash, "color:a", 0.0, 0.5)
+## apanhou (de: de onde veio o golpe, para a seta vermelha)
+func dano(de := Vector3.INF) -> void:
+	if hud != null:
+		hud.dano(de)
 
 
-func mostrar_morte(on: bool) -> void:
-	morte.visible = on
-	bt_saco.visible = on and main.construcao.sacos.size() > 0
-	_mouse()
+## o golpe acertou: a mira fica vermelha por um instante
+func acerto() -> void:
+	if hud != null:
+		hud.acerto()
 
 
 func _process(_dt: float) -> void:
-	if Input.is_action_just_pressed("sair"):
-		if aberto:
-			abrir(false)
-		elif not morte.visible:
-			abrir_menu(not menu_aberto)
-	if Input.is_action_just_pressed("tela_cheia"):
-		_mudou_tela(not bool(opcoes["tela_cheia"]))
-		var tc := menu.find_child("TelaCheia", true, false) as CheckBox
-		if tc:
-			tc.set_pressed_no_signal(bool(opcoes["tela_cheia"]))
-	if fps_lbl.visible:
-		fps_lbl.text = "FPS %d" % Engine.get_frames_per_second()
-	var j = main.jogador
-	for k in ["vida", "fome", "sede"]:
-		var b: Dictionary = barras[k]
-		var v: float = j.get(k)
-		var fundo: Panel = b["fundo"]
-		var cheio: ColorRect = b["cheio"]
-		cheio.position = Vector2(2, 2)
-		cheio.size = Vector2(maxf(0.0, (fundo.size.x - 4.0) * v / 100.0), fundo.size.y - 4.0)
-		(b["txt"] as Label).text = "  %s  %d" % [b["nome"], int(round(v))]
-	relogio.text = "Dia %d · %s" % [main.dia, main.hora_txt()]
-	mira_lbl.text = main.texto_mira()
+	if not main.em_jogo:
+		return
 	if main.construcao.ativo and obra_painel.visible:
 		_texto_obra()
-	for p in barra_slots:
-		_pintar(p)

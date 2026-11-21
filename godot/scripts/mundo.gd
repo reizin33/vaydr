@@ -27,6 +27,9 @@ var aguas := []           # poços e barris: {pos, nome}
 var portas := []
 var zspawn := {}          # lugar -> [[x, z]...] (onde os zumbis de cada lugar nascem)
 var lugares := []         # {id, nome, x, z, r}
+var ruas := []            # estradas do jogo antigo (minimapa e mapa): {cor: asfalto/terra/trilha, w, pts: PackedVector2Array}
+var predios := []         # prédios da cidade (minimapa e mapa): {ret: Rect2 em x/z, tipo, nome}
+var lugares_nome := []    # lugares com nome (galpão, bunker, base militar...): {nome, x, z}
 var esp := []             # espécies: {id, k, cx, cz, aabb, cela}
 var _alcances := []       # [GeometryInstance3D, ini, fim]
 var _pend := {}
@@ -214,6 +217,22 @@ func montar(col: ColisaoMapa = null) -> void:
 	zspawn = o.get("zspawn", {})
 	for p in v.get("places", []):
 		lugares.append({"id": str(p["id"]), "nome": str(p.get("nome", p["id"])), "x": float(p["x"]), "z": float(p["z"]), "r": float(p.get("r", 14.0))})
+	for r in v.get("roads", []):
+		var pts := PackedVector2Array()
+		for q in r["pts"]:
+			pts.append(Vector2(float(q[0]), float(q[1])))
+		ruas.append({"cor": str(r.get("cor", "terra")), "w": float(r.get("w", 3.0)), "pts": pts})
+	for p in o.get("predios", []):
+		predios.append({"ret": Rect2(float(p["x0"]), float(p["z0"]), float(p["x1"]) - float(p["x0"]), float(p["z1"]) - float(p["z0"])),
+			"tipo": str(p.get("tipo", "")), "nome": str(p.get("nome", "")), "rural": bool(p.get("rural", false))})
+	var ja := {}
+	for l in o.get("lugares", []):
+		var nm := str(l.get("nome", ""))
+		# os pedaços de um mesmo lugar (a base militar tem dezenas) contam uma vez, no primeiro
+		if nm == "" or ja.has(nm) or nm == "Carro destruído":
+			continue
+		ja[nm] = true
+		lugares_nome.append({"nome": nm, "x": float(l["x"]), "z": float(l["z"])})
 	_especies(me)
 	_arvores(v, me)
 	_pedras(v["rocks"])
@@ -1005,3 +1024,37 @@ func _process(dt: float) -> void:
 			else:
 				c["cheia"] = true
 		_vazias = fica2
+
+
+## o nome do lugar perto de um ponto e a distância até ele (minimapa, pausa): a cidade, uma clareira, um lugar com nome
+## ou só "Mata" (como no jogo antigo)
+func lugar_em(x: float, z: float) -> Dictionary:
+	for p in predios:
+		if not p["rural"] and (p["ret"] as Rect2).grow(14.0).has_point(Vector2(x, z)):
+			return {"nome": "Cidade", "d": -1.0}
+	var melhor := {}
+	var md := 1e9
+	for p in lugares:
+		var d := Vector2(x - float(p["x"]), z - float(p["z"])).length()
+		if d < float(p["r"]) + 45.0 and d < md:
+			md = d
+			melhor = {"nome": p["nome"], "d": d}
+	for l in lugares_nome:
+		var d := Vector2(x - float(l["x"]), z - float(l["z"])).length()
+		if d < 45.0 and d < md:
+			md = d
+			melhor = {"nome": l["nome"], "d": d}
+	if melhor.is_empty():
+		return {"nome": "Mata", "d": -1.0}
+	return melhor
+
+
+## o meio da cidade (a média dos prédios que não são da roça), para o nome no mapa
+func centro_cidade() -> Vector2:
+	var soma := Vector2.ZERO
+	var n := 0
+	for p in predios:
+		if not p["rural"]:
+			soma += (p["ret"] as Rect2).get_center()
+			n += 1
+	return soma / n if n > 0 else Vector2.ZERO

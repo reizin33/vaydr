@@ -34,6 +34,7 @@ var tex_altura: ImageTexture
 var tex_cor: ImageTexture
 var tex_mata: ImageTexture
 var tex_pisos: ImageTexture
+var tex_agua: ImageTexture    # tipo de água em cada metro (0 nada, 1 rio ou lago, 2 mar): minimapa e mapa
 var mar: MeshInstance3D
 var nivel_mar := -0.9
 var normais := PackedVector3Array()
@@ -65,6 +66,7 @@ func _carregar() -> void:
 	agua_tipo = FileAccess.get_file_as_bytes(PASTA + "agua_tipo.u8")
 	tex_cor = ImageTexture.create_from_image(Image.create_from_data(W, H, false, Image.FORMAT_RGBA8, FileAccess.get_file_as_bytes(PASTA + "cor.rgba8")))
 	tex_mata = ImageTexture.create_from_image(Image.create_from_data(W, H, false, Image.FORMAT_L8, FileAccess.get_file_as_bytes(PASTA + "mata.u8")))
+	tex_agua = ImageTexture.create_from_image(Image.create_from_data(W, H, false, Image.FORMAT_L8, agua_tipo))
 	var sp := int(meta["splat"]["S"])
 	var img_p := Image.create_from_data(sp, sp, false, Image.FORMAT_RGBA8, FileAccess.get_file_as_bytes(PASTA + "pisos.rgba8"))
 	img_p.generate_mipmaps()

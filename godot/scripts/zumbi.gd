@@ -161,7 +161,7 @@ func _physics_process(dt: float) -> void:
 			if alvo_peca >= 0:
 				main.construcao.ferir_peca(alvo_peca, 4.0 if corredor else 3.0, ponto_peca)
 			elif dist < 1.9 and j.vivo and _bloqueio(j).is_empty():
-				j.ferir(11.0 if not corredor else 9.0)
+				j.ferir(11.0 if not corredor else 9.0, true, global_position)
 		if golpe_t > 1.2:
 			golpe_t = -1.0
 	# armadilhas da base
