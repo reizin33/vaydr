@@ -31,11 +31,14 @@ env:
   GODOT_VER: "4.7.2"
 
 jobs:
-  montar:
+  # os testes num job só deles: o registro sai em uns 3 minutos (as fotos e o .exe vêm no job de montar, depois)
+  testes:
     runs-on: ubuntu-latest
-    timeout-minutes: 95
+    timeout-minutes: 30
     permissions:
       contents: read
+    outputs:
+      abriu: ${{ steps.teste.outputs.abriu }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -64,6 +67,7 @@ jobs:
 
       # a saída vai inteira para o arquivo; no registro aparece cada linha uma vez só (erro repetido não enche o registro)
       - name: Teste sem tela
+        id: teste
         run: |
           set +e
           # erro de script na importação: o jogo nem abre (sem isso o teste ficava 10 minutos parado esperando)
@@ -75,7 +79,7 @@ jobs:
           echo "----- resumo -----"
           grep -E "^(ok |FALHA|TESTE|mapa:)" teste.log
           # o jogo abriu (os scripts compilaram e o mapa montou): as fotos valem a pena mesmo se alguma conferência falhou
-          if grep -q "TESTE VAYDR Godot: começo" teste.log; then echo sim > jogo_abriu; fi
+          if grep -q "TESTE VAYDR Godot: começo" teste.log; then echo sim > jogo_abriu; echo "abriu=sim" >> "$GITHUB_OUTPUT"; fi
           # as falhas e os erros de script viram anotações da execução (dá para ler antes de as fotos acabarem)
           grep -E "^FALHA|^TESTE FALHOU|SCRIPT ERROR|Parse Error|Invalid |at: " teste.log | awk '!visto[$0]++' | head -24 | while IFS= read -r l; do echo "::error title=Teste::${l//%/%25}"; done
           grep -q "TESTE OK" teste.log
@@ -110,11 +114,47 @@ jobs:
           if-no-files-found: ignore
           retention-days: 5
 
+
+  montar:
+    needs: testes
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Godot e modelos de exportação
+        run: |
+          set -e
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils libxcursor1 libxinerama1 libxrandr2 libxi6 libfontconfig1 > /dev/null
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable"
+          curl -sSfL -o godot.zip "$base/Godot_v${GODOT_VER}-stable_linux.x86_64.zip"
+          curl -sSfL -o modelos.tpz "$base/Godot_v${GODOT_VER}-stable_export_templates.tpz"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VER}-stable_linux.x86_64" godot-bin
+          chmod +x godot-bin
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VER}.stable"
+          mkdir -p "$dest"
+          unzip -q -j modelos.tpz "templates/windows_release_x86_64.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d "$dest"
+          ls -la "$dest"
+
+      - name: Importar o projeto
+        run: |
+          ./godot-bin --headless --path godot --import 2>&1 | tee importar.log | tail -40
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR: Failed" importar.log; then echo "erros na importação"; fi
+
       - name: Fotos (OpenGL por software)
         if: ${{ always() && (github.event_name == 'push' || inputs.fotos) }}
+        env:
+          ABRIU: ${{ needs.testes.outputs.abriu }}
         run: |
           set +e
-          if [ ! -f jogo_abriu ]; then echo "o jogo nem abriu no teste (erro de script?): sem fotos"; exit 0; fi
+          if [ "$ABRIU" != "sim" ]; then echo "o jogo nem abriu no teste (erro de script?): sem fotos"; exit 0; fi
           export LIBGL_ALWAYS_SOFTWARE=1
           # o amigo das fotos da partida em rede (outro jogo, sem tela): entra na partida que o jogo das fotos abre no fim
           timeout 2700 ./godot-bin --headless --path godot -- --fotos-rede convidado > rede_fotos.log 2>&1 &
@@ -155,9 +195,6 @@ jobs:
             out/
             godot/fotos/
             importar.log
-            teste.log
-            rede_anf.log
-            rede_conv.log
             rede_fotos.log
             fotos.log
             exportar.log
