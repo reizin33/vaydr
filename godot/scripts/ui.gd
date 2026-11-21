@@ -831,7 +831,16 @@ func _detalhe(dono: String, i: int) -> void:
 		_botao("Vestir", func(): _usar_slot(i))
 	elif d.has("acao"):
 		_botao(str(d["acao"]), func(): _usar_slot(i))
+	if s.has("dur") and float(s["dur"]) < float(d.get("durMax", 1.0)) and main.construcao.nivel_bancada_perto(main.jogador.global_position) > 0:
+		_botao("Consertar (%s)" % Dados.custo_txt(Fabricacao.custo_conserto(id)), _consertar.bind(i))
 	_botao("Largar", func(): _largar(i))
+
+
+func _consertar(i: int) -> void:
+	var m := Fabricacao.consertar_item(main.jogador, i)
+	aviso("Consertado" if m == "" else m)
+	_detalhe("jog", i)
+	atualizar()
 
 
 func _tirar(lugar: String) -> void:

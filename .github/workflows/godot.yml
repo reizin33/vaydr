@@ -71,6 +71,8 @@ jobs:
           grep -E "^(ok |FALHA|TESTE|mapa:)" teste.log
           # o jogo abriu (os scripts compilaram e o mapa montou): as fotos valem a pena mesmo se alguma conferência falhou
           if grep -q "TESTE VAYDR Godot: começo" teste.log; then echo sim > jogo_abriu; fi
+          # as falhas e os erros de script viram anotações da execução (dá para ler antes de as fotos acabarem)
+          grep -E "^FALHA|^TESTE FALHOU|SCRIPT ERROR|Parse Error|Invalid |at: " teste.log | awk '!visto[$0]++' | head -24 | while IFS= read -r l; do echo "::error title=Teste::${l//%/%25}"; done
           grep -q "TESTE OK" teste.log
 
       - name: Fotos (OpenGL por software)

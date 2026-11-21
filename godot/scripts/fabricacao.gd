@@ -98,3 +98,34 @@ static func fazer(r: Dictionary, j) -> String:
 
 static func nome(r: Dictionary) -> String:
 	return str(r.get("nome", Dados.nome(str(r["faz"]))))
+
+
+## conserto na bancada (ferramenta, arma e roupa gastas): um terço do que a receita pede (sem receita: sucata e madeira)
+static func custo_conserto(id: String) -> Dictionary:
+	for r in Dados.RECEITAS:
+		if str(r["faz"]) == id:
+			var c := {}
+			var base := Dados.custo(r)
+			for k in base:
+				c[k] = maxi(1, ceili(float(base[k]) / 3.0))
+			return c
+	return {"sucata": 1, "madeira": 1}
+
+
+static func consertar_item(j, i: int) -> String:
+	var s = j.inv.slots[i]
+	if s == null or not s.has("dur"):
+		return "Isso não gasta"
+	var mx := float(Dados.item(str(s["id"])).get("durMax", 1.0))
+	if float(s["dur"]) >= mx:
+		return "Já está inteiro"
+	if j.main.construcao.nivel_bancada_perto(j.global_position) <= 0:
+		return "Conserto só perto de uma bancada de trabalho"
+	var c := custo_conserto(str(s["id"]))
+	if not j.inv.pagar(c):
+		return "Falta material para consertar: " + Dados.custo_txt(c)
+	s["dur"] = mx
+	j.consertos += 1
+	j.inv.mudou.emit()
+	return ""
+

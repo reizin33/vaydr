@@ -580,9 +580,16 @@ func _aprender_uma() -> String:
 func ferir(dano: float, tremer := true) -> void:
 	if not vivo:
 		return
-	# a roupa segura parte do golpe (não da fome, da sede ou da queda)
+	# a roupa segura parte do golpe (não da fome, da sede ou da queda) e gasta com isso
 	if tremer:
 		dano *= 1.0 - inv.protecao()
+		for lugar in inv.roupa.keys():
+			var r: Dictionary = inv.roupa[lugar]
+			if lugar != "costas" and r.has("dur") and float(Dados.item(str(r["id"])).get("prot", 0.0)) > 0.0:
+				r["dur"] = float(r["dur"]) - 1.0
+				if float(r["dur"]) <= 0.0:
+					inv.roupa.erase(lugar)
+					main.ui.aviso("%s rasgou." % Dados.nome(str(r["id"])))
 	vida -= dano
 	if tremer:
 		tremor = 0.25
