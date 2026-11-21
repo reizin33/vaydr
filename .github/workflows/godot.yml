@@ -66,6 +66,11 @@ jobs:
       - name: Teste sem tela
         run: |
           set +e
+          # erro de script na importação: o jogo nem abre (sem isso o teste ficava 10 minutos parado esperando)
+          if grep -q -E "SCRIPT ERROR|Parse Error" importar.log; then
+            grep -E "SCRIPT ERROR|Parse Error|at: " importar.log | awk '!visto[$0]++' | head -24 | while IFS= read -r l; do echo "::error title=Importação::${l//%/%25}"; done
+            exit 1
+          fi
           timeout 600 ./godot-bin --headless --path godot -- --teste 2>&1 | tee teste.log | awk '!visto[$0]++ && n++ < 600'
           echo "----- resumo -----"
           grep -E "^(ok |FALHA|TESTE|mapa:)" teste.log
