@@ -59,7 +59,9 @@ func _ready() -> void:
 		_fotos.call_deferred()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		ui.aviso("Colete madeira e pedra, fabrique (Tab) e construa antes da noite.")
+		ui.aviso("Bata nas árvores e nas pedras (clique) para pegar madeira e pedra.", 8.0)
+		ui.aviso("Tab abre a mochila e a fabricação: comece pelo machado e pelo plano de construção.", 9.0)
+		ui.aviso("Esc: menu (gráficos, mouse, sair).", 9.0)
 
 
 func _teclas() -> void:
@@ -156,10 +158,16 @@ func _ciclo() -> void:
 
 func _process(dt: float) -> void:
 	# o dia passa devagar (50 s por hora) e a noite mais rápido (25 s por hora): ~11 min de dia e ~5 de noite
+	var antes := hora
 	hora += dt / (SEG_POR_HORA * (0.5 if noite() else 1.0))
 	if hora >= 24.0:
 		hora -= 24.0
 		dia += 1
+	if not modo_teste:
+		if antes < 17.5 and hora >= 17.5:
+			ui.aviso("O sol está indo embora: de noite os zumbis correm. Faça uma fogueira ou se tranque na base.", 7.0)
+		if antes < 6.0 and hora >= 6.0:
+			ui.aviso("Amanheceu: dia %d" % dia, 5.0)
 	_ciclo()
 	# zumbis: alguns de dia, muitos de noite; nascem longe e fora da vista
 	spawn_t -= dt
@@ -255,7 +263,7 @@ func texto_mira() -> String:
 	if c.has_meta("porta"):
 		return "E  Fechar a porta" if construcao.portas[c.get_meta("porta")]["aberta"] else "E  Abrir a porta"
 	if c.has_meta("bau"):
-		return "E  Abrir o baú"
+		return "E  Pegar suas coisas" if construcao.baus[c.get_meta("bau")].get("mochila", false) else "E  Abrir o baú"
 	if c.has_meta("recurso"):
 		var r: Dictionary = mundo.recursos[c.get_meta("recurso")]
 		match r["tipo"]:
@@ -276,6 +284,13 @@ func texto_mira() -> String:
 
 func _morreu() -> void:
 	ui.abrir(false)
+	# como no Rust: o que você tinha fica numa mochila no chão, dá para voltar e pegar
+	var tinha := false
+	for s in jogador.inv.slots:
+		if s != null:
+			tinha = true
+	if tinha:
+		construcao.por_mochila(jogador.global_position, jogador.inv)
 	ui.mostrar_morte(true)
 
 
@@ -608,10 +623,14 @@ func _teste() -> void:
 	await _quadros(10)
 	_confere(z.estado == "morto", "zumbi morreu com os golpes")
 	_confere(z.anim != null and z.anim.has_animation("sFeridoAnda") and z.anim.has_animation("sGolpe"), "animações do zumbi carregadas")
-	# morte e volta
+	# morte e volta: a mochila cai no chão com o que tinha
+	jogador.inv.por("pedra", 37)
+	var n_baus := construcao.baus.size()
 	jogador.ferir(999.0)
 	await _quadros(3)
 	_confere(not jogador.vivo and ui.morte.visible, "morreu e apareceu a tela de morte")
+	var caiu: bool = construcao.baus.size() == n_baus + 1 and construcao.baus[n_baus].get("mochila", false)
+	_confere(caiu and (construcao.baus[n_baus]["inv"] as Inventario).conta("pedra") >= 37, "a mochila caiu no chão com as coisas")
 	renascer()
 	await _quadros(5)
 	_confere(jogador.vivo and jogador.inv.conta("madeira") == 0, "renasceu na clareira de mão vazia")

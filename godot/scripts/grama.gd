@@ -95,7 +95,7 @@ func _textura_folhas() -> ImageTexture:
 			var f := (float(t - 1) - y) / (float(t - 1) - topo)   # 0 na base, 1 na ponta
 			var x := x0 + curva * f * f
 			var meia := larg * (1.0 - f * 0.85)
-			var cor := Color(0.16, 0.3, 0.07).lerp(Color(0.5, 0.6, 0.22), f * 0.8 + tom * 0.2)
+			var cor := Color(0.12, 0.2, 0.06).lerp(Color(0.36, 0.42, 0.16), f * 0.8 + tom * 0.2)
 			for px in range(int(x - meia), int(x + meia) + 1):
 				if px >= 0 and px < t:
 					img.set_pixel(px, int(y), cor)
@@ -162,7 +162,7 @@ void vertex() {
 	float dens = (1.0 - wr) * (1.0 - wm * 0.9) * (1.0 - wf * 0.8) * mix(0.35, 1.0, sm) * step(agua + 0.35, h);
 	float dist = distance(w, CAMERA_POSITION_WORLD.xz);
 	float some = 1.0 - smoothstep(raio * 0.7, raio, dist);
-	float esc = mix(0.65, 1.35, r4) * some * step(r3 * 0.9 + 0.05, dens);
+	float esc = mix(0.6, 1.15, r4) * some * step(r3 * 0.9 + 0.05, dens);
 	float a = r3 * 6.2831;
 	vec3 v = VERTEX;
 	v.xz = mat2(vec2(cos(a), sin(a)), vec2(-sin(a), cos(a))) * v.xz;
@@ -179,7 +179,7 @@ void vertex() {
 
 void fragment() {
 	vec4 c = texture(folhas, UV);
-	ALBEDO = c.rgb * mix(vec3(0.85, 0.95, 0.8), vec3(1.1, 1.05, 0.85), tom);
+	ALBEDO = c.rgb * mix(vec3(0.8, 0.88, 0.72), vec3(1.08, 1.0, 0.78), tom);
 	ALPHA = c.a;
 	ALPHA_SCISSOR_THRESHOLD = 0.5;
 	ROUGHNESS = 0.95;

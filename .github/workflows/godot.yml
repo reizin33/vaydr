@@ -12,6 +12,10 @@ on:
         description: "Versão do protótipo para publicar (ex.: 0.1.0). Vazio = só monta e testa"
         required: false
         default: ""
+      fotos:
+        description: "Tirar as fotos de conferência (demora uns 10 min no Linux sem placa de vídeo)"
+        type: boolean
+        default: true
   push:
     branches: [correcoes-10-2-2]
     paths: ["godot/**", ".github/workflows/godot.yml"]
@@ -68,7 +72,7 @@ jobs:
           grep -q "TESTE OK" teste.log
 
       - name: Fotos (OpenGL por software)
-        if: always()
+        if: ${{ always() && (github.event_name == 'push' || inputs.fotos) }}
         run: |
           set +e
           export LIBGL_ALWAYS_SOFTWARE=1
@@ -77,7 +81,7 @@ jobs:
 
       # as fotos saem no próprio registro (em base64), para conferir sem baixar o artefato
       - name: Fotos no registro
-        if: always()
+        if: ${{ always() && (github.event_name == 'push' || inputs.fotos) }}
         run: |
           for f in godot/fotos/*.jpg; do
             [ -f "$f" ] || continue

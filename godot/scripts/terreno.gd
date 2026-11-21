@@ -111,7 +111,7 @@ uniform sampler2D n_rocha : hint_normal, filter_linear_mipmap_anisotropic, repea
 uniform sampler2D ruido : filter_linear_mipmap, repeat_enable;
 uniform sampler2D sombra_mata : filter_linear, repeat_disable;
 uniform float agua = 0.35;
-uniform float tam = 512.0;
+uniform float tam_mapa = 512.0;
 varying vec3 wn;
 varying float wy;
 void vertex() {
@@ -139,7 +139,7 @@ void fragment() {
 	c = mix(c, duas(t_mata, uv, 3.2) * vec3(0.62, 0.58, 0.52), wb);
 	c = mix(c, duas(t_rocha, uv, 1.8) * vec3(0.58, 0.56, 0.53), wr);
 	nm = mix(nm, texture(n_rocha, uv / 1.8).rgb, wr);
-	float sm = texture(sombra_mata, (uv + tam * 0.5) / tam).r;
+	float sm = texture(sombra_mata, (uv + tam_mapa * 0.5) / tam_mapa).r;
 	c = mix(c * vec3(0.55, 0.58, 0.5), c, sm);
 	ALBEDO = c * (0.85 + 0.3 * n1);
 	NORMAL_MAP = nm;
@@ -164,7 +164,7 @@ void fragment() {
 	nt.noise = fn
 	m.set_shader_parameter("ruido", nt)
 	m.set_shader_parameter("agua", AGUA)
-	m.set_shader_parameter("tam", TAM)
+	m.set_shader_parameter("tam_mapa", TAM)
 	sombra_img = Image.create_empty(N, N, false, Image.FORMAT_L8)
 	sombra_img.fill(Color(1, 1, 1))
 	m.set_shader_parameter("sombra_mata", ImageTexture.create_from_image(sombra_img))

@@ -56,7 +56,7 @@ func _ready() -> void:
 	cam.far = 900.0
 	cabeca.add_child(cam)
 	mao = Node3D.new()
-	mao.position = Vector3(0.32, -0.3, -0.5)
+	mao.position = Vector3(0.34, -0.42, -0.55)
 	cam.add_child(mao)
 	# lanterna: um facho de luz que sai da câmera quando ela está na mão
 	luz_mao = SpotLight3D.new()
@@ -172,7 +172,7 @@ func _physics_process(dt: float) -> void:
 	golpe = maxf(0.0, golpe - dt * 3.2)
 	var g := sin(golpe * PI) if golpe > 0.0 else 0.0
 	mao.rotation = Vector3(-g * 1.2, g * 0.4, g * 0.3)
-	mao.position = Vector3(0.32 - g * 0.12, -0.3 + cam.position.y * 0.5, -0.5 - g * 0.15)
+	mao.position = Vector3(0.34 - g * 0.12, -0.42 + cam.position.y * 0.5, -0.55 - g * 0.15)
 	if global_position.y < -30.0:
 		ferir(999.0, false)
 
@@ -264,7 +264,8 @@ func usar() -> void:
 			main.construcao.alternar_porta(c.get_meta("porta"))
 			return
 		if c.has_meta("bau"):
-			main.ui.abrir_bau(main.construcao.baus[c.get_meta("bau")]["inv"])
+			var b: Dictionary = main.construcao.baus[c.get_meta("bau")]
+			main.ui.abrir_bau(b["inv"], "Sua mochila (caiu quando você morreu)" if b.get("mochila", false) else "Baú")
 			return
 		if c.has_meta("recurso"):
 			var i: int = c.get_meta("recurso")

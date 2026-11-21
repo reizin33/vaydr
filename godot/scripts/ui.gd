@@ -24,6 +24,7 @@ var bau_inv: Inventario = null
 var col_fab: VBoxContainer
 var col_bau: VBoxContainer
 var grade_bau: GridContainer
+var titulo_bau: Label
 var aberto := false
 var menu: PanelContainer
 var menu_aberto := false
@@ -102,6 +103,7 @@ func _ready() -> void:
 	avisos = VBoxContainer.new()
 	_ancorar(avisos, Control.PRESET_TOP_RIGHT, Rect2(-330, 16, 310, 300))
 	avisos.alignment = BoxContainer.ALIGNMENT_BEGIN
+	avisos.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	raiz.add_child(avisos)
 	# barras
 	var caixa := VBoxContainer.new()
@@ -177,13 +179,14 @@ func _ready() -> void:
 	col_bau.custom_minimum_size = Vector2(420, 0)
 	col_bau.visible = false
 	lados.add_child(col_bau)
-	col_bau.add_child(_lbl("Baú", 20))
+	titulo_bau = _lbl("Baú", 20)
+	col_bau.add_child(titulo_bau)
 	grade_bau = GridContainer.new()
 	grade_bau.columns = 6
 	grade_bau.add_theme_constant_override("h_separation", 6)
 	grade_bau.add_theme_constant_override("v_separation", 6)
 	col_bau.add_child(grade_bau)
-	for i in 18:
+	for i in Inventario.ESPACOS:
 		grade_bau.add_child(_slot(i, false, "bau"))
 	var guardar := Button.new()
 	guardar.text = "Guardar madeira, pedra e o resto dos recursos"
@@ -373,7 +376,7 @@ func _clique(ev: InputEvent, i: int, dono: String) -> void:
 	if not (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT):
 		return
 	var inv := _inv(dono)
-	if inv == null:
+	if inv == null or i >= inv.slots.size():
 		return
 	if escolhido < 0:
 		if inv.slots[i] != null:
@@ -426,8 +429,11 @@ func _guardar_recursos() -> void:
 	inv.mudou.emit()
 
 
-func abrir_bau(inv: Inventario) -> void:
+func abrir_bau(inv: Inventario, titulo := "Baú") -> void:
 	bau_inv = inv
+	titulo_bau.text = titulo
+	for k in grade_bau.get_child_count():
+		(grade_bau.get_child(k) as Control).visible = k < inv.slots.size()
 	if not inv.mudou.is_connected(atualizar):
 		inv.mudou.connect(atualizar)
 	col_fab.visible = false
@@ -513,9 +519,10 @@ func abrir(on: bool) -> void:
 	atualizar()
 
 
-func aviso(txt: String) -> void:
+func aviso(txt: String, tempo := 2.4) -> void:
 	var l := _lbl(txt, 16)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(310, 0)
 	avisos.add_child(l)
 	while avisos.get_child_count() > 7:
@@ -523,7 +530,7 @@ func aviso(txt: String) -> void:
 		avisos.remove_child(velho)
 		velho.queue_free()
 	var tw := create_tween()
-	tw.tween_interval(2.4)
+	tw.tween_interval(tempo)
 	tw.tween_property(l, "modulate:a", 0.0, 0.8)
 	tw.tween_callback(l.queue_free)
 

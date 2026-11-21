@@ -430,6 +430,39 @@ func por_bau(j) -> void:
 	main.ui.aviso("Baú no lugar: E abre")
 
 
+## mochila caída: quando o jogador morre, tudo o que ele tinha fica numa mochila no chão (E abre e pega de volta)
+func por_mochila(p: Vector3, inv: Inventario) -> void:
+	var sp := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(p + Vector3(0, 1.0, 0), p + Vector3(0, -6.0, 0), 1)
+	var h := sp.intersect_ray(q)
+	var no := Node3D.new()
+	no.position = h["position"] if not h.is_empty() else p
+	add_child(no)
+	var m := MeshInstance3D.new()
+	var cm := CapsuleMesh.new()
+	cm.radius = 0.22
+	cm.height = 0.62
+	m.mesh = cm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.34, 0.27, 0.18)
+	mat.roughness = 0.95
+	m.material_override = mat
+	m.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0).scaled(Vector3(1.0, 0.7, 1.0)), Vector3(0, 0.16, 0))
+	no.add_child(m)
+	var corpo := StaticBody3D.new()
+	corpo.collision_layer = 2   # a mira pega, mas ninguém tropeça nela
+	corpo.collision_mask = 0
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(0.7, 0.45, 0.7)
+	cs.shape = bs
+	cs.position.y = 0.2
+	corpo.add_child(cs)
+	no.add_child(corpo)
+	corpo.set_meta("bau", baus.size())
+	baus.append({"no": no, "inv": inv, "mochila": true})
+
+
 ## saco de dormir: no chão ou na fundação; quem morre pode renascer nele
 func por_saco(j) -> void:
 	var h: Dictionary = j.mira(4.0, 1)
