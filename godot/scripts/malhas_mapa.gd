@@ -173,10 +173,15 @@ void fragment() {
 	%s
 	ALBEDO = c;
 	ROUGHNESS = 0.88;
-	SPECULAR = 0.35;
-	// lado de dentro: o céu quase não ilumina (como numa sala fechada; o sol já não entra por causa da sombra)
-	AO = 1.0 - 0.8 * clamp(interior, 0.0, 1.0);
+	// lado de dentro: o céu quase não ilumina (14%%-20%% da luz de fora, como numa sala fechada no jogo antigo)
+	AO = 1.0 - 0.82 * clamp(interior, 0.0, 1.0);
 	EMISSION = c * brilho * 1.5;
+}
+
+// luz: o sol e a lua não entram no lado de dentro (como no jogo antigo); lanterna, fogueira e lâmpadas iluminam igual
+void light() {
+	float k = LIGHT_IS_DIRECTIONAL ? 1.0 - clamp(interior, 0.0, 1.0) : 1.0;
+	DIFFUSE_LIGHT += clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION * LIGHT_COLOR / PI * k;
 }
 """ % ["c *= texture(tex, UV).rgb;" if com_tex else """vec3 bw = pow(abs(wnrm), vec3(4.0));
 	bw /= max(bw.x + bw.y + bw.z, 0.001);

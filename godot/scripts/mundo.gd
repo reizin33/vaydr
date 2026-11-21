@@ -656,7 +656,9 @@ func _serra_velha(d: Dictionary, col: ColisaoMapa) -> void:
 		serra["paredoes"] += 1
 		if xf.origin.x > BORDA_OESTE:
 			_corpo_convexo(m, xf)
-			if serra["teste"] == Vector3.ZERO and xf.origin.x > BORDA_OESTE + 8.0:
+			# para o teste: um que sai bem do chão (muitos ficam quase todo enterrados na encosta, como lá)
+			var topo := xf.origin.y + malha(m).get_aabb().end.y * float(a[4])
+			if serra["teste"] == Vector3.ZERO and topo > terreno.h(xf.origin.x, xf.origin.z) + 2.0:
 				serra["teste"] = xf.origin
 	var pedra := "res://assets/mata/pedra.glb"
 	malha(pedra, Color(0.8, 0.78, 0.76))

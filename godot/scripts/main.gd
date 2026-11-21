@@ -932,6 +932,11 @@ func _teste() -> void:
 
 
 func _foto(nome: String) -> void:
+	# a janela das fotos é 1280 x 720 (às vezes ela encolhia no meio e a foto saía com dois quadros misturados)
+	if DisplayServer.window_get_size() != Vector2i(1280, 720):
+		print("foto %s: janela estava %s" % [nome, DisplayServer.window_get_size()])
+		DisplayServer.window_set_size(Vector2i(1280, 720))
+		await _quadros(6)
 	await _quadros(10)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
@@ -1002,8 +1007,9 @@ func _fotos() -> void:
 	# Morro do Sabiá (sul da cidade) e Cidade Alta (norte)
 	await _cam(Vector3(250, 0, 84), Vector3(255, 6.0, 135))
 	await _foto("07_morro_do_sabia")
-	await _cam(Vector3(230, 0, -70), Vector3(230, 4.0, -150))
+	await _cam_alto(Vector3(244, 34, -52), Vector3(246, 6.0, -150))
 	await _foto("08_cidade_alta")
+	jogador.set_physics_process(true)
 	# porto e mar
 	await _cam_alto(Vector3(334, 24, 58), Vector3(378, 2.0, 8))
 	await _foto("09_porto_e_mar")
@@ -1014,8 +1020,15 @@ func _fotos() -> void:
 	await _cam(Vector3(30, 0, 100), Vector3(66, 0.5, 104))
 	await _foto("11_lago")
 	# o mapa visto do alto
+	# vista do alto (câmera solta): enxerga mais longe e com menos neblina que no jogo, para mostrar o mapa inteiro
+	var far0 := jogador.cam.far
+	var neb0 := amb.fog_density
+	jogador.cam.far = 2500.0
+	amb.fog_density = 0.0012
 	await _cam_alto(Vector3(60, 140, 190), Vector3(220, 0, -20))
 	await _foto("12_mapa_do_alto")
+	jogador.cam.far = far0
+	amb.fog_density = neb0
 	jogador.set_physics_process(true)
 	# machado na mão, de frente para uma árvore perto do começo
 	var livre := _lugar_livre(Vector2(0, 0), 14.0)

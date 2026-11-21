@@ -321,7 +321,7 @@ void fragment() {
 	c = mix(c, vec3(0.3 + 0.06 * n2) * (0.85 + 0.15 * dm), pis.r);
 	c = mix(c, vec3(0.56 + 0.05 * n2) * (0.9 + 0.1 * dm), pis.b);
 	// pedra nas encostas, com a cor dela
-	c = mix(c, tr * 0.78, wr * 0.85);
+	c = mix(c, tr * 0.6, wr * 0.85);
 	vec3 nm = mix(texture(n_grama, w / 2.0).rgb, texture(n_mata, w / 3.2).rgb, km);
 	nm = mix(nm, texture(n_rocha, w / 1.8).rgb, wr);
 	ALBEDO = c * (0.95 + 0.1 * n1);
