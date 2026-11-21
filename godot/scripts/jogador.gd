@@ -319,7 +319,7 @@ func _vestir_braco() -> void:
 func _dobrar_braco(dt: float) -> void:
 	if braco_fp == null or not braco_fp.is_visible_in_tree():
 		return
-	var cot := mao_item.global_transform.affine_inverse() * cam.to_global(Vector3(0.45, -0.38, 0.0))
+	var cot := mao_item.global_transform.affine_inverse() * mao.to_global(Vector3(0.45, -0.38, 0.0))
 	var f := cot.normalized()
 	var x := Vector3(0, 0, -1)
 	var y := Vector3(0, 1, 0)
@@ -351,6 +351,11 @@ const GOLPE_FP_VAZIA := {"k": -0.85, "kd": 0.0, "sobe": [0.08, 0.3, 0.15, 0.4, 0
 
 
 func _view_model() -> void:
+	# o jogo antigo desenhava a mão com um campo de visão próprio, mais fechado (0,9 rad): na tela ela fica grande, embaixo à
+	# direita, com o antebraço saindo pela borda. Aqui o mundo usa o campo de visão das configurações; a mão é esticada na
+	# horizontal e na vertical da câmera para cair no mesmo lugar da tela (é o que o outro campo de visão faz)
+	var kv := tan(deg_to_rad(cam.fov) * 0.5) / tan(0.45)
+	mao.scale = Vector3(kv, kv, 1.0)
 	var id := ferramenta_id
 	var d := Dados.item(id) if id != "" and id != "-" else {}
 	var com_item := ferramenta_no != null

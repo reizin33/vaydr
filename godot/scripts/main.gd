@@ -673,7 +673,9 @@ func _teste_personagem(livre: Vector3) -> void:
 	_confere(c.esq != null and c.ix.size() == Corpo.NB and not c.ix.has(-1) and c.nos.size() > 40,
 		"corpo do personagem: esqueleto de %d ossos e %d malhas (corpo em pedaços, olhos, cabelos, barbas, roupas e cascas)" % [c.ix.size(), c.nos.size()])
 	_confere(Corpo.CL.size() >= 18 and Corpo.CLIP.size() > 100000, "animações do sobrevivente: %d clipes" % Corpo.CL.size())
-	_por_em(Vector3(livre.x, livre.y + 0.2, livre.z + 4.0))
+	# um lugar aberto longe da base de teste (que foi montada perto da clareira)
+	livre = _lugar_livre(Vector2(-35, 45), 16.0, Vector2(livre.x, livre.z))
+	_por_em(Vector3(livre.x, livre.y + 0.2, livre.z + 6.0))
 	_olhar(jogador.global_position + Vector3(0, 1.6, -10))
 	await _quadros(40)
 	var est0 := c.estado
@@ -1751,12 +1753,17 @@ func _fotos() -> void:
 	await _foto("13_machado_na_mao")
 	# terceira pessoa (V): o corpo com o machado, a mão esquerda junto no cabo; o golpe; a roupa no corpo (de frente); e a mão
 	# de verdade na primeira pessoa (com a manga da camisa e a luva)
+	var la := _lugar_livre(Vector2(10, 12), 12.0)
+	_por_em(Vector3(la.x, la.y + 0.3, la.z))
+	await _quadros(8)
+	jogador.rotation.y = atan2(la.x - 0.0, la.z - 0.0) + 0.5
+	jogador.cabeca.rotation.x = -0.12
 	jogador.alternar_camera(true)
 	await _quadros(70)
 	await _foto("13b_terceira_pessoa")
 	jogador.cd = 0.0
 	jogador.atacar()
-	await _quadros(7)
+	await _quadros(9)
 	await _foto("13c_golpe_terceira_pessoa")
 	await _quadros(30)
 	for id in ["camisaLeve", "calcaCargo", "botasTrilha", "gorroPele", "cinto", "luvasCouro"]:
@@ -1771,6 +1778,10 @@ func _fotos() -> void:
 	jogador.cabeca.rotation.x = -0.12
 	await _quadros(50)
 	await _foto("13d_roupa_no_corpo")
+	# conferência do defeito do llvmpipe (metade de baixo deslocada): o mesmo quadro sem o brilho
+	amb.glow_enabled = false
+	await _foto("13d2_sem_brilho")
+	amb.glow_enabled = true
 	jogador.rotation.y -= PI * 0.82
 	jogador.corpo.trava = false
 	jogador.alternar_camera(false)
@@ -1868,6 +1879,9 @@ func _fotos() -> void:
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()
 	await _foto("17_pausa")
+	amb.glow_enabled = false
+	await _foto("17b_pausa_sem_brilho")
+	amb.glow_enabled = true
 	telas.voltar_ao_jogo()
 	telas.abrir_mapa("")
 	await _foto("18_mapa")

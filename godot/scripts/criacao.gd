@@ -715,7 +715,7 @@ func _voltar() -> void:
 func _confirmar() -> void:
 	ap["nome"] = Perfis.limpar_nome(nome.text)
 	Perfis.atual["ap"] = Corpo.limpa(ap)
-	var img: Image = main.palco.foto_retrato()
+	var img: Image = main.palco.foto_retrato() if DisplayServer.get_name() != "headless" else null
 	if img != null and not img.is_empty():
 		DirAccess.make_dir_recursive_absolute("user://retratos")
 		img.resize(128, 128, Image.INTERPOLATE_LANCZOS)
