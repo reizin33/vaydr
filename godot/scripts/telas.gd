@@ -65,6 +65,7 @@ var sz_destaque: Control
 var lg_grade: HFlowContainer
 var lg_form: PanelContainer
 var lg_nome: LineEdit
+var _renomeando := {}
 # ajustes
 var aj_abas: VBoxContainer
 var aj_corpo: VBoxContainer
@@ -142,6 +143,16 @@ func _tela(nome: String, fundo := Estilo.FUNDO) -> Control:
 	raiz.add_child(t)
 	telas[nome] = t
 	return t
+
+
+## caixa com o traço cor de brasa só do lado esquerdo (o escolhido nas listas e nas abas)
+func _so_esquerda(cor: Color, raio: int, margem: int) -> StyleBoxFlat:
+	var b := Estilo.caixa(cor, Estilo.BRASA, raio, margem)
+	b.border_width_top = 0
+	b.border_width_right = 0
+	b.border_width_bottom = 0
+	b.border_width_left = 3
+	return b
 
 
 func _sombreado(codigo: String) -> ShaderMaterial:
@@ -475,10 +486,14 @@ func _tela_login() -> void:
 	lg_nome.text_submitted.connect(func(_t): _criar_perfil())
 	fh.add_child(lg_nome)
 	var bc := Estilo.botao("Criar perfil", true)
+	bc.name = "Criar"
 	bc.pressed.connect(_criar_perfil)
 	fh.add_child(bc)
 	var bx := Estilo.botao("Cancelar")
-	bx.pressed.connect(func(): lg_form.visible = false)
+	bx.pressed.connect(func():
+		lg_form.visible = false
+		_renomeando = {}
+		bc.text = "CRIAR PERFIL")
 	fh.add_child(bx)
 	var rod := HBoxContainer.new()
 	t.add_child(rod)
@@ -509,7 +524,8 @@ func _montar_login() -> void:
 		lg_grade.add_child(_cartao_perfil(p))
 	if Perfis.lista().size() < Perfis.MAX_PERFIS:
 		var novo := Button.new()
-		novo.custom_minimum_size = Vector2(200, 236)
+		novo.custom_minimum_size = Vector2(200, 200)
+		novo.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		novo.focus_mode = Control.FOCUS_NONE
 		novo.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		novo.text = "+\n\nNOVO PERFIL"
@@ -520,6 +536,8 @@ func _montar_login() -> void:
 		novo.add_theme_stylebox_override("hover", Estilo.caixa(Color(1, 1, 1, 0.05), Estilo.BRASA, 16, 12))
 		novo.add_theme_stylebox_override("pressed", Estilo.caixa(Color(1, 1, 1, 0.05), Estilo.BRASA, 16, 12))
 		novo.pressed.connect(func():
+			_renomeando = {}
+			(lg_form.find_child("Criar", true, false) as Button).text = "CRIAR PERFIL"
 			lg_form.visible = true
 			lg_nome.text = ""
 			lg_nome.grab_focus())
@@ -566,10 +584,23 @@ func _cartao_perfil(p: Dictionary) -> Control:
 	var acoes := HBoxContainer.new()
 	acoes.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(acoes)
+	var rn := Estilo.link("Renomear", 12)
+	rn.pressed.connect(_renomear_perfil.bind(p))
+	acoes.add_child(rn)
 	var ap := Estilo.link("Apagar", 12)
 	ap.pressed.connect(_pedir_apagar_perfil.bind(p))
 	acoes.add_child(ap)
 	return v
+
+
+## o mesmo quadro do perfil novo, já com o nome, troca o nome do perfil
+func _renomear_perfil(p: Dictionary) -> void:
+	_renomeando = p
+	lg_form.visible = true
+	lg_nome.text = str(p["nome"])
+	lg_nome.grab_focus()
+	lg_nome.select_all()
+	(lg_form.find_child("Criar", true, false) as Button).text = "SALVAR NOME"
 
 
 func _pedir_apagar_perfil(p: Dictionary) -> void:
@@ -587,6 +618,13 @@ func _criar_perfil() -> void:
 	var n := Perfis.limpar_nome(lg_nome.text)
 	if n == "":
 		lg_nome.placeholder_text = "Escreva um nome"
+		return
+	if not _renomeando.is_empty():
+		Perfis.renomear_perfil(_renomeando, n)
+		_renomeando = {}
+		lg_form.visible = false
+		(lg_form.find_child("Criar", true, false) as Button).text = "CRIAR PERFIL"
+		_montar_login()
 		return
 	Perfis.novo_perfil(n)
 	lg_form.visible = false
@@ -719,7 +757,7 @@ void fragment() {
 	baixo.add_theme_constant_override("separation", 10)
 	baixo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	c.add_child(baixo)
-	Estilo.encher(baixo, Vector2(0, 1), Vector2(1, 1), Vector2(26, -30), Vector2(-26, -30))
+	Estilo.encher(baixo, Vector2(0, 1), Vector2(1, 1), Vector2(22, -30), Vector2(-22, -30))
 	baixo.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	var tr := ColorRect.new()
 	tr.color = d["cor"]
@@ -785,9 +823,10 @@ func _lobby_escolher(i: int, ja := false) -> void:
 	for k in lobby_cartoes.size():
 		var c: Control = lobby_cartoes[k]
 		var aberto := k == i
-		_lobby_tw.tween_property(c, "size_flags_stretch_ratio", 1.75 if aberto else 1.0, 0.0 if ja else 0.35)
+		_lobby_tw.tween_property(c, "size_flags_stretch_ratio", 1.6 if aberto else 1.0, 0.0 if ja else 0.35)
 		var tit: Label = c.get_meta("tit")
-		tit.add_theme_font_size_override("font_size", 34 if aberto else 22)
+		tit.add_theme_font_size_override("font_size", 34 if aberto else 19)
+		tit.add_theme_font_override("font", Estilo.fonte("titulo", 700, 2 if aberto else 1))
 		(c.get_meta("extra") as Label).visible = aberto and (c.get_meta("extra") as Label).text != ""
 		if c.has_meta("img"):
 			var img: TextureRect = c.get_meta("img")
@@ -823,7 +862,7 @@ func _tela_sozinho() -> void:
 	sz_destaque.add_theme_stylebox_override("panel", Estilo.caixa(Color(0.07, 0.08, 0.085), Color(0, 0, 0, 0), 14, 0))
 	sz_destaque.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	sz_destaque.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sz_destaque.size_flags_stretch_ratio = 1.75
+	sz_destaque.size_flags_stretch_ratio = 1.6
 	h.add_child(sz_destaque)
 	var dir := VBoxContainer.new()
 	dir.add_theme_constant_override("separation", 10)
@@ -885,9 +924,7 @@ func _linha_mundo(m: Dictionary) -> Control:
 	b.focus_mode = Control.FOCUS_NONE
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	var n := Estilo.caixa(Estilo.CARTAO, Color(1, 1, 1, 0.06), 10, 14)
-	var s := (Estilo.caixa(Color(0.12, 0.1, 0.085, 0.95), Color(1, 1, 1, 0.06), 10, 14)).duplicate() as StyleBoxFlat
-	s.border_color = Estilo.BRASA
-	s.border_width_left = 3
+	var s := _so_esquerda(Color(0.12, 0.1, 0.085, 0.95), 10, 14)
 	b.add_theme_stylebox_override("normal", s if sel else n)
 	b.add_theme_stylebox_override("hover", s if sel else Estilo.caixa(Color(0.1, 0.11, 0.115, 0.95), Estilo.BORDA_ALTA, 10, 14))
 	b.add_theme_stylebox_override("pressed", s)
@@ -1096,9 +1133,7 @@ func _montar_ajustes() -> void:
 		b.add_theme_font_override("font", Estilo.fonte("ui", 700))
 		b.add_theme_font_size_override("font_size", 16)
 		var sel := i == aj_aba
-		var s := (Estilo.caixa(Color(0.12, 0.13, 0.135, 0.95), Estilo.BORDA_ALTA, 10, 14)).duplicate() as StyleBoxFlat
-		s.border_color = Estilo.BRASA
-		s.border_width_left = 3
+		var s := _so_esquerda(Color(0.12, 0.13, 0.135, 0.95), 10, 14)
 		var n := Estilo.caixa(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 10, 14)
 		b.add_theme_stylebox_override("normal", s if sel else n)
 		b.add_theme_stylebox_override("hover", s if sel else Estilo.caixa(Color(1, 1, 1, 0.04), Color(0, 0, 0, 0), 10, 14))
@@ -1322,34 +1357,122 @@ func _creditos() -> String:
 
 # ================================================================ pausa
 func _tela_pausa() -> void:
-	var t := _tela("pausa", Color(0.016, 0.024, 0.02, 0.78))
-	_brilho(t, Vector2(0.25, 1.1), Vector2(0.5, 0.5), 0.22)
+	var t := _tela("pausa", Color(0.016, 0.024, 0.02, 0.8))
+	_brilho(t, Vector2(0.2, 1.1), Vector2(0.55, 0.5), 0.2)
+	# à esquerda: o título, quem e onde, e a lista (como no jogo antigo: Voltar em destaque, seções com as teclas)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
+	col.add_theme_constant_override("separation", 6)
 	t.add_child(col)
-	Estilo.prender(col, 0.0, 0.5, 90, -300, Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_END)
-	col.add_child(Estilo.rotulo("JOGO PARADO", 12, Estilo.BRASA, "ui", 800, 4))
-	pz_mundo = Estilo.rotulo("", 46, Estilo.OSSO, "titulo", 700)
+	Estilo.encher(col, Vector2(0, 0), Vector2(0, 1), Vector2(64, 22), Vector2(520, -16))
+	col.add_child(Estilo.rotulo("JOGO PARADO", 12, Estilo.BRASA, "ui", 800, 3))
+	col.add_child(Estilo.rotulo("PAUSADO", 64, Estilo.OSSO, "titulo", 700, 3))
+	var linha := ColorRect.new()
+	linha.color = Estilo.BRASA
+	linha.custom_minimum_size = Vector2(70, 3)
+	linha.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	col.add_child(linha)
+	pz_mundo = Estilo.rotulo("", 13, Estilo.CINZA, "ui", 700, 2)
 	col.add_child(pz_mundo)
-	pz_onde = Estilo.rotulo("", 15, Estilo.CINZA, "ui", 600)
+	pz_onde = Estilo.rotulo("", 15, Estilo.OSSO, "ui", 600)
 	col.add_child(pz_onde)
-	pz_relogio = Estilo.rotulo("", 16, Estilo.OSSO, "ui", 700)
-	col.add_child(pz_relogio)
-	pz_stats = HBoxContainer.new()
-	pz_stats.add_theme_constant_override("separation", 30)
-	col.add_child(pz_stats)
 	var esp := Control.new()
-	esp.custom_minimum_size = Vector2(0, 14)
+	esp.custom_minimum_size = Vector2(0, 8)
 	col.add_child(esp)
-	var acoes := [["Voltar ao jogo", true, voltar_ao_jogo], ["Mapa", false, _pz_mapa], ["Configurações", false, _pz_ajustes],
-		["Salvar agora", false, _pz_salvar], ["Como jogar", false, _pz_ajuda], ["Sair para o lobby", false, _pz_lobby],
-		["Sair do jogo", false, _pz_sair]]
-	for b in acoes:
-		var bt := Estilo.botao(str(b[0]), bool(b[1]), 15)
-		bt.custom_minimum_size = Vector2(320, 46)
-		bt.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		bt.pressed.connect(b[2])
-		col.add_child(bt)
+	col.add_child(_item_pausa("Voltar ao jogo", "Esc", "olho", voltar_ao_jogo, true))
+	col.add_child(_secao_pausa("Sobrevivência"))
+	col.add_child(_item_pausa("Mapa", "M", "mapa", _pz_mapa))
+	col.add_child(_item_pausa("Salvar agora", "F5", "check", _pz_salvar))
+	col.add_child(_secao_pausa("Sistema"))
+	col.add_child(_item_pausa("Configurações", "", "grade", _pz_ajustes))
+	col.add_child(_item_pausa("Como jogar", "", "livro", _pz_ajuda))
+	col.add_child(_item_pausa("Salvar e ir ao lobby", "", "mochila", _pz_lobby))
+	col.add_child(_item_pausa("Salvar e sair do jogo", "", "x", _pz_sair))
+	# à direita: o relógio (o dia inteiro num anel, com o sol ou a lua) e os números do mundo
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Estilo.caixa(Color(0.06, 0.07, 0.07, 0.9), Estilo.BORDA, 14, 18))
+	t.add_child(card)
+	Estilo.prender(card, 1.0, 1.0, -52, -24, Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BEGIN)
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override("separation", 14)
+	card.add_child(cv)
+	var topo := HBoxContainer.new()
+	topo.add_theme_constant_override("separation", 18)
+	cv.add_child(topo)
+	var rel := Relogio.new(main)
+	rel.name = "Relogio"
+	rel.custom_minimum_size = Vector2(108, 108)
+	topo.add_child(rel)
+	var tv := VBoxContainer.new()
+	tv.alignment = BoxContainer.ALIGNMENT_CENTER
+	topo.add_child(tv)
+	pz_relogio = Estilo.rotulo("", 40, Estilo.OSSO, "titulo", 700)
+	tv.add_child(pz_relogio)
+	var sub := Estilo.rotulo("", 13, Estilo.CINZA, "ui", 600)
+	sub.name = "Sub"
+	tv.add_child(sub)
+	pz_stats = HBoxContainer.new()
+	pz_stats.add_theme_constant_override("separation", 10)
+	cv.add_child(pz_stats)
+
+
+func _secao_pausa(nome: String) -> Control:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	var l := Estilo.rotulo(nome.to_upper(), 11, Estilo.APAGADO, "ui", 800, 3)
+	h.add_child(l)
+	var tr := ColorRect.new()
+	tr.color = Color(0.925, 0.894, 0.824, 0.1)
+	tr.custom_minimum_size = Vector2(0, 1)
+	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(tr)
+	var m := MarginContainer.new()
+	m.add_theme_constant_override("margin_top", 10)
+	m.add_child(h)
+	return m
+
+
+func _item_pausa(txt: String, tecla_txt: String, ico: String, f: Callable, destaque := false) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(440, 44 if destaque else 38)
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var n := Estilo.caixa(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 6, 14)
+	var h := Estilo.caixa(Color(1, 1, 1, 0.05), Color(0, 0, 0, 0), 6, 14)
+	if destaque:
+		n = Estilo.caixa(Color(0.55, 0.25, 0.1, 0.75), Color(0, 0, 0, 0), 4, 14)
+		n.border_color = Estilo.BRASA
+		n.border_width_left = 3
+		h = Estilo.caixa(Color(0.65, 0.3, 0.12, 0.85), Color(0, 0, 0, 0), 4, 14)
+		h.border_color = Estilo.BRASA
+		h.border_width_left = 3
+	b.add_theme_stylebox_override("normal", n)
+	b.add_theme_stylebox_override("hover", h)
+	b.add_theme_stylebox_override("pressed", h)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.pressed.connect(f)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(row)
+	Estilo.encher(row, Vector2(0, 0), Vector2(1, 1), Vector2(16, 0), Vector2(-12, 0))
+	var ic := TextureRect.new()
+	ic.texture = Estilo.icone(ico, 16)
+	ic.custom_minimum_size = Vector2(16, 16)
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	ic.modulate = Estilo.OSSO if destaque else Estilo.CINZA
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(ic)
+	var l := Estilo.rotulo(txt, 18 if destaque else 16, Estilo.OSSO, "ui", 800 if destaque else 700)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(l)
+	if tecla_txt != "":
+		var k := Estilo.tecla(tecla_txt, 11)
+		k.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(k)
+	return b
 
 
 func _pz_mapa() -> void:
@@ -1386,12 +1509,16 @@ func pausa() -> void:
 	main.ui.abrir(false)
 	get_tree().paused = true
 	main.salvar_jogo()
-	pz_mundo.text = str(main.mundo_atual.get("nome", "Mundo"))
+	var nome_p := str(Perfis.atual.get("nome", ""))
+	pz_mundo.text = ("SOBREVIVENTE: %s  ·  %s" % [nome_p, str(main.mundo_atual.get("nome", "Mundo"))]).to_upper() if nome_p != "" \
+		else str(main.mundo_atual.get("nome", "Mundo")).to_upper()
 	var j: Node3D = main.jogador
 	var l: Dictionary = main.mundo.lugar_em(j.global_position.x, j.global_position.z)
-	pz_onde.text = "Sobrevivente: %s  ·  %s" % [str(Perfis.atual.get("nome", "")), str(l["nome"])]
 	var falta: String = str(main.ui.hud.dia_falta.text)
-	pz_relogio.text = "Dia %d  ·  %s  ·  %s" % [int(main.dia), main.hora_txt(), falta]
+	pz_onde.text = "Dia %d  ·  %s  ·  %s  ·  %s" % [int(main.dia), main.hora_txt(), falta, str(l["nome"])]
+	pz_relogio.text = main.hora_txt()
+	(telas["pausa"].find_child("Sub", true, false) as Label).text = "Dia %d  ·  %s" % [int(main.dia), falta]
+	telas["pausa"].find_child("Relogio", true, false).queue_redraw()
 	_stats(pz_stats)
 	mostrar("pausa")
 
@@ -1400,14 +1527,16 @@ func _stats(onde: HBoxContainer) -> void:
 	for c in onde.get_children():
 		c.queue_free()
 	var st: Dictionary = main.stats
-	onde.add_child(_numero(str(int(main.dia)), "Dia"))
-	onde.add_child(_numero(str(int(st.get("zumbis", 0))), "Zumbis"))
-	onde.add_child(_numero(str(int(st.get("fabricados", 0))), "Fabricados"))
 	var n_base := 0
 	for pe in main.construcao.pecas:
 		if pe is Dictionary and not pe.get("caiu", false):
 			n_base += 1
-	onde.add_child(_numero(str(n_base), "Construções"))
+	for par in [[str(int(main.dia)), "Dia"], [str(int(st.get("zumbis", 0))), "Zumbis"], [str(int(st.get("fabricados", 0))), "Fabricados"], [str(n_base), "Construções"]]:
+		var p := PanelContainer.new()
+		p.add_theme_stylebox_override("panel", Estilo.caixa(Color(1, 1, 1, 0.03), Color(1, 1, 1, 0.08), 10, 12))
+		p.custom_minimum_size = Vector2(96, 0)
+		p.add_child(_numero(par[0], par[1]))
+		onde.add_child(p)
 
 
 func voltar_ao_jogo() -> void:
@@ -1797,6 +1926,10 @@ void fragment() {
 		var mu = main.mundo
 		for p in mu.lugares:
 			draw_circle(tela(p["x"], p["z"]), float(p["r"]) * k, Color(0.2, 0.33, 0.2, 0.9), true, -1.0, true)
+		# a cidade: o asfalto em volta dos prédios (como o retângulo da cidade no mapa do jogo antigo)
+		var cid_r: Rect2 = mu.area_cidade()
+		if cid_r.has_area():
+			draw_rect(Rect2(tela(cid_r.position.x, cid_r.position.y), cid_r.size * k), Color(0.23, 0.23, 0.22))
 		for r in mu.ruas:
 			var pts := PackedVector2Array()
 			for q in (r["pts"] as PackedVector2Array):
@@ -1818,8 +1951,14 @@ void fragment() {
 		var nomes := []
 		for p in mu.lugares:
 			nomes.append([p["nome"], p["x"], p["z"]])
-		for l in mu.lugares_nome:
-			nomes.append([l["nome"], l["x"], l["z"]])
+		var ja := {}
+		for p in mu.lugares:
+			ja[str(p["nome"])] = true
+		# os lugares menores (galpão, bunker, túnel...) só aparecem aproximando, para os nomes não se amontoarem
+		if zoom >= 2.0:
+			for l in mu.lugares_nome:
+				if not ja.has(str(l["nome"])):
+					nomes.append([l["nome"], l["x"], l["z"]])
 		var cid: Vector2 = mu.centro_cidade()
 		if cid != Vector2.ZERO:
 			nomes.append(["Cidade", cid.x, cid.y])
@@ -1846,3 +1985,41 @@ void fragment() {
 		cont.append(pts2[0])
 		draw_polyline(cont, Color(0.027, 0.039, 0.035), 2.0, true)
 		draw_rect(Rect2(Vector2.ZERO, size), Estilo.BORDA, false, 1.0)
+
+
+## o relógio da pausa: o dia inteiro num anel (a noite azul, o dia dourado), o sol ou a lua no meio e o ponto da hora
+class Relogio extends Control:
+	var main
+
+	func _init(m) -> void:
+		main = m
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5 - 8.0
+		# 0h em cima, horário; a noite vai das 19h às 5h30
+		var a0 := -PI * 0.5
+		var noite_ini := a0 + TAU * 19.0 / 24.0
+		var noite_fim := a0 + TAU * (24.0 + 5.5) / 24.0
+		draw_arc(c, r, a0, a0 + TAU, 64, Color(0.83, 0.62, 0.25, 0.85), 6.0, true)
+		draw_arc(c, r, noite_ini, noite_fim, 32, Color(0.29, 0.38, 0.62, 0.95), 6.0, true)
+		for h in 24:
+			var ang := a0 + TAU * h / 24.0
+			var d := Vector2(cos(ang), sin(ang))
+			draw_line(c + d * (r + 6.0), c + d * (r + (10.0 if h % 6 == 0 else 8.0)), Color(0.925, 0.894, 0.824, 0.35), 1.0)
+		var fu := Estilo.fonte("ui", 800)
+		for par in [[0, "0"], [6, "6"], [12, "12"], [18, "18"]]:
+			var ang2 := a0 + TAU * float(par[0]) / 24.0
+			var p := c + Vector2(cos(ang2), sin(ang2)) * (r - 16.0)
+			var w := fu.get_string_size(str(par[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+			draw_string(fu, p + Vector2(-w * 0.5, 4), str(par[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.925, 0.894, 0.824, 0.55))
+		var hora: float = main.hora
+		var noite: bool = main.noite()
+		var ic := Estilo.icone("lua" if noite else "sol", 22)
+		if ic:
+			draw_texture_rect(ic, Rect2(c - Vector2(11, 11), Vector2(22, 22)), false, Color(0.7, 0.78, 1.0) if noite else Estilo.BRASA)
+		var ah := a0 + TAU * hora / 24.0
+		var ph := c + Vector2(cos(ah), sin(ah)) * r
+		draw_circle(ph, 7.0, Color(0.04, 0.05, 0.05), true, -1.0, true)
+		draw_circle(ph, 5.5, Color(1.0, 0.86, 0.55), true, -1.0, true)

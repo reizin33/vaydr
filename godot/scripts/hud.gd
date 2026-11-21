@@ -64,6 +64,7 @@ var _t := 0.0
 var _lento := 0.0
 var _chip_cache := ""
 var construindo := false
+var cidade := Rect2()      # o retângulo da cidade (calculado uma vez, para o minimapa)
 
 
 func _init(m: Node) -> void:
@@ -71,7 +72,8 @@ func _init(m: Node) -> void:
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# já dentro da tela: as âncoras E as margens (só as âncoras deixavam o HUD com tamanho zero e tudo ia para o canto)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	theme = Estilo.tema()
 	_veus()
@@ -718,6 +720,12 @@ class DesenhoMapa extends Control:
 		var alc2: float = (Hud.ALCANCE_MINI + 30.0) * (Hud.ALCANCE_MINI + 30.0)
 		var jp: Vector3 = main.jogador.global_position
 		if parte == "lugares":
+			# a cidade: o asfalto em volta dos prédios
+			if hud.cidade == Rect2():
+				hud.cidade = main.mundo.area_cidade()
+			if hud.cidade.has_area():
+				var cp: Vector2 = hud._mini_pos(hud.cidade.position.x, hud.cidade.position.y)
+				draw_rect(Rect2(cp, hud.cidade.size * k), Color(0.23, 0.23, 0.22))
 			for p in main.mundo.lugares:
 				if Vector2(float(p["x"]) - jp.x, float(p["z"]) - jp.z).length_squared() < alc2 + float(p["r"]) * float(p["r"]) * 4.0:
 					draw_circle(hud._mini_pos(p["x"], p["z"]), float(p["r"]) * k, Color(0.184, 0.302, 0.192), true, -1.0, true)

@@ -826,6 +826,14 @@ func _teste_telas() -> void:
 	await _quadros(2)
 	_confere(telas.atual == "" and not get_tree().paused, "fechou o mapa e voltou ao jogo")
 	Perfis.apagar_perfil(p)
+	# HUD no lugar certo da tela (as âncoras dependem do HUD ocupar a tela inteira)
+	var tela := get_viewport().get_visible_rect().size
+	var rb: Rect2 = ui.hud.barra.get_global_rect()
+	var rbs: Rect2 = ui.hud.bussola.get_global_rect()
+	var rv: Rect2 = ui.hud.vitais.get_global_rect()
+	_confere(absf(rb.get_center().x - tela.x * 0.5) < 4.0 and rb.end.y > tela.y - 40.0 and absf(rbs.get_center().x - tela.x * 0.5) < 4.0 \
+		and rbs.position.y < 20.0 and rv.end.x > tela.x - 40.0 and rv.end.y > tela.y - 40.0,
+		"HUD no lugar: barra rápida embaixo no meio (%s), bússola em cima no meio (%s), vida embaixo à direita (%s)" % [rb, rbs, rv])
 	# HUD: o nome do lugar embaixo do minimapa e a bússola
 	ui.hud._lento = 0.0
 	await _quadros(3)
@@ -1422,6 +1430,7 @@ func _foto(nome: String) -> void:
 		DisplayServer.window_set_size(Vector2i(1280, 720))
 		await _quadros(6)
 	await _quadros(10)
+	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://fotos"))

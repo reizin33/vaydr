@@ -1058,3 +1058,16 @@ func centro_cidade() -> Vector2:
 			soma += (p["ret"] as Rect2).get_center()
 			n += 1
 	return soma / n if n > 0 else Vector2.ZERO
+
+
+## o retângulo da cidade (os prédios que não são da roça, com a rua em volta), para o mapa
+func area_cidade() -> Rect2:
+	var r := Rect2()
+	var tem := false
+	for p in predios:
+		if p["rural"]:
+			continue
+		var q: Rect2 = p["ret"]
+		r = q if not tem else r.merge(q)
+		tem = true
+	return r.grow(8.0) if tem else Rect2()
