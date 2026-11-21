@@ -1429,40 +1429,20 @@ func _foto(nome: String) -> void:
 		print("foto %s: janela estava %s" % [nome, DisplayServer.window_get_size()])
 		DisplayServer.window_set_size(Vector2i(1280, 720))
 		await _quadros(6)
-	# no Linux sem placa de vídeo, às vezes um pedaço da imagem vem de um quadro antigo (a foto sai com dois quadros
-	# misturados): tira duas seguidas e só fica com ela quando as duas batem (até 4 tentativas)
-	var img: Image = null
-	for tentativa in 4:
-		await _quadros(8)
-		await RenderingServer.frame_post_draw
-		var a := get_viewport().get_texture().get_image()
-		await _quadros(2)
-		await RenderingServer.frame_post_draw
+	await _quadros(10)
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	# no Linux sem placa de vídeo, ler a imagem da textura da tela às vezes desloca a metade de baixo para o lado; a
+	# imagem da própria tela (o que a janela mostra) não tem esse defeito: usa ela e, se não der, a da textura
+	var img: Image = DisplayServer.screen_get_image(DisplayServer.window_get_current_screen())
+	var tam_ok := img != null and not img.is_empty() and img.get_size() == DisplayServer.window_get_size()
+	if not tam_ok:
 		img = get_viewport().get_texture().get_image()
-		if _parecidas(a, img):
-			break
-		print("foto %s: dois quadros diferentes (tentativa %d), tirando de novo" % [nome, tentativa + 1])
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://fotos"))
 	img.save_jpg(ProjectSettings.globalize_path("res://fotos/%s.jpg" % nome), 0.86)
 	var dc := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
 	var pr := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
 	print("foto %s: %d chamadas de desenho, %d mil triângulos, %d fps (software)" % [nome, dc, pr / 1000, Engine.get_frames_per_second()])
-
-
-## duas fotos quase iguais? (compara reduzidas: o mato balança um pouco, mas o defeito troca pedaços inteiros da imagem)
-func _parecidas(a: Image, b: Image) -> bool:
-	var pa := a.duplicate() as Image
-	var pb := b.duplicate() as Image
-	pa.resize(64, 36, Image.INTERPOLATE_BILINEAR)
-	pb.resize(64, 36, Image.INTERPOLATE_BILINEAR)
-	var ruins := 0
-	for y in 36:
-		for x in 64:
-			var ca := pa.get_pixel(x, y)
-			var cb := pb.get_pixel(x, y)
-			if absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b) > 0.3:
-				ruins += 1
-	return ruins < 64 * 36 * 0.06
 
 
 ## põe a câmera num ponto do chão olhando para o alvo (relativo: a altura do alvo conta a partir do chão de lá)
