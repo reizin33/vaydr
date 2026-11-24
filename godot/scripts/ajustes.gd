@@ -43,7 +43,8 @@ static func aplicar(main) -> void:
 	main.aplicar_qualidade(int(v["qualidade"]))
 	var vp: Viewport = main.get_viewport()
 	vp.scaling_3d_scale = vp.scaling_3d_scale * clampf(float(v["escala"]) / 100.0, 0.5, 1.0)
-	main.jogador.cam.fov = clampf(float(v["fov"]), 60.0, 100.0)
+	main.jogador.fov_base = clampf(float(v["fov"]), 60.0, 100.0)
+	main.jogador.cam.fov = main.jogador.fov_base
 	main.jogador.sens = 0.0022 * clampf(float(v["sens"]), 0.2, 3.0)
 	main.jogador.inverter_y = bool(v["inverter_y"])
 	if main.jogador.terceira != bool(v["terceira"]):

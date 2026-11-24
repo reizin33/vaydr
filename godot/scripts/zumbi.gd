@@ -97,6 +97,9 @@ var _parado_no_chao := false
 var _casa_ok := false
 var dist_alvo := 0.0
 var parado := false        # de guarda: não vaga, fica onde está até ver ou ouvir alguém
+var cravadas: Array = []   # as flechas e virotes cravados nele (caem quando ele morre, a maioria inteira)
+var queima := 0.0          # pegando fogo: segundos que faltam
+var _fogo_no: CPUParticles3D = null
 
 
 func _init(m: Node, t = "walker") -> void:
@@ -430,6 +433,8 @@ func ouvir(p: Vector3, atraso: float) -> void:
 func morrer(quem := 0) -> void:
 	estado = "morto"
 	morto_t = 25.0
+	_apagar()
+	_soltar_flechas()
 	golpe_t = -1.0
 	_tocar("sQueda")
 	collision_layer = 0
@@ -446,6 +451,104 @@ func _estourar() -> void:
 	main.efeitos.sangue(global_position + Vector3(0, 1.1, 0), Vector3.UP)
 	main.sons.tocar("estouro", global_position, 2.0)
 	main.barulho(global_position, 18.0)
+
+
+## pegou fogo (o fogo no chão do molotov, outro zumbi queimando do lado): queima por t segundos (16 de vida por segundo) e
+## passa para quem encostar
+func acender(t: float) -> void:
+	if estado == "morto":
+		return
+	if lan:
+		Rede.efeito_z(uid, 2, t)
+		return
+	if queima <= 0.0:
+		_fogo_visual()
+	queima = maxf(queima, t)
+	if estado in ["vaga", "alerta", "dorme"]:
+		if estado == "dorme":
+			_levantar(LEVANTA_T * 0.75, "caca")
+		else:
+			estado = "caca"
+
+
+## as chamas no corpo (e o som de pegar fogo)
+func _fogo_visual() -> void:
+	main.sons.tocar("fogo", global_position, -2.0)
+	_fogo_no = CPUParticles3D.new()
+	_fogo_no.amount = 26
+	_fogo_no.lifetime = 0.55
+	_fogo_no.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_fogo_no.emission_box_extents = Vector3(0.22, 0.7, 0.18) * escala
+	_fogo_no.direction = Vector3.UP
+	_fogo_no.spread = 12.0
+	_fogo_no.initial_velocity_min = 0.8
+	_fogo_no.initial_velocity_max = 1.8
+	_fogo_no.gravity = Vector3(0, 0.5, 0)
+	_fogo_no.scale_amount_min = 0.5
+	_fogo_no.scale_amount_max = 1.1
+	var q := QuadMesh.new()
+	q.size = Vector2(0.22, 0.3)
+	var mf := StandardMaterial3D.new()
+	mf.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mf.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mf.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mf.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mf.vertex_color_use_as_albedo = true
+	mf.albedo_color = Color(1.0, 0.55, 0.15, 0.8)
+	q.material = mf
+	_fogo_no.mesh = q
+	_fogo_no.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_fogo_no.position.y = 0.95 * escala
+	add_child(_fogo_no)
+	_fogo_no.emitting = true
+
+
+func _queimando(dt: float) -> void:
+	queima -= dt
+	vida -= 16.0 * dt * float(S.get("resist", 1.0))
+	if mat != null and flash <= 0.0:
+		var fl := 0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.023 + uid)
+		mat.albedo_color = tom * Color(1.25 + 0.5 * fl, 0.62 + 0.2 * fl, 0.32)
+	# passa para quem encostar
+	if randf() < dt * 2.5:
+		for o in main.zumbis:
+			if o != self and is_instance_valid(o) and not o.lan and o.estado != "morto" and o.queima <= 0.0 \
+					and Vector2(o.global_position.x - global_position.x, o.global_position.z - global_position.z).length() < 0.9:
+				o.acender(3.2)
+	var j = main.jogador
+	if j != null and j.vivo and randf() < dt * 1.2 and absf(j.global_position.y - global_position.y) < 1.5 \
+			and Vector2(j.global_position.x - global_position.x, j.global_position.z - global_position.z).length() < 0.7:
+		j.queimar(1.2)
+	if vida <= 0.0:
+		vida = 0.0
+		morrer()
+	elif queima <= 0.0:
+		_apagar()
+
+
+func _apagar() -> void:
+	queima = 0.0
+	if _fogo_no != null and is_instance_valid(_fogo_no):
+		_fogo_no.queue_free()
+	_fogo_no = null
+	if mat != null:
+		mat.albedo_color = tom
+
+
+## as flechas cravadas caem no chão quando ele morre (70% inteiras)
+func _soltar_flechas() -> void:
+	if cravadas.is_empty():
+		return
+	var c := {}
+	for it in cravadas:
+		if randf() < 0.7:
+			c[it] = int(c.get(it, 0)) + 1
+	cravadas.clear()
+	var L := []
+	for it in c:
+		L.append([it, c[it]])
+	if not L.is_empty() and main.construcao != null:
+		main.construcao.soltar_no_chao(global_position, L)
 
 
 # ======================================================================== partida em rede
@@ -465,13 +568,18 @@ func para_rede() -> PackedFloat32Array:
 			st = 2 if golpe_t >= 0.0 else (1 if estado in ["caca", "atordoado"] else 0)
 	var p := global_position
 	return PackedFloat32Array([uid, p.x, p.y, p.z, rotation.y, st, clampf(vida / vida_max, 0.0, 1.0),
-		Vector2(velocity.x, velocity.z).length(), float(TIPOS.keys().find(tipo)) + (0.5 if capacete > 0 else 0.0)])
+		Vector2(velocity.x, velocity.z).length(), float(TIPOS.keys().find(tipo)) + (0.5 if capacete > 0 else 0.0) + (0.25 if queima > 0.0 else 0.0)])
 
 
-## o boneco recebe o que chegou de quem abriu (cap: o capacete ainda está na cabeça)
-func rede(p: Vector3, yaw: float, st: int, hp: float, v: float, cap := true) -> void:
+## o boneco recebe o que chegou de quem abriu (cap: o capacete ainda está na cabeça; fogo: está queimando)
+func rede(p: Vector3, yaw: float, st: int, hp: float, v: float, cap := true, fogo := false) -> void:
 	if capacete > 0 and not cap:
 		_capacete_voa()
+	if fogo and _fogo_no == null and st != 3:
+		_fogo_visual()
+		queima = 1.0
+	elif not fogo and _fogo_no != null:
+		_apagar()
 	lan_alvo = p
 	lan_yaw = yaw
 	lan_v = v
@@ -479,6 +587,8 @@ func rede(p: Vector3, yaw: float, st: int, hp: float, v: float, cap := true) -> 
 	if st == 3:
 		if estado != "morto":
 			estado = "morto"
+			_apagar()
+			_soltar_flechas()
 			golpe_t = -1.0
 			_tocar("sQueda")
 			collision_layer = 0
@@ -585,6 +695,10 @@ func _physics_process(dt: float) -> void:
 		return
 	_piscar(dt)
 	empurrado_t += dt
+	if queima > 0.0 and estado != "morto":
+		_queimando(dt)
+		if estado == "morto":
+			return
 	if not _casa_ok:
 		_casa_ok = true
 		casa = global_position

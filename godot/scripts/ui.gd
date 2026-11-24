@@ -778,10 +778,16 @@ func dano(de := Vector3.INF) -> void:
 		hud.dano(de)
 
 
-## o golpe acertou: a mira fica vermelha por um instante
-func acerto() -> void:
+## o golpe (ou o tiro) acertou: a mira fica vermelha por um instante (na cabeça, o X maior)
+func acerto(cabeca := false) -> void:
 	if hud != null:
-		hud.acerto()
+		hud.acerto(cabeca)
+
+
+## a munição e o nome do item da mão mudaram (tiro, recarga): o HUD atualiza na hora
+func hud_item() -> void:
+	if hud != null:
+		hud.atualizar_item()
 
 
 func _process(_dt: float) -> void:

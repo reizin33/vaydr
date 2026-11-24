@@ -72,6 +72,13 @@ var golpe_n := 0         # quantos golpes já deu (a partida em rede manda: o bo
 var uso_n := 0           # quantas vezes comeu ou bebeu (idem)
 var acao := {}           # o empurrão (Q), a voadora (Q correndo) e o pisão (no zumbi caído): {tipo, t, dur, alvo, feito}
 var acao_n := 0          # (a partida em rede manda: o boneco faz junto)
+var mira_k := 0.0        # mirando (botão direito, com arma de fogo ou arco): 0 a 1
+var recuo := 0.0         # o coice do tiro (a câmera sobe e volta devagar)
+var tiro_n := 0          # quantos tiros já deu (a partida em rede manda: o boneco atira junto)
+var queima := 0.0        # pegando fogo: segundos que faltam
+var _queima_t := 0.0
+var _besta_t := -1.0     # a besta arma sozinha um instante depois do tiro
+var fov_base := 75.0     # o campo de visão das configurações (mirando fecha um pouco)
 ## a lanterna acesa no escuro ajuda os zumbis a te ver
 var lanterna_acesa: bool:
 	get:
@@ -215,16 +222,22 @@ func _atualizar_mao() -> void:
 	if ferramenta_no:
 		ferramenta_no.queue_free()
 		ferramenta_no = null
-	if Dados.modelo(id) != "":
-		var cena: PackedScene = load(Dados.modelo(id))
-		ferramenta_no = cena.instantiate()
+	if Dados.modelo(id) != "" or ModelosArmas.tem(id):
+		if Dados.modelo(id) != "":
+			var cena: PackedScene = load(Dados.modelo(id))
+			ferramenta_no = cena.instantiate()
+		else:
+			ferramenta_no = ModelosArmas.criar(id)
 		mao_item.add_child(ferramenta_no)
 		for no in ferramenta_no.find_children("*", "MeshInstance3D", true, false):
 			var mi := no as MeshInstance3D
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			# na frente de tudo (o jogo antigo limpava a profundidade antes de desenhar a mão): não atravessa parede nem mato
-			for k in mi.mesh.get_surface_count():
-				mi.set_surface_override_material(k, _mat_na_frente(mi.get_active_material(k)))
+			if mi.material_override != null:
+				mi.material_override = _mat_na_frente(mi.material_override)
+			else:
+				for k in mi.mesh.get_surface_count():
+					mi.set_surface_override_material(k, _mat_na_frente(mi.get_active_material(k)))
 	corpo.segurar(id)
 	_luz()
 	main.construcao.ativar(id == "plano")
@@ -429,7 +442,7 @@ func _view_model() -> void:
 	var id := ferramenta_id
 	var d := Dados.item(id) if id != "" and id != "-" else {}
 	var com_item := ferramenta_no != null
-	var fogo := bool(d.get("fogo", false)) or id == "lanterna"
+	var fogo := bool(d.get("fogo", false)) or id == "lanterna" or id == "arco"
 	var g0: Dictionary = GOLPE_FP if com_item else GOLPE_FP_VAZIA
 	var b0: Array = VM_MAO if com_item else VM_VAZIA
 	var sx := 0.0
@@ -474,8 +487,18 @@ func _view_model() -> void:
 		py += 0.27 * k
 		pz -= 0.16 * k
 	if fogo:
-		mao_item.transform = Transform3D(Basis.from_euler(Vector3(-PI / 2.0 + kick, PI, 0.0)), Vector3(px, py, pz))
+		# mirando (botão direito): a arma vai para o meio da tela, na frente do olho; o coice sobe o cano
+		var longa := id in ["espingarda", "rifle", "besta"]
+		var ak := Corpo._ease_io(mira_k)
+		px = lerpf(px, 0.0, ak)
+		py = lerpf(py, -0.075 if longa else -0.1, ak)
+		pz = lerpf(pz + (0.06 if longa else 0.0), -0.34 if longa else -0.38, ak)
+		var coice := recuo * 4.0
+		mao_item.transform = Transform3D(Basis.from_euler(Vector3(-PI / 2.0 + kick + coice, PI, 0.0)), Vector3(px, py, pz + coice * 0.25))
+		# com a luneta no olho a arma some (a tela da luneta é o HUD)
+		mao.visible = not terceira and not (id == "rifle" and mira_k > 0.6)
 	else:
+		mao.visible = not terceira
 		mao_item.transform = Transform3D(Basis.from_euler(Vector3(float(b0[3]) + sx + kick, float(b0[4]) + sy, float(b0[5]) + gr)).scaled(Vector3.ONE * 0.85),
 			Vector3(px + gx, py + gy, pz + gz))
 
@@ -607,12 +630,20 @@ func _physics_process(dt: float) -> void:
 		cam.position = _bob
 	golpe = maxf(0.0, golpe - dt * 3.2)
 	_passo_acao(dt)
+	_passo_armas(dt)
 	if global_position.y < -30.0:
 		ferir(999.0, false)
 
 
 func _process(dt: float) -> void:
 	_camera(dt)
+	# mirando, o campo de visão fecha um pouco (a luneta do rifle, bem mais); o coice levanta a câmera e volta
+	var id_m := str(item_mao().get("id", ""))
+	var fov_alvo := fov_base * lerpf(1.0, 0.8, mira_k)
+	if id_m == "rifle" and mira_k > 0.6:
+		fov_alvo = 16.0
+	cam.fov = fov_alvo if absf(cam.fov - fov_alvo) < 0.5 or mira_k <= 0.0 else lerpf(cam.fov, fov_alvo, 1.0 - exp(-dt * 18.0))
+	cam.rotation.x = recuo
 	_animar_corpo(dt)
 	_view_model()
 	_dobrar_braco(dt)
@@ -630,6 +661,8 @@ func _process(dt: float) -> void:
 		empurrar()
 	if Input.is_action_just_pressed("usar"):
 		usar()
+	if Input.is_action_just_pressed("recarregar") and not main.construcao.ativo:
+		recarregar()
 
 
 ## o que a mira pega (até "alcance")
@@ -703,7 +736,7 @@ func _animar_corpo(dt: float) -> void:
 			uso_t = -1.0
 			uk = 0.0
 	corpo.animar(dt, {"vel": velocity, "chao": is_on_floor(), "agachado": agachado, "correndo": _corre, "ferido": vida < 28.0,
-		"energia": energia, "item": id, "golpe": gs, "vertical": bool(d.get("vertical", false)), "usar": maxf(0.0, uk), "mira": 0.0,
+		"energia": energia, "item": id, "golpe": gs, "vertical": bool(d.get("vertical", false)), "usar": maxf(0.0, uk), "mira": mira_k,
 		"vivo": vivo, "primeira": not terceira, "yaw": rotation.y, "vira_anda": bool(Ajustes.v.get("corpo_anda", false)),
 		"acao": str(acao.get("tipo", "")), "acao_k": (float(acao["t"]) / float(acao["dur"])) if not acao.is_empty() else 0.0})
 	# a roupa no corpo (muda pela mochila, rasga com os golpes)
@@ -733,9 +766,19 @@ func atacar() -> void:
 		return
 	var arma := tp == "arma"
 	var st: Dictionary = d if arma else Dados.MAO
-	# um zumbi caído na frente: o golpe vira pisão
 	if not acao.is_empty():
 		return
+	# armas de fogo e besta, o arco e o que se arremessa (molotov, bomba caseira, isca)
+	if Armas.de_fogo(id):
+		_disparar(it, id)
+		return
+	if id == "arco":
+		_puxar_arco()
+		return
+	if bool(d.get("arremesso", false)):
+		_arremesso(id)
+		return
+	# um zumbi caído na frente: o golpe vira pisão
 	var caido = _caido_na_frente(1.7)
 	if caido != null and energia >= 5.0:
 		_pisao(caido)
@@ -911,6 +954,30 @@ func _passo_acao(dt: float) -> void:
 	fr.y = 0.0
 	fr = fr.normalized()
 	match str(acao["tipo"]):
+		"recarga":
+			if sel != int(acao.get("slot", sel)):
+				acao = {}
+				return
+			if t >= float(acao["dur"]):
+				_fim_recarga()
+		"arco":
+			acao["puxa"] = minf(1.0, t / float(Armas.ARCO["puxa"]))
+			if float(acao["puxa"]) >= 1.0:
+				energia = maxf(0.0, energia - (9.0 + float(Armas.ARCO["energia"])) * dt)
+				_folego_t = 0.0
+				if not acao.get("cheio", false):
+					acao["cheio"] = true
+					main.sons.tocar("clique", global_position, -10.0)
+			if not Input.is_action_pressed("atacar") or energia <= 0.0 or sel != int(acao.get("slot", sel)) or bool(acao.get("soltar", false)):
+				if float(acao["puxa"]) > 0.2:
+					_soltar_flecha(float(acao["puxa"]))
+				acao = {}
+				cd = 0.22
+				return
+		"arremesso":
+			if not acao["feito"] and t >= float(acao["dur"]) * 0.4:
+				acao["feito"] = true
+				_lancar(str(acao["id"]))
 		"empurrao":
 			if not acao["feito"] and t >= 0.15:
 				acao["feito"] = true
@@ -1323,3 +1390,261 @@ func renascer(p: Vector3) -> void:
 	corpo.ini = false
 	corpo.vestir(inv.roupa)
 	_vestir_braco()
+
+# ---------------------------------------------------------------- armas de fogo, besta, arco e arremesso (etapa 5)
+## a arma de fogo ou o arco na mão: o botão direito mira
+func _arma_mira() -> bool:
+	var id := str(item_mao().get("id", ""))
+	return Armas.de_fogo(id) or id == "arco"
+
+
+## o ponto onde a mira pega (zumbi, parede, árvore ou chão), até maxd
+func ponto_mira(maxd: float) -> Vector3:
+	var o := cam.global_position
+	var d := -cam.global_transform.basis.z
+	var h := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(o, o + d * maxd, 1, [get_rid()]))
+	return h["position"] if not h.is_empty() else o + d * maxd
+
+
+## de onde sai o tiro (a boca da arma): na primeira pessoa, na frente da câmera; na terceira, na frente do peito do lado direito
+func boca_arma(longa: bool) -> Vector3:
+	var b := cam.global_transform.basis
+	if not terceira or mira_k > 0.6:
+		return cam.global_position - b.z * 0.9 + b.x * 0.12 * (1.0 - mira_k) - b.y * 0.1
+	var fr := -global_transform.basis.z
+	var lado := global_transform.basis.x
+	return global_position + Vector3(0, 1.42 if not agachado else 0.95, 0) + fr * (0.75 if longa else 0.5) + lado * 0.18
+
+
+## o que o tiro pega primeiro: um zumbi (o ponto e ele) ou um obstáculo (parede, árvore, chão: as faíscas)
+func _tiro_hit(o: Vector3, d: Vector3, maxd: float, ign: Array) -> Dictionary:
+	var fora: Array[RID] = [get_rid()]
+	for z in ign:
+		fora.append((z as CollisionObject3D).get_rid())
+	var h := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(o, o + d * maxd, 1, fora))
+	if h.is_empty():
+		return {}
+	var c: Object = h["collider"]
+	if c.has_meta("zumbi"):
+		var z = c.get_meta("zumbi")
+		if is_instance_valid(z) and z.estado != "morto":
+			return {"z": z, "p": h["position"], "n": h["normal"]}
+	return {"p": h["position"], "n": h["normal"], "c": c}
+
+
+## o tiro (pistola, espingarda, rifle) ou o virote (besta)
+func _disparar(s: Dictionary, id: String) -> void:
+	var B := Armas.dados(id)
+	if int(s.get("mun", 0)) <= 0:
+		main.sons.tocar("vazio", global_position, -4.0)
+		cd = 0.35
+		if inv.conta(str(B["municao"])) > 0:
+			recarregar()
+		else:
+			main.ui.aviso("Sem %s (procure na delegacia, no posto, nos carros e na base militar)" % Dados.nome(str(B["municao"])).to_lower())
+		return
+	s["mun"] = int(s["mun"]) - 1
+	cd = float(B["tempo"])
+	acao = {"tipo": "tiro", "t": 0.0, "dur": minf(float(B["tempo"]), 0.3), "feito": true}
+	acao_n += 1
+	tiro_n += 1
+	var q := int(s.get("q", 1))
+	var o := cam.global_position
+	var dir := -cam.global_transform.basis.z
+	var boca := boca_arma(id != "pistola")
+	main.sons.tocar(str(B["som"]), global_position, 6.0 if id != "besta" else -2.0)
+	main.barulho(global_position, float(B["barulho"]))
+	recuo += float(B["recuo"]) * (0.6 if mira_k > 0.6 else 1.0)
+	tremor = maxf(tremor, 0.08 if id in ["pistola", "besta"] else 0.2)
+	main.ui.hud_item()
+	if id == "besta":
+		var vb: float = B["vel"]
+		var db := Armas.balistica(boca, ponto_mira(120.0), vb, float(Armas.ARCO["g"]))
+		main.projeteis.flecha(boca, db, vb, float(B["dano"]) * float(Armas.QUAL_DANO[clampi(q, 0, 3)]), "besta", "virote")
+		_besta_t = 0.35
+		return
+	main.efeitos.boca(boca, dir, id != "pistola")
+	var mirando := mira_k > 0.6
+	if B.has("chumbo"):
+		# espingarda: 8 bagos; o dano de todos no mesmo zumbi vai junto
+		var acum := {}
+		var ab := Armas.abre(id, mirando, _corre)
+		for k in int(B["chumbo"]):
+			var d2 := Armas.espalhar(dir, ab)
+			var h := _tiro_hit(o, d2, 45.0, [])
+			if h.has("z"):
+				var z = h["z"]
+				var hp: Vector3 = h["p"]
+				var reg := Armas.regiao(z, hp)
+				var a: Dictionary = acum.get(z, {"dano": 0.0, "head": false, "n": 0, "p": hp})
+				a["dano"] = float(a["dano"]) + Armas.dano_tiro(id, reg, cam.global_position.distance_to(hp), q)
+				a["head"] = bool(a["head"]) or reg == "cabeca"
+				a["n"] = int(a["n"]) + 1
+				a["p"] = hp
+				acum[z] = a
+			elif h.has("p"):
+				main.efeitos.faiscas(h["p"])
+		var cab := false
+		for z in acum:
+			var a: Dictionary = acum[z]
+			main.efeitos.sangue(a["p"], -dir)
+			if int(a["n"]) >= 4:
+				main.efeitos.sangue(a["p"], -dir)
+			cab = cab or bool(a["head"])
+			z.ferir(float(a["dano"]), global_position, 0, {"k": "bala", "head": a["head"], "reg": "cabeca" if a["head"] else "tronco", "arma": id,
+				"mult": 1.6 if a["head"] else 1.0, "forte": true, "empurra": 0.8 if int(a["n"]) >= 4 else 0.4})
+		if not acum.is_empty():
+			main.ui.acerto(cab)
+		return
+	# pistola e rifle (o rifle atravessa até dois zumbis; o segundo leva menos)
+	dir = Armas.espalhar(dir, Armas.abre(id, mirando, _corre))
+	var ign := []
+	var n := 0
+	var oo := o
+	var fim := o + dir * 60.0
+	var cat := str(B["cat"])
+	while n < int(B.get("atravessa", 1)):
+		var h := _tiro_hit(oo, dir, 140.0 if id == "rifle" else 70.0, ign)
+		if not h.has("z"):
+			if h.has("p"):
+				main.efeitos.faiscas(h["p"])
+				fim = h["p"]
+			break
+		var z = h["z"]
+		var hp: Vector3 = h["p"]
+		var reg := Armas.regiao(z, hp)
+		var dano := Armas.dano_tiro(id, reg, cam.global_position.distance_to(hp), q) * (float(B.get("atravessa_k", 1.0)) if n > 0 else 1.0)
+		main.efeitos.sangue(hp, -dir)
+		if reg == "cabeca":
+			main.efeitos.sangue(hp, -dir)
+		z.ferir(dano, global_position, 0, {"k": "bala", "head": reg == "cabeca", "reg": reg, "arma": id, "mult": Armas.mult_regiao(cat, reg),
+			"forte": true, "empurra": 0.7 if id == "rifle" else 0.45})
+		main.ui.acerto(reg == "cabeca")
+		ign.append(z)
+		n += 1
+		oo = hp + dir * 0.05
+		fim = hp
+	if n >= 2:
+		main.ui.aviso("Dois de uma vez!")
+	if id == "rifle":
+		main.efeitos.rastro(boca, fim)
+
+
+## R: recarrega a arma da mão com a munição da mochila (a espingarda põe um cartucho de cada vez)
+func recarregar() -> void:
+	var s := item_mao()
+	var id := str(s.get("id", ""))
+	if not Armas.de_fogo(id) or not acao.is_empty() or not vivo:
+		return
+	var B := Armas.dados(id)
+	var mun := int(s.get("mun", 0))
+	if mun >= int(B["pente"]):
+		return
+	var tem := inv.conta(str(B["municao"]))
+	if tem <= 0:
+		main.ui.aviso("Sem %s" % Dados.nome(str(B["municao"])).to_lower())
+		return
+	var dur := float(B.get("recarga", 1.3))
+	if bool(B.get("por_cartucho", false)):
+		dur = 0.35 + 0.42 * mini(int(B["pente"]) - mun, tem)
+	acao = {"tipo": "recarga", "t": 0.0, "dur": dur, "feito": false, "slot": sel}
+	acao_n += 1
+	main.sons.tocar("puxar" if id == "besta" else "recarga", global_position, -4.0)
+
+
+func _fim_recarga() -> void:
+	var s := item_mao()
+	var id := str(s.get("id", ""))
+	acao = {}
+	if not Armas.de_fogo(id):
+		return
+	var B := Armas.dados(id)
+	var mun := int(s.get("mun", 0))
+	var k := mini(int(B["pente"]) - mun, inv.conta(str(B["municao"])))
+	if k > 0 and inv.tirar(str(B["municao"]), k):
+		s["mun"] = mun + k
+		main.sons.tocar("clique", global_position, -6.0)
+	main.ui.hud_item()
+
+
+## o arco: segure para puxar a corda e solte para atirar
+func _puxar_arco() -> void:
+	if inv.conta("flecha") <= 0:
+		main.sons.tocar("vazio", global_position, -6.0)
+		cd = 0.4
+		main.ui.aviso("Sem flechas (na mochila, aba Fabricar: gravetos, pedra e fibra viram flechas)")
+		return
+	acao = {"tipo": "arco", "t": 0.0, "dur": 1e9, "puxa": 0.0, "feito": false, "slot": sel}
+	acao_n += 1
+	main.sons.tocar("puxar", global_position, -8.0)
+
+
+func _soltar_flecha(k: float) -> void:
+	if not inv.tirar("flecha", 1):
+		return
+	var v := lerpf(float(Armas.ARCO["v_min"]), float(Armas.ARCO["v_max"]), k)
+	var o := boca_arma(false)
+	var dir := Armas.balistica(o, ponto_mira(95.0), v, float(Armas.ARCO["g"]))
+	var q := int(item_mao().get("q", 1))
+	var dano := float(Armas.ARCO["dano"]) * float(Armas.QUAL_DANO[clampi(q, 0, 3)]) * (0.3 + 0.7 * k * k)
+	main.projeteis.flecha(o, dir, v, dano, "arco", "flecha")
+	main.sons.tocar("arco", global_position, -2.0)
+	main.barulho(global_position, 3.0)
+	recuo += 0.012
+	tiro_n += 1
+	_gastar()
+	main.ui.hud_item()
+
+
+## o molotov, a bomba caseira e a isca: o braço vai para trás e joga (até 26 m, para onde a mira aponta)
+func _arremesso(id: String) -> void:
+	acao = {"tipo": "arremesso", "t": 0.0, "dur": 0.62, "feito": false, "id": id}
+	acao_n += 1
+	cd = 0.7
+	main.sons.tocar("golpe", global_position, -8.0)
+
+
+func _lancar(id: String) -> void:
+	if not inv.tirar(id, 1):
+		return
+	var b := cam.global_transform.basis
+	var o := cam.global_position - b.z * 0.5 + b.x * 0.2 + Vector3(0, 0.05, 0)
+	if terceira:
+		o = global_position + Vector3(0, 1.6, 0) - global_transform.basis.z * 0.4 + global_transform.basis.x * 0.25
+	main.projeteis.arremessar(o, ponto_mira(Armas.ARREMESSO["alcance"] + 8.0), id, velocity)
+	main.barulho(global_position, 4.0)
+	tiro_n += 1
+	main.ui.hud_item()
+
+
+## pegou fogo (o fogo do molotov no chão, um zumbi queimando encostado): 4,5 de dano a cada meio segundo enquanto queima
+func queimar(t: float) -> void:
+	if not vivo:
+		return
+	if queima <= 0.0:
+		main.ui.aviso("Você está pegando fogo! Saia das chamas", 2.5)
+	queima = maxf(queima, t)
+
+
+func _passo_armas(dt: float) -> void:
+	# mirando: o botão direito com a arma de fogo ou o arco (com o plano na mão o botão direito é da construção)
+	var quer := Input.is_action_pressed("mirar") and _arma_mira() and not preso and not main.construcao.ativo \
+		and str(acao.get("tipo", "")) != "recarga"
+	mira_k = move_toward(mira_k, 1.0 if quer else 0.0, dt * 6.0)
+	# o coice volta devagar
+	if recuo > 0.0:
+		var k := minf(recuo, dt * 0.35)
+		recuo -= k
+	if _besta_t >= 0.0:
+		_besta_t -= dt
+		if _besta_t < 0.0 and str(item_mao().get("id", "")) == "besta" and int(item_mao().get("mun", 0)) <= 0 and inv.conta("virote") > 0:
+			recarregar()
+	if queima > 0.0:
+		queima -= dt
+		_queima_t -= dt
+		if _queima_t <= 0.0:
+			_queima_t = 0.5
+			ferir(4.5, false)
+		if main.terreno.tipo_agua(global_position.x, global_position.z) != 0 and global_position.y < main.terreno.nivel_agua(global_position.x, global_position.z) + 0.3:
+			queima = 0.0
+			main.ui.aviso("Fogo apagado")

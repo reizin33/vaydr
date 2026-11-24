@@ -40,6 +40,21 @@ func _ready() -> void:
 	bancos["estouro"] = [_mistura(_ruido(0.55, 950.0, 0.85, 6.0), _tom(0.45, 75.0, 38.0, 0.75, 7.0))]
 	bancos["grito"] = [_mistura(_gemido(1.3, 360.0), _ruido(1.1, 3200.0, 0.22, 2.2)), _mistura(_gemido(1.1, 420.0), _ruido(0.9, 2800.0, 0.2, 2.6))]
 	bancos["tosse"] = [_mistura(_ruido(0.22, 1300.0, 0.55, 13.0), _tom(0.18, 180.0, 120.0, 0.35, 16.0))]
+	# as armas (etapa 5): tiros, a besta e o arco, recarga, o clique de vazio, a flecha cravando, o vidro do molotov, o fogo,
+	# a explosão e o bipe da isca
+	bancos["tiro"] = [_mistura(_ruido(0.32, 5200.0, 1.0, 16.0), _tom(0.16, 160.0, 60.0, 0.9, 24.0))]
+	bancos["espingarda"] = [_mistura(_ruido(0.55, 3400.0, 1.0, 9.0), _tom(0.3, 110.0, 40.0, 1.0, 12.0))]
+	bancos["rifle"] = [_mistura(_ruido(0.7, 6200.0, 1.0, 7.5), _tom(0.24, 140.0, 45.0, 1.0, 14.0))]
+	bancos["besta"] = [_mistura(_tom(0.18, 420.0, 180.0, 0.5, 18.0), _ruido(0.1, 2600.0, 0.4, 40.0))]
+	bancos["arco"] = [_mistura(_tom(0.22, 300.0, 140.0, 0.45, 14.0), _ruido(0.12, 1800.0, 0.3, 30.0))]
+	bancos["puxar"] = [_varrida(0.35, 400.0, 1400.0, 0.12)]
+	bancos["recarga"] = [_mistura(_tom(0.06, 2200.0, 1800.0, 0.4, 60.0), _ruido(0.25, 2800.0, 0.35, 14.0))]
+	bancos["vazio"] = [_tom(0.04, 1600.0, 1500.0, 0.35, 80.0)]
+	bancos["flecha"] = [_mistura(_tom(0.1, 240.0, 120.0, 0.6, 30.0), _ruido(0.08, 1500.0, 0.5, 40.0))]
+	bancos["vidro"] = [_mistura(_ruido(0.3, 9000.0, 0.7, 12.0), _tom(0.25, 3100.0, 2900.0, 0.2, 15.0))]
+	bancos["fogo"] = [_ruido(0.9, 1200.0, 0.55, 2.5)]
+	bancos["explosao"] = [_mistura(_ruido(1.6, 1600.0, 1.0, 3.2), _tom(0.9, 70.0, 28.0, 1.0, 4.5))]
+	bancos["isca"] = [_mistura(_tom(0.12, 1760.0, 1760.0, 0.4, 10.0), _tom(0.12, 2640.0, 2640.0, 0.15, 10.0))]
 	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
 	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]
 

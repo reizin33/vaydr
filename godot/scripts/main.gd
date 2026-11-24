@@ -15,6 +15,7 @@ var grama: Grama
 var construcao: Construcao
 var sons: Sons
 var efeitos: Efeitos
+var projeteis: Projeteis
 var jogador: Jogador
 var palco: Palco          # o palco da criação do personagem (a clareira no começo da noite)
 var ui: UI
@@ -99,6 +100,8 @@ func _ready() -> void:
 	add_child(sons)
 	efeitos = Efeitos.new()
 	add_child(efeitos)
+	projeteis = Projeteis.new(self)
+	add_child(projeteis)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -207,7 +210,7 @@ func _teclas() -> void:
 		"frente": [KEY_W], "tras": [KEY_S], "esquerda": [KEY_A], "direita": [KEY_D], "pular": [KEY_SPACE], "correr": [KEY_SHIFT],
 		"agachar": [KEY_CTRL, KEY_C], "usar": [KEY_E], "mochila": [KEY_TAB, KEY_I], "girar": [KEY_R], "sair": [KEY_ESCAPE], "aba_obra": [KEY_Q], "salvar": [KEY_F5],
 		"barra1": [KEY_1], "barra2": [KEY_2], "barra3": [KEY_3], "barra4": [KEY_4], "barra5": [KEY_5], "barra6": [KEY_6], "tela_cheia": [KEY_F11],
-		"mapa": [KEY_M], "lanterna": [KEY_F], "construir": [KEY_B], "comandos": [KEY_H], "camera": [KEY_V]}
+		"mapa": [KEY_M], "lanterna": [KEY_F], "construir": [KEY_B], "comandos": [KEY_H], "camera": [KEY_V], "recarregar": [KEY_R]}
 	for a in mapa:
 		if not InputMap.has_action(a):
 			InputMap.add_action(a)
@@ -679,7 +682,8 @@ func mundo_rede(h: float, L: PackedFloat32Array) -> void:
 			z.lan_alvo = p
 			zumbis.append(z)
 			z_rede[uid] = z
-		z.rede(p, L[b + 4], st, L[b + 6], L[b + 7], fposmod(L[b + 8], 1.0) >= 0.25)
+		var fr := fposmod(L[b + 8], 1.0)
+		z.rede(p, L[b + 4], st, L[b + 6], L[b + 7], fr >= 0.45, fposmod(fr, 0.5) >= 0.2)
 	for uid in z_rede.keys():
 		if not vistos.has(uid):
 			var z = z_rede[uid]
@@ -726,6 +730,8 @@ func efeito_rede(uid: int, tipo: int, t: float) -> void:
 		if is_instance_valid(z) and z.uid == uid and not z.lan and z.estado != "morto":
 			if tipo == 1:
 				z.prender(t)
+			elif tipo == 2:
+				z.acender(t)
 			else:
 				z.atrasar(t)
 			return
@@ -985,6 +991,260 @@ func _segurar(acao: String, n: int) -> void:
 	Input.action_release(acao)
 
 
+func _escrever(cam: String, txt: String) -> void:
+	var f := FileAccess.open(cam, FileAccess.WRITE)
+	if f != null:
+		f.store_string(txt)
+		f.close()
+
+
+## a atualização automática: compara as versões, acha a mais nova publicada (godot-vX.Y.Z com o .exe), troca o .exe (o aberto
+## vira .velho e o novo fica com o mesmo nome) e limpa o velho ao abrir; e pergunta de verdade ao GitHub
+func _teste_atualiza() -> void:
+	_confere(AtualizadorJogo.comparar("0.10.0", "0.9.9") == 1 and AtualizadorJogo.comparar("0.5.0", "0.5.0") == 0 and AtualizadorJogo.comparar("0.4.9", "0.5.0") == -1
+		and AtualizadorJogo.comparar("abc", "0.0.1") == -1, "atualização: compara as versões (0.10.0 vem depois da 0.9.9)")
+	var lista := [
+		{"tag_name": "v10.7.0", "assets": [{"name": "VAYDR-Setup-10.7.0.exe", "browser_download_url": "https://github.com/x/v10.exe", "size": 5}]},
+		{"tag_name": "godot-v0.5.0", "assets": [{"name": "VAYDR-Godot-0.5.0.exe", "browser_download_url": "https://github.com/a/0.5.0.exe", "size": 400000000}]},
+		{"tag_name": "godot-v0.6.0", "draft": true, "assets": [{"name": "VAYDR-Godot-0.6.0.exe", "browser_download_url": "https://github.com/a/0.6.0.exe", "size": 1}]},
+		{"tag_name": "godot-v0.5.2", "assets": [{"name": "VAYDR-Godot-0.5.2.exe", "browser_download_url": "https://github.com/a/0.5.2.exe", "size": 410000000}]},
+		{"tag_name": "godot-v0.5.3", "assets": []}]
+	var r := AtualizadorJogo.escolher(lista, "0.5.0")
+	_confere(str(r.get("versao", "")) == "0.5.2" and str(r.get("url", "")).ends_with("0.5.2.exe") and int(r.get("tam", 0)) == 410000000,
+		"atualização: acha a versão nova (%s; pula o rascunho, a do jogo antigo e a sem .exe)" % str(r.get("versao", "nenhuma")))
+	_confere(AtualizadorJogo.escolher(lista, "0.5.2").is_empty(), "atualização: na versão mais nova fica em dia")
+	# a troca do .exe, com arquivos de teste
+	var pasta := OS.get_user_data_dir().path_join("teste_atualiza")
+	DirAccess.make_dir_recursive_absolute(pasta)
+	var exe := pasta.path_join("VAYDR-Godot-0.5.0.exe")
+	var novo := pasta.path_join("VAYDR-Godot-0.5.2.exe.baixando")
+	_escrever(exe, "velho")
+	_escrever(novo, "novo")
+	var t := AtualizadorJogo.trocar(exe, novo, "0.5.2")
+	_confere(bool(t["ok"]) and bool(t["trocou"]) and FileAccess.get_file_as_string(exe) == "novo" and FileAccess.file_exists(exe + ".velho")
+		and not FileAccess.file_exists(novo), "atualização: troca o .exe (o aberto vira .velho e o novo fica com o mesmo nome: os atalhos continuam)")
+	_escrever(pasta.path_join("VAYDR-Godot-0.5.9.exe.baixando"), "parou no meio")
+	AtualizadorJogo.limpar(exe)
+	_confere(not FileAccess.file_exists(exe + ".velho") and not FileAccess.file_exists(pasta.path_join("VAYDR-Godot-0.5.9.exe.baixando")),
+		"atualização: ao abrir, apaga o .exe velho e o download que parou no meio")
+	DirAccess.remove_absolute(exe)
+	var ps := AtualizadorJogo.script_ajudante(1234, "C:/Jogos/VAYDR d'Ana/VAYDR.exe", "C:/Jogos/VAYDR d'Ana/VAYDR.exe.novo", true)
+	_confere(ps.contains("$p = 1234") and ps.contains("Wait-Process") and ps.contains("Move-Item") and ps.contains("'C:\\Jogos\\VAYDR d''Ana\\VAYDR.exe'")
+		and ps.contains("--atualizou"), "atualização: o ajudante do Windows espera o jogo fechar, põe o novo no lugar e abre de novo (com aspas no caminho)")
+	_confere(not Atualiza.ligada and Atualiza.estado == "desligada", "atualização: desligada nos testes e fora do .exe do Windows")
+	# de verdade: a lista de versões publicadas no GitHub (uma versão bem velha acha a mais nova)
+	var res: Dictionary = await Atualiza.consultar("0.0.1")
+	if int(res.get("codigo", 0)) == 403:
+		print("ok    atualização: o GitHub limitou as perguntas desta máquina agora (403); a conferência de verdade fica para a próxima")
+	else:
+		_confere(not res.has("erro") and AtualizadorJogo.comparar(str(res.get("versao", "")), "0.5.0") >= 0 and int(res.get("tam", 0)) > 100000000,
+			"atualização: o GitHub respondeu e a versão publicada mais nova é a %s (%d MB)" % [str(res.get("versao", res.get("erro", "?"))), int(res.get("tam", 0)) / 1000000])
+
+
+## mira num ponto com o botão direito apertado (a arma fecha) e atira uma vez
+func _atirar_em(p: Vector3) -> void:
+	_olhar(p)
+	jogador.cd = 0.0
+	jogador.atacar()
+
+
+## as armas (a etapa 5b): o balanço (dano por região e distância), a munição no pente, a recarga, o tiro na cabeça e no peito,
+## mirar (fecha o campo de visão), a espingarda de perto, o rifle que atravessa, o barulho do tiro, a besta (arma sozinha) e o
+## arco (o que voa e crava), o molotov (o zumbi pega fogo), a bomba caseira (explode e derruba) e a isca (chama os zumbis)
+func _teste_armas(livre: Vector3) -> void:
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	_limpar_zumbis()
+	hora = 10.0
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clareira := _clareira_teste(c, 45.0)
+	var X := Vector3(1, 0, 0)
+	var Zv := Vector3(0, 0, 1)
+	# os números do balanço
+	var dc := Armas.dano_tiro("pistola", "cabeca", 10.0)
+	var dpe := Armas.dano_tiro("pistola", "pernas", 10.0)
+	var dr := Armas.dano_tiro("rifle", "cabeca", 30.0)
+	var dl := Armas.dano_tiro("pistola", "tronco", 50.0)
+	_confere(dc > 47.0 and dc < 57.0 and dpe > 16.0 and dpe < 20.0 and dr > 340.0 and dr < 410.0 and dl > 12.0 and dl < 16.0,
+		"armas: pistola na cabeça %.0f, nas pernas %.0f, de longe (50 m) %.0f; rifle na cabeça %.0f" % [dc, dpe, dl, dr])
+	_confere(int(Inventario.novo("pistola", 1).get("mun", -1)) == 0 and Inventario.novo("municao9", 5).get("mun", -1) == -1,
+		"armas: a arma achada vem vazia (as balas ficam na mochila)")
+	# a pistola: sem bala, o gatilho dá o clique e recarrega sozinha
+	_jogador_em(c, c + X * 8.0 + Vector3(0, 1.6, 0))
+	jogador.inv.por("pistola", 1)
+	jogador.inv.por("municao9", 16)
+	_na_mao("pistola")
+	await _quadros(3)
+	jogador.atacar()
+	var rec := str(jogador.acao.get("tipo", ""))
+	await _quadros(90)
+	var s := jogador.item_mao()
+	_confere(rec == "recarga" and int(s.get("mun", 0)) == 8 and jogador.inv.conta("municao9") == 8,
+		"pistola: sem bala, o gatilho dá o clique e recarrega sozinha (8 no pente, %d na mochila)" % jogador.inv.conta("municao9"))
+	main_hud_item_ok(s)
+	# mirar: o botão direito fecha o campo de visão (e o tiro abre menos)
+	Input.action_press("mirar")
+	await _quadros(25)
+	_confere(jogador.mira_k > 0.95 and jogador.cam.fov < jogador.fov_base * 0.85, "mirar (botão direito): a arma vem para o meio e a visão fecha (%.0f°)" % jogador.cam.fov)
+	# o tiro na cabeça e no peito (um zumbi a 8 m, de frente); quem ouve de longe, de costas, vem ver
+	var ouve := _z_teste(c - X * 34.0, "walker", c - X * 80.0)
+	var z := _z_teste(c + X * 8.0, "walker", c)
+	await _quadros(3)
+	_atirar_em(z.global_position + Vector3(0, 1.62 * z.escala, 0))
+	var d1 := z.vida_max - z.vida
+	var mun1 := int(s.get("mun", 0))
+	await _quadros(22)
+	var v0 := z.vida
+	_atirar_em(z.global_position + Vector3(0, 1.15 * z.escala, 0))
+	var d2 := v0 - z.vida
+	_confere(d1 > 40.0 and d2 > 18.0 and d2 < 32.0 and mun1 == 7, "pistola: na cabeça a 8 m tira %.0f, no peito %.0f (gastou uma bala por tiro)" % [d1, d2])
+	var e_ouve: String = await _z_ate(ouve, ["alerta", "caca"], 150)
+	_confere(e_ouve in ["alerta", "caca"], "o tiro faz barulho: o zumbi a 34 m, de costas, veio ver (%s)" % e_ouve)
+	_limpar_zumbis()
+	await _quadros(3)
+	# a espingarda de perto (8 bagos): quase derruba de um tiro; recarrega um cartucho de cada vez
+	jogador.inv.por("espingarda", 1)
+	jogador.inv.por("cartucho", 10)
+	_na_mao("espingarda")
+	await _quadros(3)
+	jogador.recarregar()
+	var dur_e := float(jogador.acao.get("dur", 0.0))
+	await _quadros(int(dur_e * 60.0) + 12)
+	var se := jogador.item_mao()
+	z = _z_teste(c + X * 4.0, "walker", c)
+	await _quadros(3)
+	_atirar_em(z.global_position + Vector3(0, 1.15 * z.escala, 0))
+	var de := z.vida_max - maxf(z.vida, 0.0)
+	_confere(int(se.get("mun", 0)) == 4 and absf(dur_e - (0.35 + 0.42 * 5.0)) < 0.05 and (de >= 60.0 or z.estado == "morto"),
+		"espingarda: 5 cartuchos em %.1f s; de perto tira %.0f de um tiro (%s)" % [dur_e, de, z.estado])
+	_limpar_zumbis()
+	await _quadros(3)
+	# o rifle com luneta: atravessa o primeiro e pega o de trás (com menos força)
+	jogador.inv.por("rifle", 1)
+	jogador.inv.por("balaRifle", 5)
+	_na_mao("rifle")
+	await _quadros(3)
+	jogador.recarregar()
+	await _quadros(135)
+	var z1 := _z_teste(c + X * 10.0, "walker", c)
+	var z2 := _z_teste(c + X * 12.5, "walker", c)
+	await _quadros(25)
+	var luneta := jogador.cam.fov < 25.0
+	_atirar_em(z1.global_position + Vector3(0, 1.15 * z1.escala, 0))
+	var d_z2 := z2.vida_max - maxf(z2.vida, 0.0)
+	_confere(luneta and z1.estado == "morto" and d_z2 > 40.0, "rifle: a luneta no olho (%.0f°); o tiro mata o da frente e atravessa no de trás (%.0f)" % [jogador.cam.fov, d_z2])
+	_limpar_zumbis()
+	await _quadros(3)
+	# a besta: o virote voa e crava; arma sozinha depois do tiro
+	jogador.inv.por("besta", 1)
+	jogador.inv.por("virote", 3)
+	_na_mao("besta")
+	await _quadros(3)
+	jogador.recarregar()
+	await _quadros(100)
+	z = _z_teste(c + X * 15.0, "walker", c + X * 40.0)
+	await _quadros(3)
+	_atirar_em(z.global_position + Vector3(0, 1.15 * z.escala, 0))
+	await _quadros(40)
+	var db := z.vida_max - maxf(z.vida, 0.0)
+	var cravou: bool = z.estado == "morto" or z.cravadas.size() > 0
+	await _quadros(130)
+	_confere(db > 50.0 and cravou and int(jogador.item_mao().get("mun", 0)) == 1 and jogador.inv.conta("virote") == 1,
+		"besta: o virote voou 15 m e cravou (%.0f de dano); ela armou sozinha de novo" % db)
+	_limpar_zumbis()
+	await _quadros(3)
+	# o arco: segura para puxar e solta (puxado até o fim vai longe e mata mais)
+	Input.action_release("mirar")
+	jogador.inv.por("arco", 1)
+	jogador.inv.por("flecha", 5)
+	_na_mao("arco")
+	z = _z_teste(c + X * 12.0, "walker", c + X * 40.0)
+	await _quadros(3)
+	_olhar(z.global_position + Vector3(0, 1.2 * z.escala, 0))
+	jogador.cd = 0.0
+	Input.action_press("atacar")
+	await _quadros(50)
+	var puxa := float(jogador.acao.get("puxa", 0.0))
+	Input.action_release("atacar")
+	await _quadros(45)
+	var da := z.vida_max - maxf(z.vida, 0.0)
+	_confere(puxa >= 1.0 and jogador.inv.conta("flecha") == 4 and da > 25.0, "arco: puxou até o fim e a flecha pegou a 12 m (%.0f de dano)" % da)
+	_limpar_zumbis()
+	await _quadros(3)
+	# o molotov: o fogo no chão e o zumbi pegando fogo
+	jogador.inv.por("molotov", 1)
+	_na_mao("molotov")
+	z = _z_teste(c + X * 8.0, "walker", c + X * 40.0)
+	await _quadros(3)
+	_olhar(z.global_position + Vector3(0, 0.05, 0))
+	jogador.cd = 0.0
+	jogador.atacar()
+	await _quadros(100)
+	var chamas := projeteis.chamas.size()
+	var pegou: bool = z.estado == "morto" or z.queima > 0.0
+	_confere(chamas == 1 and pegou and z.vida < z.vida_max and jogador.inv.conta("molotov") == 0,
+		"molotov: quebrou, o chão pegou fogo e o zumbi também (vida %.0f)" % maxf(z.vida, 0.0))
+	projeteis.limpar()
+	_limpar_zumbis()
+	await _quadros(3)
+	# a bomba caseira: cai, o pavio queima e explode (os de perto morrem ou caem)
+	jogador.inv.por("bombaCaseira", 1)
+	_na_mao("bombaCaseira")
+	var grupo := []
+	for k in 3:
+		grupo.append(_z_teste(c + X * 9.0 + Zv * (k - 1) * 1.3, "walker", c + X * 40.0))
+	await _quadros(3)
+	_olhar(c + X * 9.0 + Vector3(0, 0.05, 0))
+	jogador.cd = 0.0
+	jogador.atacar()
+	await _quadros(80)
+	var no_chao := projeteis.bombas.size()
+	await _quadros(200)
+	var caidos := 0
+	for g in grupo:
+		if g.estado in ["morto", "derrubado", "levanta"]:
+			caidos += 1
+	_confere(no_chao == 1 and caidos == 3, "bomba caseira: caiu, o pavio queimou e explodiu (%d de 3 zumbis mortos ou no chão)" % caidos)
+	projeteis.limpar()
+	_limpar_zumbis()
+	await _quadros(3)
+	# a isca: toca e os zumbis vão até ela
+	jogador.inv.por("isca", 1)
+	_na_mao("isca")
+	var a1 := _z_teste(c + X * 10.0 + Zv * 14.0, "walker", c + X * 10.0 + Zv * 40.0)
+	var a2 := _z_teste(c + X * 10.0 - Zv * 14.0, "walker", c + X * 10.0 - Zv * 40.0)
+	await _quadros(3)
+	_olhar(c + X * 10.0 + Vector3(0, 0.05, 0))
+	jogador.cd = 0.0
+	jogador.atacar()
+	await _quadros(60)
+	var lp: Vector3 = projeteis.iscas[0]["p"] if projeteis.iscas.size() > 0 else Vector3.INF
+	var ea1: String = await _z_ate(a1, ["alerta", "caca"], 120)
+	var ea2: String = await _z_ate(a2, ["alerta", "caca"], 60)
+	_confere(lp != Vector3.INF and ea1 in ["alerta", "caca"] and ea2 in ["alerta", "caca"] and a1.alerta_p.distance_to(lp) < 4.0,
+		"isca: caiu a uns 10 m, tocou e os dois zumbis foram até ela (%s, %s)" % [ea1, ea2])
+	projeteis.limpar()
+	_limpar_zumbis()
+	for id in ["pistola", "municao9", "espingarda", "cartucho", "rifle", "balaRifle", "besta", "virote", "arco", "flecha", "molotov", "bombaCaseira", "isca"]:
+		var n := jogador.inv.conta(id)
+		if n > 0:
+			jogador.inv.tirar(id, n)
+	_mao_vazia()
+	await _quadros(3)
+	_devolver_clareira(clareira)
+	jogador.vida = 100.0
+	spawn_t = spawn_antes
+
+
+## o HUD com a arma de fogo na mão: as balas no pente / na mochila
+func main_hud_item_ok(s: Dictionary) -> void:
+	if ui == null or ui.hud == null:
+		return
+	ui.hud_item()
+	var t: String = ui.hud.pct_item.text
+	_confere(t == "%d / %d" % [int(s.get("mun", 0)), jogador.inv.conta("municao9")], "HUD: a munição na arma da mão (%s)" % t)
+
+
 ## tira os zumbis e as nuvens de gás (os testes dos zumbis começam do zero)
 func _limpar_zumbis() -> void:
 	for z in zumbis:
@@ -993,6 +1253,58 @@ func _limpar_zumbis() -> void:
 	zumbis.clear()
 	for n in get_tree().get_nodes_in_group("gas"):
 		n.queue_free()
+
+
+## um lugar plano para os testes dos zumbis e das armas (sem casa nem muro no meio; árvore e pedra podem ter: a clareira tira)
+func _lugar_plano(centro: Vector2, lado: float, evita: Vector2) -> Vector3:
+	var sp := get_world_3d().direct_space_state
+	var q := PhysicsShapeQueryParameters3D.new()
+	var caixa := BoxShape3D.new()
+	caixa.size = Vector3(lado, 4.0, lado)
+	q.shape = caixa
+	q.collision_mask = 1
+	var fora: Array[RID] = [terreno.corpo_chao.get_rid()]
+	q.exclude = fora
+	for k in 700:
+		var a := k * 2.39996
+		var r := 1.0 + k * 0.6
+		var p := centro + Vector2(cos(a), sin(a)) * r
+		if p.distance_to(evita) < lado + 4.0 or not terreno.dentro(p.x, p.y) or terreno.tipo_agua(p.x, p.y) != 0:
+			continue
+		var ys := []
+		var m := lado * 0.5
+		for d in [Vector2(-m, -m), Vector2(m, -m), Vector2(-m, m), Vector2(m, m), Vector2.ZERO, Vector2(-m, 0), Vector2(m, 0), Vector2(0, -m), Vector2(0, m)]:
+			ys.append(terreno.h(p.x + d.x, p.y + d.y))
+		if ys.max() - ys.min() > 0.8:
+			continue
+		q.transform = Transform3D(Basis(), Vector3(p.x, terreno.h(p.x, p.y) + 2.3, p.y))
+		var ok := true
+		for hh in sp.intersect_shape(q, 64):
+			if not (hh["collider"] as Object).has_meta("recurso"):
+				ok = false
+				break
+		if ok:
+			return Vector3(p.x, terreno.h(p.x, p.y), p.y)
+	return Vector3(centro.x, terreno.h(centro.x, centro.y), centro.y)
+
+
+## para os testes: tira a colisão das árvores e pedras em volta (o mato fechado tapa a visão dos zumbis e o tiro); volta depois
+func _clareira_teste(c: Vector3, raio: float) -> Array:
+	var tirados := []
+	for r in mundo.recursos:
+		var corpo = r.get("corpo")
+		if corpo is CollisionObject3D and is_instance_valid(corpo) and r.has("pos"):
+			var p: Vector3 = r["pos"]
+			if Vector2(p.x - c.x, p.z - c.z).length() < raio and (corpo as CollisionObject3D).collision_layer != 0:
+				tirados.append([corpo, (corpo as CollisionObject3D).collision_layer])
+				(corpo as CollisionObject3D).collision_layer = 0
+	return tirados
+
+
+func _devolver_clareira(L: Array) -> void:
+	for e in L:
+		if is_instance_valid(e[0]):
+			(e[0] as CollisionObject3D).collision_layer = e[1]
 
 
 ## para entender uma falha de visão: a distância, se ele está de frente, quanto vê e o que tapa a linha do olho dele até você
@@ -1053,8 +1365,9 @@ func _teste_zumbis(livre: Vector3) -> void:
 	for lugar in jogador.inv.roupa.keys():
 		if str(jogador.inv.roupa[lugar].get("id", "")) == "mascaraGas":
 			jogador.inv.despir(lugar)
-	var c := _lugar_livre(Vector2(-35, 45), 20.0, Vector2(livre.x, livre.z))
-	print("zumbis: teste em %.0f, %.0f" % [c.x, c.z])
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clareira := _clareira_teste(c, 34.0)
+	print("zumbis: teste em %.0f, %.0f (sem a colisão de %d árvores e pedras em volta)" % [c.x, c.z, clareira.size()])
 	var X := Vector3(1, 0, 0)
 	var Zv := Vector3(0, 0, 1)
 	_jogador_em(c + Zv * 9.0, c)
@@ -1268,6 +1581,7 @@ func _teste_zumbis(livre: Vector3) -> void:
 	_limpar_zumbis()
 	await _quadros(3)
 	jogador.vida = 100.0
+	_devolver_clareira(clareira)
 	spawn_t = spawn_antes
 
 
@@ -1647,6 +1961,7 @@ func _teste() -> void:
 	jogador.cabeca.rotation.x = olhar0
 	# as telas do jogo antigo: perfis, lobby, Jogar sozinho, configurações, pausa, mapa
 	await _teste_telas()
+	await _teste_atualiza()
 	var F := Construcao.FUND
 	# o mapa do jogo antigo
 	_confere(terreno.W >= 801 and terreno.H >= 681 and terreno.alturas.size() == terreno.W * terreno.H, "relevo do jogo antigo: %d x %d m (com a Serra Velha)" % [terreno.W, terreno.H])
@@ -2193,6 +2508,7 @@ func _teste() -> void:
 	# o personagem (a etapa 3), por último: mexe na mochila, na roupa e na câmera
 	hora = 10.0
 	await _teste_zumbis(livre)
+	await _teste_armas(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")

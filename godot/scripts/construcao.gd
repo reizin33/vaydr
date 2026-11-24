@@ -480,6 +480,34 @@ func ferir_peca(i: int, dano: float, onde: Vector3) -> void:
 		main.ui.aviso("Caiu: " + Dados.nome(str(pe["id"])) + "!")
 
 
+## o fogo no chão perto da base: a madeira pega (dano por segundo); pedra, ferro, a fogueira e as fornalhas não queimam
+const NAO_QUEIMA := ["muroPedra", "muralha", "muroFerro", "portaoFerro", "espetosFerro", "fogueira", "fornalha", "fundacao", "armarioFerro"]
+
+
+func queimar_perto(p: Vector3, r: float, dano: float) -> void:
+	for i in pecas.size():
+		var pe: Dictionary = pecas[i]
+		if pe.get("caiu", false) or str(pe["id"]) in NAO_QUEIMA:
+			continue
+		var o: Vector3 = (pe["xf"] as Transform3D).origin
+		if absf(o.y - p.y) < 2.0 and Vector2(o.x - p.x, o.z - p.z).length() < r:
+			ferir_peca(i, dano, o + Vector3(0, 0.8, 0))
+
+
+## a explosão (bomba caseira): as peças perto levam dano (menos as de pedra e de ferro)
+func explosao_perto(p: Vector3, R: float, dano: float) -> void:
+	for i in pecas.size():
+		var pe: Dictionary = pecas[i]
+		if pe.get("caiu", false):
+			continue
+		var o: Vector3 = (pe["xf"] as Transform3D).origin
+		var d := Vector2(o.x - p.x, o.z - p.z).length()
+		if d < R and absf(o.y - p.y) < 3.0:
+			var k := 1.0 - 0.6 * d / R
+			var forte := str(pe["id"]) in ["muroPedra", "muralha", "muroFerro", "portaoFerro", "fundacao"]
+			ferir_peca(i, dano * k * (0.25 if forte else 0.8), o + Vector3(0, 1.0, 0))
+
+
 func _cair(i: int) -> void:
 	var pe: Dictionary = pecas[i]
 	pe["caiu"] = true

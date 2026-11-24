@@ -52,6 +52,10 @@ var cg_barra: ColorRect
 var cg_etapas: Array = []
 var cg_dica: Label
 var cg_rodape: Label
+var cg_ver: Label          # a versão e a atualização automática (carregamento)
+var lb_ver: Label          # (lobby)
+var lb_reiniciar: Button   # "Reiniciar agora" quando a versão nova já baixou
+var pz_atualiza: Button
 var _dica_i := -1
 var _dica_t := 0.0
 var _carga_ok := false
@@ -124,11 +128,30 @@ func _ready() -> void:
 	_tela_mapa()
 	_tela_morte()
 	_modal()
+	Atualiza.mudou.connect(_atualiza_mudou)
+	_atualiza_mudou()
 	veu = ColorRect.new()
 	veu.color = Color(0, 0, 0, 0)
 	veu.set_anchors_preset(Control.PRESET_FULL_RECT)
 	veu.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	raiz.add_child(veu)
+
+
+## a atualização automática mudou (procurando, baixando, pronta...): o texto do rodapé e o botão de reiniciar
+func _atualiza_mudou() -> void:
+	var t: String = Atualiza.texto()
+	var txt := "VERSÃO %s · GODOT · PC" % VERSAO + (("  ·  " + t) if t != "" else "")
+	if cg_ver != null:
+		cg_ver.text = txt
+	if lb_ver != null:
+		lb_ver.text = txt
+	var pronta: bool = Atualiza.estado == "pronta"
+	if lb_reiniciar != null:
+		lb_reiniciar.visible = pronta
+	if pz_atualiza != null:
+		pz_atualiza.visible = pronta
+	if pronta and main != null and main.em_jogo and main.ui != null:
+		main.ui.aviso("A versão %s do VAYDR baixou: ela entra na próxima vez que você abrir o jogo (ou Reiniciar na versão nova, no Esc)" % Atualiza.versao_nova, 8.0)
 
 
 # ================================================================ peças comuns
@@ -429,6 +452,7 @@ void fragment() {
 	dh.add_child(cg_dica)
 	var rod := Estilo.rotulo("VERSÃO %s · GODOT · PC" % VERSAO, 10, Estilo.APAGADO, "ui", 800, 2)
 	t.add_child(rod)
+	cg_ver = rod
 	Estilo.prender(rod, 0.0, 1.0, 80, -22, Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BEGIN)
 	cg_rodape = Estilo.rotulo("MONTANDO O MUNDO", 10, Estilo.APAGADO, "ui", 800, 2)
 	t.add_child(cg_rodape)
@@ -718,6 +742,12 @@ func _tela_lobby() -> void:
 	var ver := Estilo.rotulo("VERSÃO %s · GODOT · PC" % VERSAO, 11, Estilo.APAGADO, "ui", 800, 2)
 	ver.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	rod.add_child(ver)
+	lb_ver = ver
+	lb_reiniciar = Estilo.botao("Reiniciar agora", true, 12)
+	lb_reiniciar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	lb_reiniciar.visible = false
+	lb_reiniciar.pressed.connect(func(): Atualiza.reiniciar())
+	rod.add_child(lb_reiniciar)
 
 
 func _cartao_lobby(i: int, d: Dictionary) -> Control:
@@ -1722,6 +1752,9 @@ func _tela_pausa() -> void:
 	col.add_child(_item_pausa("Como jogar", "", "livro", _pz_ajuda))
 	col.add_child(_item_pausa("Salvar e ir ao lobby", "", "mochila", _pz_lobby))
 	col.add_child(_item_pausa("Salvar e sair do jogo", "", "x", _pz_sair))
+	pz_atualiza = _item_pausa("Reiniciar na versão nova", "", "check", func(): Atualiza.reiniciar())
+	pz_atualiza.visible = false
+	col.add_child(pz_atualiza)
 	# à direita: o relógio (o dia inteiro num anel, com o sol ou a lua) e os números do mundo
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", Estilo.caixa(Color(0.06, 0.07, 0.07, 0.9), Estilo.BORDA, 14, 18))

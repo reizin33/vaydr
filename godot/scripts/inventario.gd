@@ -31,6 +31,11 @@ static func novo(id: String, n: int, extra := {}) -> Dictionary:
 	var d := Dados.item(id)
 	if d.has("durMax"):
 		s["dur"] = float(extra.get("dur", d["durMax"]))
+	# arma de fogo e besta: as balas que estão nela (achada vazia, como no jogo antigo); a qualidade, se veio com uma
+	if bool(d.get("fogo", false)):
+		s["mun"] = int(extra.get("mun", 0))
+	if extra.has("q"):
+		s["q"] = int(extra["q"])
 	return s
 
 
@@ -90,7 +95,7 @@ func por(id: String, n: int, extra := {}) -> int:
 
 ## põe uma pilha inteira (com desgaste e tudo) no primeiro lugar livre; devolve false se não coube
 func por_pilha(s: Dictionary) -> bool:
-	if not s.has("dur"):
+	if not s.has("dur") and not s.has("mun") and not s.has("q"):
 		var sobra := por(str(s["id"]), int(s["n"]))
 		if sobra > 0:
 			s["n"] = sobra

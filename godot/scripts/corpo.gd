@@ -52,7 +52,8 @@ const SOBREVIVENTE := {"g": "homem", "pele": "h_adulto_clara", "olhos": "castanh
 const CAMADA := 1 << 10
 ## ferramentas de duas mãos: onde a mão esquerda fecha no cabo (no espaço do item: cabo ao longo de +z, a mão direita no zero)
 const MAO2 := {"machado": Vector3(0, 0, 0.27), "machadoPedra": Vector3(0, 0, 0.27), "picareta": Vector3(0, 0, 0.27),
-	"pa": Vector3(0, 0, 0.3), "lanca": Vector3(0, 0, 0.11), "taco": Vector3(0, 0, 0.11), "tacoCravado": Vector3(0, 0, 0.11)}
+	"pa": Vector3(0, 0, 0.3), "lanca": Vector3(0, 0, 0.11), "taco": Vector3(0, 0, 0.11), "tacoCravado": Vector3(0, 0, 0.11),
+	"espingarda": Vector3(0, -0.36, -0.02), "rifle": Vector3(0, -0.32, -0.02), "besta": Vector3(0, -0.2, -0.03)}
 ## roupa justa: região do corpo, quanto incha (m) e a cor (as do jogo antigo: SURV_CASCAS, 61c_oficina, 48e_lesoes, 68r_lajes)
 const CASCAS := {
 	"gorroPele": [["cabeca", 0.026, 0x8c6b4a], ["cabecaAba", 0.036, 0xd6c29c]],
@@ -471,14 +472,14 @@ func vestir(roupa: Dictionary) -> void:
 
 ## o item na mão direita (aparece na terceira pessoa)
 func segurar(id: String) -> void:
-	if id == item_id and (item_no != null or Dados.modelo(id) == ""):
+	if id == item_id and (item_no != null or (Dados.modelo(id) == "" and not ModelosArmas.tem(id))):
 		return
 	item_id = id
 	if item_no:
 		item_no.queue_free()
 		item_no = null
-	if id != "" and Dados.modelo(id) != "" and encaixe:
-		item_no = (load(Dados.modelo(id)) as PackedScene).instantiate()
+	if id != "" and (Dados.modelo(id) != "" or ModelosArmas.tem(id)) and encaixe:
+		item_no = (load(Dados.modelo(id)) as PackedScene).instantiate() if Dados.modelo(id) != "" else ModelosArmas.criar(id)
 		item_no.scale = Vector3.ONE * 0.85   # as ferramentas são desenhadas a 85% na mão, como no jogo antigo
 		encaixe.add_child(item_no)
 		for mi in item_no.find_children("*", "MeshInstance3D", true, false):

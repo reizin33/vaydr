@@ -12,6 +12,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 Rede="*res://scripts/rede.gd"
+Atualiza="*res://scripts/atualizador.gd"
 
 [display]
 

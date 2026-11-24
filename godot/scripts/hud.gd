@@ -59,6 +59,8 @@ var seta_dano: Control
 var fps_lbl: Label
 var rede: HudRede
 var acerto_t := 0.0
+var acerto_cab := false    # o último acerto foi na cabeça (o X fica maior)
+var luneta: Control        # a tela da luneta do rifle (mirando)
 var dano_ang := 0.0
 var dano_t := 0.0
 var _t := 0.0
@@ -132,6 +134,10 @@ void fragment() {
 
 
 func _veus() -> void:
+	luneta = Luneta.new(self)
+	luneta.set_anchors_preset(Control.PRESET_FULL_RECT)
+	luneta.visible = false
+	add_child(luneta)
 	veu_vida = _veu(Color(0.27, 0.0, 0.0, 0.9), 0.5)
 	veu_dano = _veu(Color(0.63, 0.08, 0.05, 0.6), 0.42)
 	seta_dano = SetaDano.new(self)
@@ -481,6 +487,17 @@ func _nome_item() -> void:
 	nome_item.text = Dados.nome(id).to_upper()
 	var tipo := str(TIPOS.get(Dados.tipo(id), "")).to_upper()
 	tipo_item.text = tipo
+	if s.has("q") and int(s["q"]) != 1:
+		nome_item.text = Armas.nome_q(id, s["q"]).to_upper()
+	if Armas.de_fogo(id):
+		# a munição: no pente / na mochila
+		var B := Armas.dados(id)
+		tracos_item.visible = false
+		tipo_item.text = "ARMA DE FOGO" if id != "besta" else "BESTA"
+		pct_item.text = "%d / %d" % [int(s.get("mun", 0)), j.inv.conta(str(B["municao"]))]
+		return
+	if id == "arco":
+		tipo_item.text = "ARCO · %d FLECHAS" % j.inv.conta("flecha")
 	if s.has("dur"):
 		var f := clampf(float(s["dur"]) / maxf(1.0, float(d.get("durMax", 1.0))), 0.0, 1.0)
 		tracos_item.visible = true
@@ -649,9 +666,14 @@ func _prompt() -> void:
 	prompt_sub.visible = sub != ""
 
 
-## a mira fica vermelha e cresce um pouco quando o golpe acerta
-func acerto() -> void:
-	acerto_t = 0.18
+## a mira fica vermelha e cresce um pouco quando o golpe acerta; o tiro mostra o X (maior na cabeça)
+func acerto(cabeca := false) -> void:
+	acerto_t = 0.22 if cabeca else 0.18
+	acerto_cab = cabeca
+
+
+func atualizar_item() -> void:
+	_nome_item()
 
 
 ## apanhou: as bordas ficam vermelhas e, se veio de algum lugar, a seta mostra o lado
@@ -678,6 +700,12 @@ func _process(dt: float) -> void:
 	vitais.queue_redraw()
 	folego.queue_redraw()
 	mira.queue_redraw()
+	var lun: bool = j_luneta()
+	if luneta.visible != lun:
+		luneta.visible = lun
+	if lun:
+		luneta.queue_redraw()
+	mira.visible = not lun
 	if dano_t > 0.0 or seta_dano.visible:
 		seta_dano.visible = dano_t > 0.0
 		seta_dano.queue_redraw()
@@ -1042,7 +1070,14 @@ class Tracos extends Control:
 			draw_rect(Rect2(k * 12.0, 3.0, 9.0, 3.0), cor if k < n else Color(0.925, 0.894, 0.824, 0.22))
 
 
-## a mira: ponto claro com contorno escuro; no acerto fica vermelha e maior
+## a mira com a luneta do rifle no olho
+func j_luneta() -> bool:
+	var j = main.jogador
+	return j.vivo and str(j.item_mao().get("id", "")) == "rifle" and j.mira_k > 0.6 and not main.ui.aberto
+
+
+## a mira: ponto claro com contorno escuro; no acerto fica vermelha e maior. Com arma de fogo, quatro tracinhos mostram quanto o
+## tiro abre (mirando fecha, correndo abre); o tiro que acerta mostra um X (maior e vermelho na cabeça)
 class Mira extends Control:
 	var hud
 
@@ -1054,8 +1089,65 @@ class Mira extends Control:
 		var c := size * 0.5
 		var acerto: bool = hud.acerto_t > 0.0
 		var r := clampf(float(Ajustes.v["mira_tam"]), 1.5, 6.0) * (1.45 if acerto else 1.0)
-		draw_circle(c, r + 1.5, Color(0.04, 0.047, 0.043, 0.6), true, -1.0, true)
-		draw_circle(c, r, Estilo.SANGUE if acerto else Ajustes.cor_mira(), true, -1.0, true)
+		var j = hud.main.jogador
+		var id := str(j.item_mao().get("id", ""))
+		var cor_m: Color = Ajustes.cor_mira()
+		var escuro := Color(0.04, 0.047, 0.043, 0.6)
+		if Armas.de_fogo(id) and id != "besta":
+			# a abertura do tiro em pixels (na altura da tela)
+			var ab := Armas.abre(id, j.mira_k > 0.6, j._corre)
+			var vp := get_viewport_rect().size
+			var px := tan(maxf(ab, 0.002)) / tan(deg_to_rad(j.cam.fov) * 0.5) * vp.y * 0.5
+			var g := clampf(px, 6.0, 90.0) * lerpf(1.0, 0.75, j.mira_k)
+			for v in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+				draw_line(c + v * g, c + v * (g + 7.0), escuro, 3.5, true)
+				draw_line(c + v * g, c + v * (g + 7.0), cor_m, 1.6, true)
+			r = minf(r, 2.2)
+		if acerto and (Armas.de_fogo(id) or id == "arco"):
+			var cab: bool = hud.acerto_cab
+			var k := 9.0 if cab else 6.5
+			var cx := Estilo.SANGUE if cab else Color(0.95, 0.92, 0.85)
+			for v in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+				draw_line(c + v * 4.0, c + v * (4.0 + k), escuro, 3.5, true)
+				draw_line(c + v * 4.0, c + v * (4.0 + k), cx, 1.8, true)
+			acerto = false
+		draw_circle(c, r + 1.5, escuro, true, -1.0, true)
+		draw_circle(c, r, Estilo.SANGUE if acerto else cor_m, true, -1.0, true)
+
+
+## a luneta do rifle: tudo escuro fora do círculo, o retículo fino no meio e a borda do vidro
+class Luneta extends Control:
+	var hud
+
+	func _init(h) -> void:
+		hud = h
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var sz := size
+		var c := sz * 0.5
+		var r := minf(sz.x, sz.y) * 0.46
+		var preto := Color(0.0, 0.0, 0.0, 1.0)
+		# fora do círculo: preto (faixas dos lados e um anel grosso)
+		draw_rect(Rect2(0, 0, c.x - r + 1.0, sz.y), preto)
+		draw_rect(Rect2(c.x + r - 1.0, 0, sz.x - (c.x + r - 1.0), sz.y), preto)
+		draw_arc(c, r + 400.0, 0.0, TAU, 96, preto, 800.0, true)
+		# a sombra da borda do vidro
+		draw_arc(c, r - 6.0, 0.0, TAU, 96, Color(0, 0, 0, 0.45), 12.0, true)
+		# o retículo: linhas finas com o meio aberto e as pontas grossas
+		var fino := Color(0.02, 0.02, 0.02, 0.92)
+		draw_line(Vector2(c.x - r, c.y), Vector2(c.x - 18.0, c.y), fino, 1.4, true)
+		draw_line(Vector2(c.x + 18.0, c.y), Vector2(c.x + r, c.y), fino, 1.4, true)
+		draw_line(Vector2(c.x, c.y - r), Vector2(c.x, c.y - 18.0), fino, 1.4, true)
+		draw_line(Vector2(c.x, c.y + 18.0), Vector2(c.x, c.y + r), fino, 1.4, true)
+		draw_line(Vector2(c.x - r, c.y), Vector2(c.x - r * 0.55, c.y), fino, 5.0, true)
+		draw_line(Vector2(c.x + r * 0.55, c.y), Vector2(c.x + r, c.y), fino, 5.0, true)
+		draw_line(Vector2(c.x, c.y + r * 0.55), Vector2(c.x, c.y + r), fino, 5.0, true)
+		draw_circle(c, 1.6, Color(0.85, 0.12, 0.08, 0.95), true, -1.0, true)
+		if hud.acerto_t > 0.0:
+			var cx := Estilo.SANGUE if hud.acerto_cab else Color(0.95, 0.92, 0.85)
+			for v in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+				draw_line(c + v * 6.0, c + v * 16.0, cx, 2.0, true)
 
 
 ## o arco vermelho em volta do meio da tela, do lado de onde veio o golpe

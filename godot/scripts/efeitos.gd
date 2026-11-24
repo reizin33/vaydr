@@ -82,6 +82,157 @@ func faiscas(p: Vector3) -> void:
 	get_tree().create_timer(1.0).timeout.connect(c.queue_free)
 
 
+## o clarão da boca da arma: uma luz rápida, faíscas para a frente e um pouco de fumaça (grande: espingarda e rifle)
+func boca(p: Vector3, d: Vector3, grande := false) -> void:
+	var luz := OmniLight3D.new()
+	luz.light_color = Color(1.0, 0.78, 0.45)
+	luz.light_energy = 4.0 if grande else 2.6
+	luz.omni_range = 7.0 if grande else 5.0
+	luz.shadow_enabled = false
+	add_child(luz)
+	luz.global_position = p
+	get_tree().create_timer(0.06).timeout.connect(luz.queue_free)
+	var c := CPUParticles3D.new()
+	c.one_shot = true
+	c.emitting = false
+	c.amount = 12 if grande else 7
+	c.lifetime = 0.12
+	c.explosiveness = 1.0
+	c.direction = d
+	c.spread = 14.0
+	c.initial_velocity_min = 3.0
+	c.initial_velocity_max = 7.0
+	c.gravity = Vector3.ZERO
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.03, 0.03, 0.09) * (1.4 if grande else 1.0)
+	bm.material = _mat(Color(1.0, 0.72, 0.32), true)
+	c.mesh = bm
+	add_child(c)
+	c.global_position = p
+	c.emitting = true
+	get_tree().create_timer(0.6).timeout.connect(c.queue_free)
+	var f := CPUParticles3D.new()
+	f.one_shot = true
+	f.emitting = false
+	f.amount = 5
+	f.lifetime = 1.2
+	f.explosiveness = 0.9
+	f.direction = d + Vector3(0, 0.3, 0)
+	f.spread = 25.0
+	f.initial_velocity_min = 0.3
+	f.initial_velocity_max = 0.9
+	f.gravity = Vector3(0, 0.25, 0)
+	f.scale_amount_min = 0.8
+	f.scale_amount_max = 1.6
+	var sm := SphereMesh.new()
+	sm.radius = 0.06
+	sm.height = 0.12
+	sm.radial_segments = 6
+	sm.rings = 3
+	var mf := StandardMaterial3D.new()
+	mf.albedo_color = Color(0.7, 0.7, 0.68, 0.25)
+	mf.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mf.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	sm.material = mf
+	f.mesh = sm
+	add_child(f)
+	f.global_position = p
+	f.emitting = true
+	get_tree().create_timer(1.8).timeout.connect(f.queue_free)
+
+
+## o rastro da bala do rifle (some em um instante)
+func rastro(a: Vector3, b: Vector3) -> void:
+	var L := a.distance_to(b)
+	if L < 1.0:
+		return
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.012, 0.012, L)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(1.0, 0.9, 0.6, 0.55)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bm.material = m
+	mi.mesh = bm
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	mi.global_position = (a + b) * 0.5
+	mi.look_at(b, Vector3.UP if absf((b - a).normalized().y) < 0.98 else Vector3.RIGHT)
+	var tw := create_tween()
+	tw.tween_property(m, "albedo_color:a", 0.0, 0.15)
+	tw.tween_callback(mi.queue_free)
+
+
+## a explosão da bomba caseira: o clarão, a bola de fogo, a fumaça escura, pedrinhas e os anéis no chão
+func explosao(p: Vector3) -> void:
+	var luz := OmniLight3D.new()
+	luz.light_color = Color(1.0, 0.62, 0.3)
+	luz.light_energy = 9.0
+	luz.omni_range = 22.0
+	add_child(luz)
+	luz.global_position = p + Vector3(0, 1.0, 0)
+	var tl := create_tween()
+	tl.tween_property(luz, "light_energy", 0.0, 0.45)
+	tl.tween_callback(luz.queue_free)
+	var fogo := CPUParticles3D.new()
+	fogo.one_shot = true
+	fogo.emitting = false
+	fogo.amount = 46
+	fogo.lifetime = 0.7
+	fogo.explosiveness = 1.0
+	fogo.direction = Vector3.UP
+	fogo.spread = 85.0
+	fogo.initial_velocity_min = 3.5
+	fogo.initial_velocity_max = 10.0
+	fogo.gravity = Vector3(0, -2.0, 0)
+	fogo.scale_amount_min = 1.0
+	fogo.scale_amount_max = 2.6
+	var sm := SphereMesh.new()
+	sm.radius = 0.16
+	sm.height = 0.32
+	sm.radial_segments = 8
+	sm.rings = 4
+	sm.material = _mat(Color(1.0, 0.55, 0.15), true)
+	fogo.mesh = sm
+	add_child(fogo)
+	fogo.global_position = p + Vector3(0, 0.4, 0)
+	fogo.emitting = true
+	get_tree().create_timer(1.5).timeout.connect(fogo.queue_free)
+	var fum := CPUParticles3D.new()
+	fum.one_shot = true
+	fum.emitting = false
+	fum.amount = 22
+	fum.lifetime = 2.6
+	fum.explosiveness = 0.85
+	fum.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	fum.emission_sphere_radius = 0.8
+	fum.direction = Vector3.UP
+	fum.spread = 40.0
+	fum.initial_velocity_min = 1.0
+	fum.initial_velocity_max = 3.0
+	fum.gravity = Vector3(0, 0.3, 0)
+	fum.scale_amount_min = 2.0
+	fum.scale_amount_max = 4.0
+	var sf := SphereMesh.new()
+	sf.radius = 0.25
+	sf.height = 0.5
+	sf.radial_segments = 8
+	sf.rings = 4
+	var mf := StandardMaterial3D.new()
+	mf.albedo_color = Color(0.16, 0.15, 0.14, 0.5)
+	mf.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mf.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	sf.material = mf
+	fum.mesh = sf
+	add_child(fum)
+	fum.global_position = p + Vector3(0, 0.6, 0)
+	fum.emitting = true
+	get_tree().create_timer(3.5).timeout.connect(fum.queue_free)
+	_jato(p + Vector3(0, 0.2, 0), Vector3.UP, Color(0.3, 0.28, 0.26), 16, 0.06, 9.0, 9.8, 1.2)
+	anel(p + Vector3(0, 0.3, 0))
+
+
 ## o anel do grito (sobe da cabeça do gritador e some)
 func anel(p: Vector3) -> void:
 	for k in 2:
