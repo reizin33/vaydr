@@ -768,6 +768,18 @@ func atacar() -> void:
 	var st: Dictionary = d if arma else Dados.MAO
 	if not acao.is_empty():
 		return
+	# o laço de caça (etapa 6a): arma no chão, na frente
+	if id == "laco":
+		cd = 0.6
+		if Rede.convidado():
+			main.ui.aviso("Na partida em rede, por enquanto só quem abriu arma laço")
+			return
+		var r: String = main.fauna.armar_laco(self)
+		main.ui.aviso(r, 4.0)
+		if r.begins_with("Laço armado"):
+			inv.tirar("laco", 1)
+			main.ui.atualizar()
+		return
 	# armas de fogo e besta, o arco e o que se arremessa (molotov, bomba caseira, isca)
 	if Armas.de_fogo(id):
 		_disparar(it, id)
@@ -814,6 +826,13 @@ func atacar() -> void:
 	if h.is_empty():
 		return
 	var c: Object = h["collider"]
+	if c.has_meta("bicho") and c.get_meta("bicho").vivo:
+		_bater_bicho(c.get_meta("bicho"), st, d, arma, h)
+		main.ui.acerto()
+		main.barulho(global_position, 6.0)
+		if arma:
+			_gastar()
+		return
 	if c.has_meta("recurso"):
 		_coletar(c.get_meta("recurso"), d, arma, h)
 		main.barulho(global_position, 6.0)
@@ -845,6 +864,33 @@ func _bater_zumbi(z, st: Dictionary, d: Dictionary, arma: bool, h: Dictionary) -
 	z.ferir(dano, global_position, 0, {"k": "golpe", "forte": d.has("empurra"), "empurra": emp, "derruba": derr})
 	main.sons.tocar("acerto", p, 0.0)
 	main.efeitos.sangue(p, (global_position + Vector3(0, 1.2, 0) - p).normalized())
+
+
+## um golpe num bicho (etapa 6a): o dano da arma ou da ferramenta; agachado e sem ele te ver, dobra
+func _bater_bicho(b, st: Dictionary, d: Dictionary, arma: bool, h: Dictionary) -> void:
+	var dano := float(st.get("dano", 9.0)) * randf_range(0.92, 1.08) * (Armas.qual_dano(item_mao()) if arma else 1.0)
+	if bool(d.get("vertical", false)):
+		dano *= 1.15
+	if agachado and float(b.alerta) < 0.3:
+		dano *= 2.0
+	var p: Vector3 = h["position"] if not h.is_empty() else b.centro()
+	b.ferir(dano, global_position, "golpe")
+	main.sons.tocar("acerto", p, 0.0)
+	main.efeitos.sangue(p, (global_position + Vector3(0, 1.2, 0) - p).normalized())
+
+
+## a lâmina gasta um pouco a cada carcaça esfolada
+func gastar_lamina(s: Dictionary, n: int) -> void:
+	if not s.has("dur"):
+		return
+	s["dur"] = float(s["dur"]) - n
+	if float(s["dur"]) <= 0.0:
+		var i := inv.slots.find(s)
+		if i >= 0:
+			inv.slots[i] = null
+			inv.mudou.emit()
+		main.ui.aviso("A %s quebrou" % Dados.nome(str(s["id"])).to_lower())
+	main.ui.atualizar()
 
 
 ## os zumbis no arco do golpe (na frente, ao alcance, sem parede no meio), do mais perto para o mais longe
@@ -954,6 +1000,22 @@ func _passo_acao(dt: float) -> void:
 	fr.y = 0.0
 	fr = fr.normalized()
 	match str(acao["tipo"]):
+		"esfolar":
+			var b = acao["bicho"]
+			if not is_instance_valid(b) or global_position.distance_to(b.global_position) > ALCANCE + 1.5 or not Input.is_action_pressed("usar"):
+				acao = {}
+				main.ui.aviso("Parou de esfolar")
+				return
+			if t >= float(acao["dur"]):
+				acao = {}
+				if b.lan:
+					Rede.esfolar_b(b.uid)
+				else:
+					var r: String = main.fauna.esfolar(b, self)
+					if r != "":
+						main.ui.aviso(r, 5.0)
+					main.ui.atualizar()
+				return
 		"recarga":
 			if sel != int(acao.get("slot", sel)):
 				acao = {}
@@ -1142,6 +1204,14 @@ func usar() -> void:
 	var h := mira(ALCANCE + 0.4)
 	if not h.is_empty():
 		var c: Object = h["collider"]
+		if c.has_meta("bicho"):
+			var b = c.get_meta("bicho")
+			if is_instance_valid(b) and not b.vivo:
+				esfolar(b)
+				return
+		if c.has_meta("laco"):
+			main.fauna.usar_laco(c.get_meta("laco"), self)
+			return
 		if c.has_meta("caixa"):
 			var L: Array = main.mundo.revistar(c.get_meta("caixa"))
 			if L.is_empty():
@@ -1180,6 +1250,20 @@ func usar() -> void:
 			return
 		_agua(false, "rio")
 		return
+
+
+## esfolar a carcaça (etapa 6a): segure E o tempo da espécie (precisa de uma lâmina na mochila)
+func esfolar(b) -> void:
+	if not acao.is_empty():
+		return
+	if not b.lan and (b.carc.is_empty() or bool(b.carc.get("vazia", false))):
+		main.ui.aviso("Não sobrou nada nesta carcaça")
+		return
+	if main.fauna.lamina(inv).is_empty():
+		main.ui.aviso("Precisa de uma faca (ou outra lâmina) para esfolar. Faca de pedra: 1 madeira e 2 pedras.", 4.0)
+		return
+	acao = {"tipo": "esfolar", "t": 0.0, "dur": main.fauna.tempo_esfolar(b), "feito": false, "bicho": b}
+	main.sons.tocar("planta", b.global_position, -4.0)
 
 
 ## água: com a garrafa vazia na mão, enche todas as vazias da mochila (limpa no poço e no barril, suja no rio e no lago);
@@ -1429,6 +1513,10 @@ func _tiro_hit(o: Vector3, d: Vector3, maxd: float, ign: Array) -> Dictionary:
 		var z = c.get_meta("zumbi")
 		if is_instance_valid(z) and z.estado != "morto":
 			return {"z": z, "p": h["position"], "n": h["normal"]}
+	if c.has_meta("bicho"):
+		var b = c.get_meta("bicho")
+		if is_instance_valid(b) and b.vivo:
+			return {"b": b, "p": h["position"], "n": h["normal"]}
 	return {"p": h["position"], "n": h["normal"], "c": c}
 
 
@@ -1482,6 +1570,12 @@ func _disparar(s: Dictionary, id: String) -> void:
 				a["n"] = int(a["n"]) + 1
 				a["p"] = hp
 				acum[z] = a
+			elif h.has("b"):
+				var bb = h["b"]
+				var hb: Vector3 = h["p"]
+				bb.ferir(Armas.dano_tiro(id, "tronco", cam.global_position.distance_to(hb), q), global_position, "bala")
+				main.efeitos.sangue(hb, -dir)
+				main.ui.acerto()
 			elif h.has("p"):
 				main.efeitos.faiscas(h["p"])
 		var cab := false
@@ -1505,6 +1599,14 @@ func _disparar(s: Dictionary, id: String) -> void:
 	var cat := str(B["cat"])
 	while n < int(B.get("atravessa", 1)):
 		var h := _tiro_hit(oo, dir, 140.0 if id == "rifle" else 70.0, ign)
+		if h.has("b"):
+			var hb: Vector3 = h["p"]
+			var cab_b: bool = hb.y > float(h["b"].global_position.y) + ModelosBichos.altura_corpo(h["b"].F) * float(h["b"].esc) * 1.35
+			h["b"].ferir(Armas.dano_tiro(id, "cabeca" if cab_b else "tronco", cam.global_position.distance_to(hb), q), global_position, "bala")
+			main.efeitos.sangue(hb, -dir)
+			main.ui.acerto(cab_b)
+			fim = hb
+			break
 		if not h.has("z"):
 			if h.has("p"):
 				main.efeitos.faiscas(h["p"])

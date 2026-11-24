@@ -480,6 +480,31 @@ func ferir_peca(i: int, dano: float, onde: Vector3) -> void:
 		main.ui.aviso("Caiu: " + Dados.nome(str(pe["id"])) + "!")
 
 
+## tem fogueira (ou fornalha) a até r de p? (a matilha e a onça respeitam o fogo)
+func fogo_perto(p: Vector3, r: float) -> bool:
+	for pe in pecas:
+		if pe.get("caiu", false):
+			continue
+		var id := str(pe["id"])
+		if id != "fogueira" and id != "fornalha":
+			continue
+		var o: Vector3 = (pe["xf"] as Transform3D).origin
+		if Vector2(o.x - p.x, o.z - p.z).length() < r:
+			return true
+	return false
+
+
+## tem construção (a base de alguém) a até r de p?
+func base_perto(p: Vector3, r: float) -> bool:
+	for pe in pecas:
+		if pe.get("caiu", false):
+			continue
+		var o: Vector3 = (pe["xf"] as Transform3D).origin
+		if Vector2(o.x - p.x, o.z - p.z).length() < r:
+			return true
+	return false
+
+
 ## o fogo no chão perto da base: a madeira pega (dano por segundo); pedra, ferro, a fogueira e as fornalhas não queimam
 const NAO_QUEIMA := ["muroPedra", "muralha", "muroFerro", "portaoFerro", "espetosFerro", "fogueira", "fornalha", "fundacao", "armarioFerro"]
 

@@ -586,6 +586,88 @@ func _mundo(h: float, L: PackedFloat32Array) -> void:
 	main.mundo_rede(h, L)
 
 
+## de quem abriu: os bichos perto de alguém
+@rpc("authority", "call_remote", "unreliable_ordered", 2)
+func _fauna(L: PackedFloat32Array) -> void:
+	if papel != "convidado" or not on:
+		return
+	if main == null or not is_instance_valid(main) or not main.pronto or not main.em_jogo or main.fauna == null:
+		return
+	main.fauna.rede(L)
+
+
+## convidado: o golpe, o tiro ou a flecha no boneco de um bicho vai para quem abriu
+func hit_b(uid: int, d: float, de: Vector3, tipo: String) -> void:
+	if papel != "convidado" or not on or d <= 0.0:
+		return
+	_hit_b.rpc_id(1, uid, d, de, tipo)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _hit_b(uid: int, d: float, de: Vector3, tipo: String) -> void:
+	if papel != "anfitriao" or main == null or not is_instance_valid(main) or main.fauna == null:
+		return
+	var quem := multiplayer.get_remote_sender_id()
+	if not jog.has(quem):
+		return
+	var b = main.fauna.por_uid(uid)
+	if b == null or not b.vivo:
+		return
+	b.ferir(clampf(d, 0.0, 500.0), de, tipo.left(12) if tipo in ["golpe", "bala", "flecha", "fogo", "explosao"] else "golpe", quem)
+
+
+## convidado: esfolou a carcaça (quem abriu tira o que ela tem e manda)
+func esfolar_b(uid: int) -> void:
+	if papel != "convidado" or not on:
+		return
+	_esfolar_b.rpc_id(1, uid)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _esfolar_b(uid: int) -> void:
+	if papel != "anfitriao" or main == null or not is_instance_valid(main) or main.fauna == null:
+		return
+	var quem := multiplayer.get_remote_sender_id()
+	if not jog.has(quem):
+		return
+	var b = main.fauna.por_uid(uid)
+	if b == null or b.vivo or b.carc.is_empty() or bool(b.carc.get("vazia", false)):
+		_esfolou.rpc_id(quem, uid, [], -1)
+		return
+	if int(b.carc.get("q", -1)) < 0:
+		b.carc["q"] = b.qualidade({})
+	var L: Array = []
+	var rest: Dictionary = b.carc["rest"]
+	for id in rest:
+		if int(rest[id]) > 0:
+			L.append([str(id), int(rest[id])])
+		rest[id] = 0
+	b.carc["esfolada"] = true
+	b.carc["vazia"] = true
+	b.carc["tv"] = main.fauna.minutos()
+	_esfolou.rpc_id(quem, uid, L, int(b.carc["q"]))
+
+
+@rpc("authority", "call_remote", "reliable")
+func _esfolou(_uid: int, L: Array, q: int) -> void:
+	if papel != "convidado" or main == null or not is_instance_valid(main) or main.jogador == null:
+		return
+	if L.is_empty():
+		main.ui.aviso("Não sobrou nada nesta carcaça")
+		return
+	var j = main.jogador
+	for e in L:
+		if not (e is Array) or e.size() < 2:
+			continue
+		var id := str(e[0])
+		if not Dados.ITENS.has(id):
+			continue
+		var extra := {"q": clampi(q, 0, 3)} if bool(Dados.item(id).get("qual", false)) else {}
+		j._ganhar(id, clampi(int(e[1]), 0, 20), extra)
+	main.efeitos.sangue(j.global_position + Vector3(0, 0.5, 0), Vector3.UP)
+	main.ui.atualizar()
+
+
 ## o zumbi de quem abriu bateu em você
 @rpc("authority", "call_remote", "reliable")
 func _dano(d: float, de: Vector3) -> void:
@@ -753,6 +835,9 @@ func _mandar_mundo(j) -> void:
 	# a lua de sangue vai junto com a hora (100 a mais)
 	var sangue: bool = main.noites != null and main.noites.lua_sangue
 	_mundo.rpc(main.hora + (100.0 if sangue else 0.0), L)
+	# os bichos perto de alguém (etapa 6a)
+	if main.fauna != null:
+		_fauna.rpc(main.fauna.para_rede(perto, ALCANCE_MUNDO))
 
 
 ## o zumbi de quem abriu bateu num convidado (o boneco dele aqui): o golpe vai para o jogo dele

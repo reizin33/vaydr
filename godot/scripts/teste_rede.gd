@@ -194,6 +194,17 @@ func _anfitriao(p0: Vector3) -> void:
 	_confere(int(Rede.info["hits"]) > 0 and caiu, "o golpe do convidado vale aqui: o zumbi caiu (%d golpes chegaram)" % int(Rede.info["hits"]))
 	await _esperar(func(): return int(Rede.info["mortes"]) > 0, 5.0)
 	_confere(int(Rede.info["mortes"]) > 0 and int(main.stats["zumbis"]) == 0, "quem matou leva: o saque foi para o mundo do convidado (aqui não contou)")
+	# um bicho perto do convidado (etapa 6a): o boneco aparece lá, o golpe dele vale aqui e o esfolar leva o que a carcaça tinha
+	var pb: Vector3 = b.alvo if is_instance_valid(b) else pc
+	var ov: Bicho = main.fauna.criar("ovelha", pb + Vector3(3.0, 0, 0), "", null, "")
+	ov.set_physics_process(false)
+	ov.global_position.y = main.terreno.h(ov.global_position.x, ov.global_position.z)
+	Rede.mandar_controle("bicho")
+	var morreu_b := await _esperar(func(): return not ov.vivo, 70.0)
+	_confere(morreu_b, "o golpe do convidado no bicho vale aqui: a ovelha caiu")
+	var esfolada := await _esperar(func(): return bool(ov.carc.get("vazia", false)), 45.0)
+	_confere(esfolada, "o convidado esfolou a ovelha: a carcaça daqui ficou vazia (o que ela tinha foi para ele)")
+	main.fauna.limpar()
 	# bate-papo
 	var msg_conv := func():
 		for c in Rede.chat:
@@ -300,6 +311,40 @@ func _convidado(p0: Vector3) -> void:
 	_confere(derrubou, "o golpe aqui derrubou o zumbi de quem abriu (%d golpes mandados)" % int(Rede.info["hits"]))
 	var levou := await _esperar(func(): return int(Rede.info["mortes"]) > 0 and int(main.stats["zumbis"]) >= 1, 10.0)
 	_confere(levou, "quem matou leva: o saque caiu aqui (zumbis mortos: %d)" % int(main.stats["zumbis"]))
+	# o bicho de quem abriu (etapa 6a): aparece aqui, o golpe vale lá e o esfolar traz o que ele tinha
+	var veio_b := await _esperar(func(): return _sinal("bicho"), 150.0)
+	var bb = null
+	if veio_b:
+		await _esperar(func(): return not main.fauna.b_rede.is_empty(), 15.0)
+		for k in main.fauna.b_rede:
+			if is_instance_valid(main.fauna.b_rede[k]):
+				bb = main.fauna.b_rede[k]
+	_confere(bb != null, "o bicho de quem abriu aparece aqui (%s)" % (str(bb.tipo) if bb != null else "nenhum"))
+	if bb != null:
+		main.jogador.inv.por("machado", 1)
+		main._na_mao("machado")
+		var tb := Time.get_ticks_msec()
+		while Time.get_ticks_msec() - tb < 45000 and is_instance_valid(bb) and bb.vivo:
+			var alvo_b: Vector3 = bb.global_position
+			main._por_em(Vector3(alvo_b.x - 1.6, main.terreno.h(alvo_b.x - 1.6, alvo_b.z) + 0.15, alvo_b.z))
+			await _quadros(2)
+			main._olhar(bb.centro())
+			main.jogador.cd = 0.0
+			main.jogador.atacar()
+			await get_tree().create_timer(0.5).timeout
+		_confere(is_instance_valid(bb) and not bb.vivo, "o golpe aqui derrubou o bicho de quem abriu")
+		main.jogador.inv.por("faca", 1)
+		var antes_carne: int = main.jogador.inv.conta("carneCrua")
+		await _quadros(10)
+		if is_instance_valid(bb):
+			main._olhar(bb.centro())
+			main.jogador.acao = {}
+			main.jogador.esfolar(bb)
+			Input.action_press("usar")
+			await get_tree().create_timer(float(bb.S.get("esfola", 2.0)) + 0.6).timeout
+			Input.action_release("usar")
+		var veio := await _esperar(func(): return main.jogador.inv.conta("carneCrua") > antes_carne, 12.0)
+		_confere(veio, "esfolou o bicho de quem abriu: a carne e o couro vieram para cá (%d carnes)" % (main.jogador.inv.conta("carneCrua") - antes_carne))
 	# bate-papo
 	Rede.mandar_chat("Oi! Aqui é o convidado.")
 	var msg_anf := func():

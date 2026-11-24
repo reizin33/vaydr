@@ -92,7 +92,7 @@ func flecha(o: Vector3, dir: Vector3, v: float, dano: float, arma: String, item:
 	add_child(no)
 	no.global_position = o
 	_apontar(no, dir)
-	flechas.append({"no": no, "p": o, "v": dir * v, "voa": true, "t": 0.0, "dano": dano, "arma": arma, "item": item, "quebrou": false})
+	flechas.append({"no": no, "p": o, "o": o, "v": dir * v, "voa": true, "t": 0.0, "dano": dano, "arma": arma, "item": item, "quebrou": false})
 	if flechas.size() > 60:
 		var velha: Dictionary = flechas.pop_front()
 		if is_instance_valid(velha["no"]):
@@ -126,6 +126,20 @@ func _passo_flechas(dt: float) -> void:
 					var z = c.get_meta("zumbi")
 					if is_instance_valid(z) and z.estado != "morto":
 						_acerta_zumbi(f, z, hp, d)
+						flechas.remove_at(i)
+						continue
+				# o bicho (etapa 6a): a flecha entra e fica (volta a ser sua quando você esfola)
+				if c.has_meta("bicho"):
+					var bb = c.get_meta("bicho")
+					if is_instance_valid(bb) and bb.vivo:
+						bb.ferir(float(f["dano"]), f["o"] if f.has("o") else hp - d, "flecha")
+						main.efeitos.sangue(hp, -d)
+						main.ui.acerto()
+						main.sons.tocar("flecha", hp, -2.0)
+						if not bb.vivo and not bb.lan and not f["quebrou"] and randf() < 0.7:
+							var rest: Dictionary = bb.carc.get("rest", {})
+							rest[str(f["item"])] = int(rest.get(str(f["item"]), 0)) + 1
+						no.queue_free()
 						flechas.remove_at(i)
 						continue
 				# cravou: na árvore, na parede ou no chão (no chão fica fincada, em pé)
@@ -405,6 +419,13 @@ func _passo_chamas(dt: float) -> void:
 			if is_instance_valid(z) and z.estado != "morto" and absf(z.global_position.y - p.y) < 1.6 \
 					and Vector2(z.global_position.x - p.x, z.global_position.z - p.z).length() < r:
 				z.acender(5.0)
+		c["bicho_t"] = float(c.get("bicho_t", 0.0)) - dt
+		if main.fauna != null and float(c["bicho_t"]) <= 0.0:
+			c["bicho_t"] = 0.5
+			for b in main.fauna.bichos.duplicate():
+				if is_instance_valid(b) and b.vivo and absf(b.global_position.y - p.y) < 1.6 \
+						and Vector2(b.global_position.x - p.x, b.global_position.z - p.z).length() < r:
+					b.ferir(7.0, p, "fogo")
 		if j.vivo and absf(j.global_position.y - p.y) < 1.6 and Vector2(j.global_position.x - p.x, j.global_position.z - p.z).length() < r * 0.87:
 			j.queimar(1.4)
 		# a madeira da base perto pega fogo (pedra não)
@@ -457,6 +478,13 @@ func explosao(p: Vector3, R: float, dano: float) -> void:
 			continue
 		var k := 1.0 - 0.65 * d / R
 		z.ferir(dano * k, p, 0, {"k": "explosao", "forte": true, "derruba": 1.0, "empurra": 1.5 + k})
+	if main.fauna != null:
+		for b in main.fauna.bichos.duplicate():
+			if not is_instance_valid(b) or not b.vivo:
+				continue
+			var db: float = Vector2(b.global_position.x - p.x, b.global_position.z - p.z).length()
+			if db < R and absf(b.global_position.y - p.y) < 3.0:
+				b.ferir(dano * (1.0 - 0.65 * db / R), p, "explosao")
 	var j = main.jogador
 	var dj: float = Vector2(j.global_position.x - p.x, j.global_position.z - p.z).length()
 	if j.vivo and dj < R * 1.1 and absf(j.global_position.y - p.y) < 3.0:

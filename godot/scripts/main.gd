@@ -17,6 +17,7 @@ var sons: Sons
 var efeitos: Efeitos
 var projeteis: Projeteis
 var noites: Noites          # as noites: as ondas da horda, a lua de sangue e o Colosso (etapa 5c)
+var fauna: Fauna            # os bichos do mato: as regiões, a caça e as carcaças (etapa 6a)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
 var palco: Palco          # o palco da criação do personagem (a clareira no começo da noite)
@@ -106,6 +107,8 @@ func _ready() -> void:
 	add_child(projeteis)
 	noites = Noites.new(self)
 	add_child(noites)
+	fauna = Fauna.new(self)
+	add_child(fauna)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -360,6 +363,7 @@ func _process(dt: float) -> void:
 		_zumbis_dos_lugares(dt)
 		_emboscadas(dt)
 		noites.passo(dt)
+		fauna.passo(dt)
 	spawn_t -= dt
 	if spawn_t <= 0.0:
 		spawn_t = 12.0
@@ -522,6 +526,8 @@ func barulho(p: Vector3, r: float, alvo := Vector3.INF) -> void:
 	if Rede.convidado():
 		Rede.ruido(p, r)
 		return
+	if fauna != null:
+		fauna.ouvir(p, r)
 	var para := p if alvo == Vector3.INF else alvo
 	for z in zumbis:
 		if not is_instance_valid(z) or z.lan:
@@ -729,6 +735,7 @@ func rede_entrou() -> void:
 			z.queue_free()
 	zumbis = zumbis.filter(func(z): return is_instance_valid(z) and z.lan)
 	lugares_z.clear()
+	fauna.limpar()
 
 
 ## saiu da partida (ou ela fechou): os bonecos dos zumbis somem e o seu mundo volta a ter os seus
@@ -739,6 +746,7 @@ func rede_desligou() -> void:
 	zumbis = zumbis.filter(func(z): return is_instance_valid(z) and not z.lan)
 	z_rede.clear()
 	lugares_z.clear()
+	fauna.limpar()
 	spawn_t = 3.0
 	if em_jogo and telas.atual in ["pausa", "mapa"]:
 		get_tree().paused = true
@@ -834,6 +842,10 @@ func texto_mira() -> String:
 	if h.is_empty():
 		return ""
 	var c: Object = h["collider"]
+	if c.has_meta("bicho") and is_instance_valid(c.get_meta("bicho")):
+		return fauna.texto(c.get_meta("bicho"), jogador)
+	if c.has_meta("laco"):
+		return fauna.texto_laco(c.get_meta("laco"))
 	if c.has_meta("caixa"):
 		var cx: Dictionary = mundo.caixas[c.get_meta("caixa")]
 		return ("E  " + str(cx["nome"])) if cx["cheia"] else "Vazio (volta a ter coisa depois)"
@@ -923,7 +935,7 @@ func salvar_jogo() -> bool:
 		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
-		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar()}
+		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -948,7 +960,7 @@ func carregar_jogo() -> bool:
 	hora = float(d.get("hora", 8.0))
 	var st = d.get("stats", {})
 	if st is Dictionary:
-		stats = {"zumbis": int(st.get("zumbis", 0)), "fabricados": int(st.get("fabricados", 0))}
+		stats = {"zumbis": int(st.get("zumbis", 0)), "fabricados": int(st.get("fabricados", 0)), "cacados": int(st.get("cacados", 0))}
 	var jd: Dictionary = d.get("jogador", {})
 	var j := jogador
 	if jd.has("pos"):
@@ -973,6 +985,9 @@ func carregar_jogo() -> bool:
 	var nd = d.get("noites", {})
 	if nd is Dictionary:
 		noites.carregar(nd)
+	var fd = d.get("fauna", {})
+	if fd is Dictionary:
+		fauna.carregar(fd)
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -1506,6 +1521,332 @@ func _teste_noites(livre: Vector3) -> void:
 	_devolver_clareira(clareira)
 	hora = hora_antes
 	_ciclo()
+	jogador.vida = 100.0
+	spawn_t = spawn_antes
+
+
+## um bicho para o teste: em p, olhando para "olha", parado no lugar até o teste soltar
+func _b_teste(tp: String, p: Vector3, olha: Vector3, vd := "", zona_id := "") -> Bicho:
+	var b := fauna.criar(tp, p, zona_id, null, vd)
+	var d := olha - p
+	b.yaw = atan2(d.x, d.z)
+	b.rotation.y = b.yaw
+	b.st = "come"
+	b.t = 99.0
+	b.v_alvo = 0.0
+	b.rumo = Vector2(d.x, d.z).normalized()
+	return b
+
+
+## espera o bicho ficar num dos estados (ou acabar o tempo); devolve o estado
+func _b_ate(b: Bicho, estados: Array, n: int) -> String:
+	for i in n:
+		if not is_instance_valid(b) or b.st in estados:
+			break
+		await get_tree().physics_frame
+	return b.st if is_instance_valid(b) else "sumiu"
+
+
+func _limpar_bichos() -> void:
+	fauna.limpar()
+
+
+## os bichos (etapa 6a): os modelos das dez espécies, as regiões, quem vê e foge, o barulho, a matilha de noite, o urso que
+## defende e investe, o javali que revida, o predador que caça, o tiro, a flecha e o esfolar (com e sem faca), a população que
+## baixa com a caça, os bichos que aparecem perto das regiões e somem longe, e o jogo salvo
+func _teste_fauna(livre: Vector3) -> void:
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	_limpar_zumbis()
+	_limpar_bichos()
+	var hora_antes := hora
+	hora = 12.0
+	# os modelos: 12 ossos e as malhas de cada espécie
+	var tris := 0
+	var ok_m := true
+	for tp in Fauna.TIPOS:
+		var mb := ModelosBichos.montar(tp)
+		var O: Array = mb["ossos"]
+		if O.size() != 12:
+			ok_m = false
+		for o in O:
+			for ch in (o as Node3D).get_children():
+				if ch is MeshInstance3D:
+					tris += ((ch as MeshInstance3D).mesh as ArrayMesh).surface_get_array_len(0) / 3
+		(mb["raiz"] as Node3D).free()
+	_confere(ok_m and tris > 20000, "bichos: os modelos das 10 espécies montados por código, com 12 ossos cada (%d mil triângulos)" % (tris / 1000))
+	# as regiões do jogo antigo (os pastos da fazenda, o vale do Rio Claro...) e a população de cada uma
+	var zp: Dictionary = fauna.zona_em(-72, 60)
+	var zr: Dictionary = fauna.zona("rio")
+	_confere(str(zp.get("id", "")) == "pastos" and fauna.dentro_zona(zr, 16.0, -45.0) and fauna.rio_perto(16.0, -45.0).x < 1.0
+		and int(fauna.pop["pastos"]["vaca"]["n"]) == 5 and int(fauna.pop["serra"]["urso"]["n"]) == 1,
+		"bichos: as regiões (pastos da fazenda com 5 vacas, a serra com 1 urso, o vale ao longo do Rio Claro)")
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clareira := _clareira_teste(c, 60.0)
+	var X := Vector3(1, 0, 0)
+	var Zv := Vector3(0, 0, 1)
+	_jogador_em(c, c + X * 10.0 + Vector3(0, 1.0, 0))
+	jogador.agachado = false
+	await _quadros(5)
+	# o cervo te vê de frente e foge
+	var cv := _b_teste("cervo", c + X * 12.0, c)
+	await _quadros(3)
+	var d0 := cv.global_position.distance_to(c)
+	var ec: String = await _b_ate(cv, ["foge"], 240)
+	await _quadros(90)
+	var d1 := cv.global_position.distance_to(c)
+	_confere(ec == "foge" and d1 > d0 + 2.0, "cervo: te viu de frente a 12 m e fugiu (%s, de %.0f m para %.0f m)" % [ec, d0, d1])
+	_limpar_bichos()
+	await _quadros(2)
+	# agachado, pelas costas, ele não te vê; o tiro faz ele fugir
+	jogador.agachado = true
+	var cv2 := _b_teste("cervo", c + X * 10.0, c + X * 30.0)
+	await _quadros(150)
+	var quieto := cv2.st
+	barulho(jogador.global_position, 55.0)
+	var ec2: String = await _b_ate(cv2, ["foge"], 120)
+	_confere(quieto == "come" and ec2 == "foge", "cervo: agachado e pelas costas ele não te vê (%s); o barulho do tiro faz ele fugir (%s)" % [quieto, ec2])
+	jogador.agachado = false
+	_limpar_bichos()
+	await _quadros(2)
+	# o rifle derruba o cervo: vira carcaça (a população da região baixa um)
+	jogador.inv.por("rifle", 1)
+	jogador.inv.por("balaRifle", 5)
+	_na_mao("rifle")
+	jogador.item_mao()["mun"] = 5
+	var n_antes := int(fauna.pop["clareira"]["cervo"]["n"])
+	var cv3 := _b_teste("cervo", c + X * 9.0, c + X * 9.0 + Zv * 5.0, "", "clareira")
+	await _quadros(4)
+	_atirar_em(cv3.centro())
+	await _quadros(5)
+	var rest: Dictionary = cv3.carc.get("rest", {})
+	_confere(not cv3.vivo and cv3.st == "morto" and int(rest.get("couro", 0)) == 3 and int(rest.get("carneCrua", 0)) == 3
+		and int(fauna.pop["clareira"]["cervo"]["n"]) == n_antes - 1,
+		"rifle: derrubou o cervo; a carcaça tem %s e a mata da clareira ficou com um cervo a menos" % cv3.resumo())
+	# esfolar: sem lâmina não dá; com a faca, segura E e sai o couro (com qualidade), a carne, os ossos e o tendão
+	var laminas := {}
+	for id in ["machado", "machadoPedra", "faca", "facaPedra", "facao", "facaCaca", "cutelo"]:
+		var n := jogador.inv.conta(id)
+		if n > 0:
+			laminas[id] = n
+			jogador.inv.tirar(id, n)
+	var antes_e := {}
+	for id in ["couro", "carneCrua", "ossos", "tendao"]:
+		antes_e[id] = jogador.inv.conta(id)
+	jogador.acao = {}
+	_jogador_em(cv3.global_position - X * 1.6, cv3.centro())
+	await _quadros(3)
+	var sem := texto_mira()
+	jogador.inv.por("faca", 1)
+	_olhar(cv3.centro())
+	await _quadros(2)
+	var com := texto_mira()
+	jogador.esfolar(cv3)
+	Input.action_press("usar")
+	await _quadros(int(fauna.tempo_esfolar(cv3) * 60.0) + 20)
+	Input.action_release("usar")
+	var q_c := -1
+	for s in jogador.inv.slots:
+		if s != null and str(s["id"]) == "couro":
+			q_c = int(s.get("q", -1))
+	var ganhou := {}
+	for id in antes_e:
+		ganhou[id] = jogador.inv.conta(id) - int(antes_e[id])
+	_confere(sem.begins_with("Precisa de faca") and com.begins_with("E  Esfolar o cervo") and int(ganhou["couro"]) == 3 and q_c >= 0
+		and int(ganhou["carneCrua"]) == 3 and int(ganhou["ossos"]) == 2 and int(ganhou["tendao"]) == 1 and bool(cv3.carc.get("vazia", false)),
+		"esfolar: sem faca não dá (%s); com a faca saíram 3 couros (%s), 3 carnes, 2 ossos e 1 tendão (%s)" % [sem.left(40), Armas.QUAL_NOME[q_c] if q_c >= 0 else "?", str(ganhou)])
+	var nf := jogador.inv.conta("faca")
+	if nf > 0:
+		jogador.inv.tirar("faca", nf)
+	for id in laminas:
+		jogador.inv.por(id, int(laminas[id]))
+	for id in ["couro", "carneCrua", "ossos", "tendao"]:
+		var n2 := jogador.inv.conta(id) - int(antes_e[id])
+		if n2 > 0:
+			jogador.inv.tirar(id, n2)
+	for id in ["rifle", "balaRifle"]:
+		var n := jogador.inv.conta(id)
+		if n > 0:
+			jogador.inv.tirar(id, n)
+	_mao_vazia()
+	_limpar_bichos()
+	await _quadros(2)
+	# o coelho ouve o barulho e foge ziguezagueando
+	var co := _b_teste("coelho", c + X * 14.0, c + X * 30.0)
+	await _quadros(3)
+	barulho(jogador.global_position, 30.0)
+	var ecc: String = await _b_ate(co, ["foge"], 90)
+	_confere(ecc == "foge", "coelho: ouviu o barulho a 14 m e fugiu (%s)" % ecc)
+	_limpar_bichos()
+	await _quadros(2)
+	# a flecha pega a ovelha
+	jogador.inv.por("arco", 1)
+	jogador.inv.por("flecha", 4)
+	_na_mao("arco")
+	var ov := _b_teste("ovelha", c + X * 10.0, c + X * 10.0 + Zv * 5.0)
+	await _quadros(4)
+	_olhar(ov.centro() + Vector3(0, 0.25, 0))
+	jogador.set_physics_process(false)
+	jogador.acao = {"tipo": "arco", "t": 0.8, "dur": 1e9, "puxa": 1.0, "feito": false, "slot": jogador.sel, "soltar": true}
+	jogador.set_physics_process(true)
+	await _quadros(40)
+	_confere(ov.hp < ov.hp_max, "arco: a flecha pegou a ovelha a 10 m (vida %.0f de %.0f)" % [maxf(ov.hp, 0.0), ov.hp_max])
+	for id in ["arco", "flecha"]:
+		var n := jogador.inv.conta(id)
+		if n > 0:
+			jogador.inv.tirar(id, n)
+	_mao_vazia()
+	_limpar_bichos()
+	projeteis.limpar()
+	await _quadros(2)
+	# a matilha de noite: os lobos te cercam e mordem
+	hora = 23.0
+	jogador.vida = 100.0
+	var lobos: Array = []
+	var ld: Bicho = null
+	for k in 3:
+		var lb := _b_teste("lobo", c + X * 12.0 + Zv * (k - 1) * 2.0, c)
+		if ld == null:
+			ld = lb
+		else:
+			lb.lider = ld
+		lobos.append(lb)
+	var atacou := false
+	for i in 600:
+		await get_tree().physics_frame
+		if jogador.vida < 99.0:
+			atacou = true
+			break
+	var est_l := []
+	for lb in lobos:
+		est_l.append(lb.st)
+	var abrigo_l := construcao.base_perto(jogador.global_position, 26.0) or construcao.fogo_perto(jogador.global_position, 6.0)
+	_confere(atacou, "lobos: de noite a matilha veio em grupo e mordeu (vida %.0f; %s%s)" % [jogador.vida, ", ".join(PackedStringArray(est_l)), "; base perto" if abrigo_l else ""])
+	_limpar_bichos()
+	jogador.vida = 100.0
+	hora = 12.0
+	await _quadros(2)
+	# o urso: defende o espaço dele (fica de pé), depois investe
+	_jogador_em(c, c + X * 10.0 + Vector3(0, 1.0, 0))
+	var ur := _b_teste("urso", c + X * 11.0, c)
+	var eu: String = await _b_ate(ur, ["defende"], 240)
+	var pegou_u := false
+	for i in 480:
+		await get_tree().physics_frame
+		if jogador.vida < 99.0:
+			pegou_u = true
+			break
+	_confere(eu == "defende" and pegou_u, "urso: ficou de pé defendendo o espaço (%s) e depois investiu (vida %.0f)" % [eu, jogador.vida])
+	_limpar_bichos()
+	jogador.vida = 100.0
+	await _quadros(2)
+	# o javali ferido revida
+	_jogador_em(c, c + X * 8.0 + Vector3(0, 0.6, 0))
+	jogador.inv.por("pistola", 1)
+	jogador.inv.por("municao9", 8)
+	_na_mao("pistola")
+	jogador.item_mao()["mun"] = 8
+	var jv := _b_teste("javali", c + X * 8.0, c + X * 8.0 + Zv * 5.0)
+	await _quadros(4)
+	_atirar_em(jv.centro())
+	var ej: String = await _b_ate(jv, ["defende", "persegue", "ataca"], 120)
+	var pegou_j := false
+	for i in 300:
+		await get_tree().physics_frame
+		if jogador.vida < 99.0:
+			pegou_j = true
+			break
+	_confere(jv.vivo and ej in ["defende", "persegue", "ataca"] and pegou_j, "javali: levou o tiro e revidou (%s; vida %.0f)" % [ej, jogador.vida])
+	for id in ["pistola", "municao9"]:
+		var n := jogador.inv.conta(id)
+		if n > 0:
+			jogador.inv.tirar(id, n)
+	_mao_vazia()
+	_limpar_bichos()
+	jogador.vida = 100.0
+	await _quadros(2)
+	# a raposa com fome caça o coelho
+	_jogador_em(c - X * 30.0, c - X * 40.0 + Vector3(0, 1.0, 0))
+	var rp := _b_teste("raposa", c + Zv * 6.0, c)
+	var cl := _b_teste("coelho", c, c - Zv * 5.0)
+	cl.set_physics_process(false)
+	rp.fome = 9999.0
+	rp.t = 0.0
+	var cacou := false
+	for i in 480:
+		await get_tree().physics_frame
+		if not cl.vivo:
+			cacou = true
+			break
+	_confere(cacou, "raposa: com fome caçou o coelho (%s; o coelho %s)" % [rp.st, "morto" if not cl.vivo else cl.st])
+	_limpar_bichos()
+	await _quadros(2)
+	# o laço de caça: arma na frente; o coelho que passa fica preso; E arma de novo e, armado, recolhe
+	_jogador_em(c, c + X * 5.0 + Vector3(0, 0.2, 0))
+	await _quadros(3)
+	jogador.inv.por("laco", 2)
+	_na_mao("laco")
+	var n_laco := jogador.inv.conta("laco")
+	jogador.cd = 0.0
+	jogador.atacar()
+	var armou_l := fauna.lacos.size() == 1 and jogador.inv.conta("laco") == n_laco - 1
+	var pegou_l := false
+	var L0: Dictionary = {}
+	if armou_l:
+		L0 = fauna.lacos[0]
+		var cl2 := _b_teste("coelho", (L0["p"] as Vector3) + Zv * 0.5, L0["p"])
+		await _quadros(3)
+		fauna._passo_lacos()
+		pegou_l = not cl2.vivo and str(L0["pego"]) == "coelho" and not bool(L0["armado"])
+	var txt_l := fauna.texto_laco(L0) if armou_l else ""
+	if armou_l:
+		fauna.usar_laco(L0, jogador)
+	var rearmou := armou_l and bool(L0["armado"])
+	if armou_l:
+		fauna.usar_laco(L0, jogador)
+	_confere(armou_l and pegou_l and txt_l.contains("pegou: coelho") and rearmou and fauna.lacos.is_empty() and jogador.inv.conta("laco") == n_laco,
+		"laço: armou na frente, o coelho que passou ficou preso (%s); E armou de novo e depois recolheu" % txt_l)
+	var nl := jogador.inv.conta("laco")
+	if nl > 0:
+		jogador.inv.tirar("laco", nl)
+	_mao_vazia()
+	_limpar_bichos()
+	await _quadros(2)
+	# perto de uma região os bichos aparecem (longe de você e fora da vista); longe de todas, somem
+	_jogador_em(Vector3(-72, 0, 30), Vector3(-72, 1.5, 60))
+	await _quadros(5)
+	fauna._t = 0.0
+	fauna.passo(0.1)
+	var vistos := 0
+	var longe_ok := true
+	for b in fauna.bichos:
+		if is_instance_valid(b) and b.vivo:
+			vistos += 1
+			if Vector2(b.global_position.x - jogador.global_position.x, b.global_position.z - jogador.global_position.z).length() < 29.0:
+				longe_ok = false
+	var tipos_v := {}
+	for b in fauna.bichos:
+		tipos_v[b.tipo] = true
+	_confere(vistos >= 4 and longe_ok, "bichos: perto dos pastos apareceram %d (%s), todos a mais de 30 m de você" % [vistos, ", ".join(PackedStringArray(tipos_v.keys()))])
+	_jogador_em(Vector3(150, 0, -250), Vector3(150, 1.5, -260))
+	await _quadros(3)
+	fauna._t = 0.0
+	fauna.passo(0.1)
+	var sobraram := 0
+	for b in fauna.bichos:
+		if is_instance_valid(b) and Vector2(b.global_position.x + 72.0, b.global_position.z - 60.0).length() < 120.0:
+			sobraram += 1
+	_confere(sobraram == 0, "bichos: longe de todo mundo eles voltam para a população (%d ficaram)" % sobraram)
+	# o jogo salvo guarda a população
+	var sv := fauna.salvar()
+	fauna.pop["pastos"]["vaca"]["n"] = 1
+	fauna.carregar(sv)
+	_confere(int(fauna.pop["pastos"]["vaca"]["n"]) == 5 and int(fauna.pop["clareira"]["cervo"]["n"]) == n_antes - 1,
+		"jogo salvo: a população dos bichos volta como estava (o cervo caçado continua faltando)")
+	fauna.pop["clareira"]["cervo"]["n"] = n_antes
+	_limpar_bichos()
+	_devolver_clareira(clareira)
+	hora = hora_antes
 	jogador.vida = 100.0
 	spawn_t = spawn_antes
 
@@ -2784,6 +3125,7 @@ func _teste() -> void:
 	await _teste_zumbis(livre)
 	await _teste_armas(livre)
 	await _teste_noites(livre)
+	await _teste_fauna(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -3356,6 +3698,66 @@ func _fotos() -> void:
 	if is_instance_valid(fum):
 		fum.queue_free()
 	noites.carregar(noites_antes)
+	# os bichos do mato (etapa 6a): cervos pastando (o macho com a galhada, as fêmeas sem), um coelho e um javali
+	hora = 9.3
+	_ciclo()
+	_limpar_bichos()
+	var pb := lw + X3 * 9.0
+	var cena: Array = [["cervo", Vector3(0, 0, 0), "", 2.2, "alerta"], ["cervo", Vector3(1.6, 0, 1.9), "F", 1.4, "come"],
+		["cervo", Vector3(-1.4, 0, 2.6), "F", 2.9, "come"], ["coelho", Vector3(-2.6, 0, -1.6), "", 1.0, "come"],
+		["javali", Vector3(4.2, 0, 4.6), "", 3.6, "come"]]
+	var feitos_f: Array = []
+	for e in cena:
+		var pp: Vector3 = pb + (e[1] as Vector3)
+		var bf := fauna.criar(str(e[0]), pp, "", null, str(e[2]))
+		feitos_f.append([bf, e])
+	await _quadros(20)
+	for fe in feitos_f:
+		var bf: Bicho = fe[0]
+		var e: Array = fe[1]
+		bf.set_physics_process(false)
+		bf.yaw = float(e[3])
+		bf.rotation.y = bf.yaw
+		bf.st = str(e[4])
+		bf.v = 0.0
+		bf.global_position.y = terreno.h(bf.global_position.x, bf.global_position.z)
+		bf._pose(0.016)
+	_jogador_em(lw - X3 * 1.0, pb + Vector3(0.5, 0.7, 1.0))
+	await _quadros(10)
+	await _foto("17a_bichos_do_mato")
+	_limpar_bichos()
+	# o urso de pé defendendo o espaço dele
+	var ub := fauna.criar("urso", lw + X3 * 7.5, "", null, "")
+	await _quadros(20)
+	ub.set_physics_process(false)
+	ub.yaw = atan2(-1.0, 0.0)
+	ub.rotation.y = ub.yaw
+	ub.st = "defende"
+	ub.v = 0.0
+	ub.global_position.y = terreno.h(ub.global_position.x, ub.global_position.z)
+	ub._pose(0.016)
+	_jogador_em(lw, ub.global_position + Vector3(0, 1.6, 0))
+	jogador.alternar_camera(true)
+	await _quadros(10)
+	await _foto("17b_urso_de_pe")
+	jogador.alternar_camera(false)
+	_limpar_bichos()
+	# a carcaça do cervo e o esfolar (com a faca na mochila)
+	var cb := fauna.criar("cervo", lw + X3 * 2.2, "", null, "")
+	await _quadros(20)
+	cb.morrer("bala", 10.0)
+	cb.set_physics_process(false)
+	cb.global_position.y = terreno.h(cb.global_position.x, cb.global_position.z)
+	cb.rolo = float(cb.carc["lado"]) * 1.45
+	cb._pose_morto(0.016)
+	jogador.inv.por("faca", 1)
+	_jogador_em(lw, cb.centro() - Vector3(0, 0.25, 0))
+	await _quadros(10)
+	await _foto("17c_esfolar_o_cervo")
+	var nfa := jogador.inv.conta("faca")
+	if nfa > 0:
+		jogador.inv.tirar("faca", nfa)
+	_limpar_bichos()
 	hora = hora_f
 	_ciclo()
 	_devolver_clareira(clar)

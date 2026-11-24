@@ -55,6 +55,22 @@ func _ready() -> void:
 	bancos["fogo"] = [_ruido(0.9, 1200.0, 0.55, 2.5)]
 	bancos["explosao"] = [_mistura(_ruido(1.6, 1600.0, 1.0, 3.2), _tom(0.9, 70.0, 28.0, 1.0, 4.5))]
 	bancos["isca"] = [_mistura(_tom(0.12, 1760.0, 1760.0, 0.4, 10.0), _tom(0.12, 2640.0, 2640.0, 0.15, 10.0))]
+	# os bichos (etapa 6a): cada espécie com a sua voz, o rosnado, o rugido, o grunhido, o guincho e o mato mexendo na fuga
+	bancos["bicho_coelho"] = [_mistura(_tom(0.09, 1500.0, 1100.0, 0.25, 30.0), _ruido(0.08, 4200.0, 0.2, 40.0))]
+	bancos["bicho_raposa"] = [_mistura(_tom(0.16, 780.0, 1150.0, 0.32, 14.0), _ruido(0.1, 2600.0, 0.18, 30.0))]
+	bancos["bicho_ovelha"] = [_bale(0.75, 330.0, 9.0), _bale(0.6, 350.0, 10.0)]
+	bancos["bicho_cabra"] = [_bale(0.55, 430.0, 13.0), _bale(0.5, 460.0, 12.0)]
+	bancos["bicho_cervo"] = [_mistura(_tom(0.32, 520.0, 380.0, 0.32, 7.0), _ruido(0.18, 1600.0, 0.15, 14.0))]
+	bancos["bicho_vaca"] = [_bale(1.5, 118.0, 3.0), _bale(1.2, 132.0, 3.5)]
+	bancos["bicho_javali"] = [_mistura(_ruido(0.3, 650.0, 0.55, 9.0), _tom(0.26, 105.0, 80.0, 0.5, 9.0))]
+	bancos["bicho_lobo"] = [_uivo(2.4, 420.0, 720.0), _uivo(2.0, 460.0, 680.0)]
+	bancos["bicho_urso"] = [_mistura(_ruido(0.9, 420.0, 0.8, 3.0), _tom(0.8, 95.0, 70.0, 0.7, 3.5))]
+	bancos["bicho_onca"] = [_mistura(_ruido(0.7, 700.0, 0.6, 4.0), _tom(0.6, 150.0, 110.0, 0.55, 4.5))]
+	bancos["bicho_rosnado"] = [_mistura(_ruido(0.8, 380.0, 0.7, 3.5), _tom(0.7, 90.0, 85.0, 0.45, 4.0))]
+	bancos["bicho_rugido"] = [_mistura(_ruido(1.2, 520.0, 1.0, 2.6), _tom(1.0, 120.0, 70.0, 0.9, 3.0))]
+	bancos["bicho_grunhido"] = [_mistura(_ruido(0.45, 800.0, 0.7, 6.0), _tom(0.35, 120.0, 90.0, 0.6, 7.0))]
+	bancos["bicho_guincho"] = [_tom(0.18, 2100.0, 1500.0, 0.35, 16.0)]
+	bancos["bicho_fuga"] = [_ruido(0.45, 2400.0, 0.32, 5.0), _ruido(0.5, 1900.0, 0.3, 4.5)]
 	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
 	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]
 
@@ -150,6 +166,38 @@ func _varrida(dur: float, f0: float, f1: float, vol: float) -> AudioStreamWAV:
 
 
 ## gemido de zumbi: tom grave com vibrato e um pouco de ruído rouco
+## o balido (ovelha, cabra) e o mugido (vaca): o tom tremido com o "a" aberto no meio
+func _bale(dur: float, f: float, tremido: float) -> AudioStreamWAV:
+	var n := int(dur * HZ)
+	var a := PackedFloat32Array()
+	a.resize(n)
+	var fase := 0.0
+	for i in n:
+		var t := float(i) / HZ
+		var env := sin(t / dur * PI) * (0.7 + 0.3 * sin(t / dur * PI * 2.0))
+		var ff := f * (1.0 + 0.05 * sin(t * TAU * tremido) + 0.08 * sin(t / dur * PI))
+		fase += TAU * ff / HZ
+		var v := sin(fase) * 0.45 + sin(fase * 2.0) * 0.3 + sin(fase * 3.0) * 0.18 + sin(fase * 4.0) * 0.08
+		a[i] = v * env * 0.45
+	return _wav(a)
+
+
+## o uivo do lobo: sobe devagar, fica e desce
+func _uivo(dur: float, f0: float, f1: float) -> AudioStreamWAV:
+	var n := int(dur * HZ)
+	var a := PackedFloat32Array()
+	a.resize(n)
+	var fase := 0.0
+	for i in n:
+		var t := float(i) / HZ
+		var u := t / dur
+		var env := smoothstep(0.0, 0.15, u) * (1.0 - smoothstep(0.75, 1.0, u))
+		var ff := lerpf(f0, f1, sin(minf(1.0, u * 1.6) * PI * 0.5)) * (1.0 - 0.25 * smoothstep(0.7, 1.0, u)) * (1.0 + 0.01 * sin(t * 30.0))
+		fase += TAU * ff / HZ
+		a[i] = (sin(fase) * 0.6 + sin(fase * 2.0) * 0.12) * env * 0.4
+	return _wav(a)
+
+
 func _gemido(dur: float, f: float) -> AudioStreamWAV:
 	var n := int(dur * HZ)
 	var a := PackedFloat32Array()
