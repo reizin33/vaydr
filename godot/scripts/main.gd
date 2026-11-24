@@ -995,6 +995,26 @@ func _limpar_zumbis() -> void:
 		n.queue_free()
 
 
+## para entender uma falha de visão: a distância, se ele está de frente, quanto vê e o que tapa a linha do olho dele até você
+func _diag_z(z: Zumbi) -> String:
+	if not is_instance_valid(z):
+		return "sumiu"
+	var j = jogador
+	var para: Vector3 = j.global_position - z.global_position
+	var dist := Vector2(para.x, para.z).length()
+	var fr := -z.global_basis.z
+	var ang := (fr.x * para.x + fr.z * para.z) / maxf(dist, 0.01)
+	var a := z.global_position + Vector3(0, 1.6 * z.escala, 0)
+	var b: Vector3 = j.global_position + Vector3(0, 1.4 if not j.agachado else 0.9, 0)
+	var h := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, 1, [z.get_rid(), j.get_rid()]))
+	var tapa := "nada"
+	if not h.is_empty():
+		var c: Object = h["collider"]
+		tapa = "%s (%s, metas %s) em %s" % [str(c.get("name")) if c is Node else "?", c.get_class(), str(c.get_meta_list()), str(h["position"])]
+	return "dist %.1f, de frente %.2f, noite %.2f, lanterna %s, enxerga %s, y zumbi/você %.2f/%.2f, tapa: %s" % [dist, ang, noite_k(),
+		str(j.lanterna_acesa), str(z._enxerga(j)), z.global_position.y, j.global_position.y, tapa]
+
+
 ## um zumbi de teste num ponto, olhando para "olha" (parado: de guarda, não vaga)
 func _z_teste(p: Vector3, tipo: String, olha: Vector3, parado := true, dorme := false) -> Zumbi:
 	var z := _nascer(Vector3(p.x, 0, p.z), tipo, dorme)
@@ -1116,7 +1136,7 @@ func _teste_zumbis(livre: Vector3) -> void:
 		jogador.alternar_lanterna()
 	var acesa := jogador.lanterna_acesa
 	e2 = await _z_ate(z, ["caca"], 50)
-	_confere(e1 == "vaga" and acesa and e2 == "caca", "de noite a 14 m ele não te vê (%s); com a lanterna acesa, vê (%s)" % [e1, e2])
+	_confere(e1 == "vaga" and acesa and e2 == "caca", "de noite a 14 m ele não te vê (%s); com a lanterna acesa, vê (%s) · %s" % [e1, e2, _diag_z(z)])
 	if jogador.lanterna_acesa:
 		jogador.alternar_lanterna()
 	jogador.inv.tirar("lanterna", 1)
@@ -1203,12 +1223,15 @@ func _teste_zumbis(livre: Vector3) -> void:
 	_limpar_zumbis()
 	await _quadros(3)
 	# o brutamontes: o soco não faz ele cambalear
-	z = _z_teste(c + X * 1.6, "brute", c)
 	_jogador_em(c, c + X * 1.6 + Vector3(0, 1.5, 0))
+	await _quadros(2)
+	z = _z_teste(c + X * 1.6, "brute", c)
 	await _quadros(3)
+	var no_arco_b: int = jogador._zumbis_no_golpe(1.9).size()
 	jogador.atacar()
 	await _quadros(2)
-	_confere(z.vida < z.vida_max and z.estado != "atordoado", "brutamontes: o soco não faz ele cambalear (%s)" % z.estado)
+	_confere(z.vida < z.vida_max and z.estado != "atordoado", "brutamontes: o soco não faz ele cambalear (%s, vida %.0f/%.0f, no arco %d) · %s"
+		% [z.estado, z.vida, z.vida_max, no_arco_b, _diag_z(z)])
 	_limpar_zumbis()
 	await _quadros(3)
 	# o gritador: te vê, grita, e o zumbi de longe (de costas, a 26 m de você) vem para onde você está
@@ -1217,7 +1240,7 @@ func _teste_zumbis(livre: Vector3) -> void:
 	_jogador_em(c - X * 2.0, c + X * 6.0 + Vector3(0, 1.4, 0))
 	var e_g: String = await _z_ate(gr, ["grito"], 60)
 	var e_l: String = await _z_ate(longe, ["alerta", "caca"], 200)
-	_confere(e_g == "grito" and gr.gritou and e_l in ["alerta", "caca"], "gritador: viu, gritou (%s) e o zumbi de longe veio (%s)" % [e_g, e_l])
+	_confere(e_g == "grito" and gr.gritou and e_l in ["alerta", "caca"], "gritador: viu, gritou (%s) e o zumbi de longe veio (%s) · %s" % [e_g, e_l, _diag_z(gr)])
 	_limpar_zumbis()
 	await _quadros(3)
 	# o inchado: chega perto e estoura numa nuvem de gás que machuca
