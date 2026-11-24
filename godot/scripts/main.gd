@@ -1252,7 +1252,11 @@ func _teste_armas(livre: Vector3) -> void:
 	_olhar(c + X * 10.0 + Vector3(0, 0.05, 0))
 	jogador.cd = 0.0
 	jogador.atacar()
-	await _quadros(60)
+	# espera a isca cair (o arremesso leva uns 0,25 s e o voo quase 1 s)
+	for i in 150:
+		await get_tree().physics_frame
+		if projeteis.iscas.size() > 0:
+			break
 	var lp: Vector3 = projeteis.iscas[0]["p"] if projeteis.iscas.size() > 0 else Vector3.INF
 	var ea1: String = await _z_ate(a1, ["alerta", "caca"], 240)
 	var ea2: String = await _z_ate(a2, ["alerta", "caca"], 120)
