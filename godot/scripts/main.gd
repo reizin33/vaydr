@@ -2946,6 +2946,90 @@ func _fotos() -> void:
 	jogador.set_physics_process(true)
 	jogador.alternar_camera(false)
 	_limpar_zumbis()
+	# as armas (etapa 5b): a pistola mirando num zumbi, a luneta do rifle, a espingarda em terceira pessoa, o arco puxado e o
+	# zumbi pegando fogo no molotov
+	var la := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clar := _clareira_teste(la, 45.0)
+	var X3 := Vector3(1, 0, 0)
+	for id_a in ["pistola", "rifle", "espingarda", "arco"]:
+		jogador.inv.por(id_a, 1)
+	jogador.inv.por("municao9", 16)
+	jogador.inv.por("balaRifle", 5)
+	jogador.inv.por("cartucho", 8)
+	jogador.inv.por("flecha", 8)
+	jogador.inv.por("molotov", 1)
+	var za := _z_teste(la + X3 * 7.0, "walker", la)
+	za.set_physics_process(false)
+	za.global_position.y -= 0.15
+	_jogador_em(la, za.global_position + Vector3(0, 1.45, 0))
+	_na_mao("pistola")
+	jogador.item_mao()["mun"] = 8
+	ui.hud_item()
+	Input.action_press("mirar")
+	await _quadros(30)
+	await _foto("16e_pistola_mirando")
+	# a luneta do rifle num zumbi a 35 m
+	var zl := _z_teste(la + X3 * 35.0, "brute", la)
+	zl.set_physics_process(false)
+	zl.global_position.y -= 0.15
+	za.queue_free()
+	zumbis.erase(za)
+	_na_mao("rifle")
+	jogador.item_mao()["mun"] = 5
+	_olhar(zl.global_position + Vector3(0, 1.5 * zl.escala, 0))
+	await _quadros(30)
+	await _foto("16f_luneta_do_rifle")
+	Input.action_release("mirar")
+	_limpar_zumbis()
+	# a espingarda em terceira pessoa, mirando
+	var ze := _z_teste(la + X3 * 6.0, "policial", la)
+	ze.set_physics_process(false)
+	ze.global_position.y -= 0.15
+	_jogador_em(la, ze.global_position + Vector3(0, 1.3, 0))
+	_na_mao("espingarda")
+	jogador.item_mao()["mun"] = 5
+	jogador.alternar_camera(true)
+	Input.action_press("mirar")
+	await _quadros(35)
+	await _foto("16g_espingarda_terceira")
+	Input.action_release("mirar")
+	jogador.alternar_camera(false)
+	_limpar_zumbis()
+	# o arco puxado
+	var zb := _z_teste(la + X3 * 12.0, "runner", la)
+	zb.set_physics_process(false)
+	zb.global_position.y -= 0.15
+	_jogador_em(la, zb.global_position + Vector3(0, 1.3, 0))
+	_na_mao("arco")
+	await _quadros(4)
+	jogador.set_physics_process(false)
+	jogador.acao = {"tipo": "arco", "t": 0.8, "dur": 1e9, "puxa": 1.0, "feito": false, "slot": jogador.sel}
+	await _quadros(12)
+	await _foto("16h_arco_puxado")
+	jogador.acao = {}
+	jogador.set_physics_process(true)
+	_limpar_zumbis()
+	# o molotov: o fogo no chão e um zumbi pegando fogo
+	var zf := _z_teste(la + X3 * 8.0, "walker", la + X3 * 40.0)
+	_jogador_em(la, zf.global_position + Vector3(0, 0.05, 0))
+	_na_mao("molotov")
+	await _quadros(3)
+	jogador.cd = 0.0
+	jogador.atacar()
+	await _quadros(75)
+	if is_instance_valid(zf):
+		zf.set_physics_process(false)
+		_olhar(zf.global_position + Vector3(0, 1.0, 0))
+	await _quadros(10)
+	await _foto("16i_molotov")
+	projeteis.limpar()
+	_limpar_zumbis()
+	for id_a in ["pistola", "rifle", "espingarda", "arco", "municao9", "balaRifle", "cartucho", "flecha", "molotov"]:
+		var n_a := jogador.inv.conta(id_a)
+		if n_a > 0:
+			jogador.inv.tirar(id_a, n_a)
+	_mao_vazia()
+	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()
 	await _foto("17_pausa")

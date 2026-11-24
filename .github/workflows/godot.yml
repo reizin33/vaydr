@@ -23,9 +23,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: godot-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   GODOT_VER: "4.7.2"
@@ -118,6 +115,10 @@ jobs:
   montar:
     needs: testes
     if: ${{ always() }}
+    # só o job de montar espera o anterior sair (os testes de um envio novo começam na hora)
+    concurrency:
+      group: godot-montar-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 95
     permissions:

@@ -830,7 +830,7 @@ func atacar() -> void:
 ## um golpe num zumbi: de cima rende mais; agachado, pelas costas de quem não te viu, dobra (golpe furtivo); as armas pesadas
 ## às vezes derrubam
 func _bater_zumbi(z, st: Dictionary, d: Dictionary, arma: bool, h: Dictionary) -> void:
-	var dano := float(st.get("dano", 9.0)) * randf_range(0.92, 1.08)
+	var dano := float(st.get("dano", 9.0)) * randf_range(0.92, 1.08) * (Armas.qual_dano(item_mao()) if arma else 1.0)
 	if bool(d.get("vertical", false)):
 		dano *= 1.15
 	var furtivo: bool = agachado and z.estado in ["vaga", "alerta", "dorme"]
@@ -1289,7 +1289,7 @@ func usar_item(i: int) -> void:
 				var s = inv.slots[k]
 				if s == null or not s.has("dur"):
 					continue
-				var f := float(s["dur"]) / float(Dados.item(str(s["id"])).get("durMax", 1.0))
+				var f := float(s["dur"]) / Armas.dur_max(str(s["id"]), s.get("q", 1))
 				if k == sel and f < 1.0:
 					alvo = k
 					break
@@ -1300,7 +1300,7 @@ func usar_item(i: int) -> void:
 				main.ui.aviso("Nada gasto para remendar")
 				return
 			var s2: Dictionary = inv.slots[alvo]
-			var mx := float(Dados.item(str(s2["id"])).get("durMax", 1.0))
+			var mx := Armas.dur_max(str(s2["id"]), s2.get("q", 1))
 			s2["dur"] = minf(mx, float(s2["dur"]) + mx * 0.35)
 			inv.usar_um(i)
 			main.ui.aviso("Remendou: %s" % Dados.nome(str(s2["id"])))
@@ -1628,7 +1628,7 @@ func queimar(t: float) -> void:
 
 func _passo_armas(dt: float) -> void:
 	# mirando: o botão direito com a arma de fogo ou o arco (com o plano na mão o botão direito é da construção)
-	var quer := Input.is_action_pressed("mirar") and _arma_mira() and not preso and not main.construcao.ativo \
+	var quer: bool = Input.is_action_pressed("mirar") and _arma_mira() and not preso and not main.construcao.ativo \
 		and str(acao.get("tipo", "")) != "recarga"
 	mira_k = move_toward(mira_k, 1.0 if quer else 0.0, dt * 6.0)
 	# o coice volta devagar

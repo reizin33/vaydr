@@ -499,7 +499,7 @@ func _nome_item() -> void:
 	if id == "arco":
 		tipo_item.text = "ARCO · %d FLECHAS" % j.inv.conta("flecha")
 	if s.has("dur"):
-		var f := clampf(float(s["dur"]) / maxf(1.0, float(d.get("durMax", 1.0))), 0.0, 1.0)
+		var f := clampf(float(s["dur"]) / maxf(1.0, Armas.dur_max(id, s.get("q", 1))), 0.0, 1.0)
 		tracos_item.visible = true
 		(tracos_item as Tracos).f = f
 		tracos_item.queue_redraw()
@@ -928,7 +928,7 @@ class BarraRapida extends Control:
 					draw_string(fu, r.position + Vector2(1, T - 3), tn, HORIZONTAL_ALIGNMENT_RIGHT, T - 4, 11, Color(0, 0, 0, 0.9))
 					draw_string(fu, r.position + Vector2(0, T - 4), tn, HORIZONTAL_ALIGNMENT_RIGHT, T - 4, 11, Estilo.OSSO)
 				if s.has("dur"):
-					var f := clampf(float(s["dur"]) / maxf(1.0, float(Dados.item(str(s["id"])).get("durMax", 1.0))), 0.0, 1.0)
+					var f := clampf(float(s["dur"]) / maxf(1.0, Armas.dur_max(str(s["id"]), s.get("q", 1))), 0.0, 1.0)
 					var cor := Estilo.VERDE_DUR if f >= 0.35 else (Color(0.914, 0.773, 0.29) if f >= 0.15 else Color(0.886, 0.286, 0.227))
 					var larg := T * 0.46
 					var x := 0.0

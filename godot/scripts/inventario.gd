@@ -30,7 +30,7 @@ static func novo(id: String, n: int, extra := {}) -> Dictionary:
 	var s := {"id": id, "n": n}
 	var d := Dados.item(id)
 	if d.has("durMax"):
-		s["dur"] = float(extra.get("dur", d["durMax"]))
+		s["dur"] = float(extra.get("dur", Armas.dur_max(id, extra.get("q", 1))))
 	# arma de fogo e besta: as balas que estão nela (achada vazia, como no jogo antigo); a qualidade, se veio com uma
 	if bool(d.get("fogo", false)):
 		s["mun"] = int(extra.get("mun", 0))

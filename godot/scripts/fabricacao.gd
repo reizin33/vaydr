@@ -124,7 +124,7 @@ static func consertar_item(j, i: int) -> String:
 	var s = j.inv.slots[i]
 	if s == null or not s.has("dur"):
 		return "Isso não gasta"
-	var mx := float(Dados.item(str(s["id"])).get("durMax", 1.0))
+	var mx := Armas.dur_max(str(s["id"]), s.get("q", 1))
 	if float(s["dur"]) >= mx:
 		return "Já está inteiro"
 	if j.main.construcao.nivel_bancada_perto(j.global_position) <= 0:

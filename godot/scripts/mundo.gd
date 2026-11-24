@@ -956,8 +956,14 @@ func sortear(tab: String) -> Array:
 			continue
 		var extra := {}
 		var d := Dados.item(k)
+		var q := 1
+		# arma achada: a qualidade (baixa 18%, comum 54%, boa 21%, excepcional 7%), como no jogo antigo (65_armas_variedade.js)
+		if bool(d.get("qual", false)) and int(achou[k]) == 1:
+			var x := rng.randf()
+			q = 0 if x < 0.18 else (1 if x < 0.72 else (2 if x < 0.93 else 3))
+			extra["q"] = q
 		if d.has("durMax"):
-			extra["dur"] = roundf(float(d["durMax"]) * (0.45 + rng.randf() * 0.4))
+			extra["dur"] = roundf(Armas.dur_max(k, q) * (0.45 + rng.randf() * 0.4))
 		L.append([k, int(achou[k]), extra])
 	return L
 

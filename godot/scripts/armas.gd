@@ -29,9 +29,24 @@ const FOGO := {
 const ARCO := {"dano": 45.0, "puxa": 0.72, "v_min": 15.0, "v_max": 50.0, "g": 7.0, "energia": 2.2, "municao": "flecha"}
 const ARREMESSO := {"v": 15.5, "g": 9.8, "alcance": 26.0, "raio_fogo": 3.1, "fogo_dur": 10.0, "pavio": 2.5, "raio_bomba": 5.2,
 	"dano_bomba": 170.0, "isca_dur": 12.0, "isca_raio": 34.0}
-## a qualidade das armas achadas (65_armas_variedade.js): baixa, comum, boa, excepcional
+## a qualidade das armas achadas (65_armas_variedade.js): baixa, comum, boa, excepcional (o dano e a durabilidade)
 const QUAL_DANO := [0.88, 1.0, 1.12, 1.25]
+const QUAL_DUR := [0.75, 1.0, 1.25, 1.5]
 const QUAL_NOME := ["baixa", "", "boa", "excepcional"]
+
+
+## a durabilidade máxima do item com a qualidade dele
+static func dur_max(id: String, q = 1) -> float:
+	var d := Dados.item(id)
+	var k: float = QUAL_DUR[clampi(int(q), 0, 3)] if bool(d.get("qual", false)) else 1.0
+	return float(d.get("durMax", 1.0)) * k
+
+
+## o multiplicador do dano pela qualidade (1 sem qualidade)
+static func qual_dano(s: Dictionary) -> float:
+	if not s.has("q"):
+		return 1.0
+	return float(QUAL_DANO[clampi(int(s["q"]), 0, 3)])
 
 
 static func de_fogo(id: String) -> bool:

@@ -537,7 +537,7 @@ func _detalhe(dono: String, i: int) -> void:
 	var id := str(s["id"])
 	var d := Dados.item(id)
 	det_ico.texture = Dados.icone_item(id)
-	det_nome.text = Dados.nome(id) + (("  x%d" % int(s["n"])) if int(s["n"]) > 1 else "")
+	det_nome.text = Armas.nome_q(id, s.get("q")) + (("  x%d" % int(s["n"])) if int(s["n"]) > 1 else "")
 	var L := [str(d.get("desc", ""))]
 	var ef := []
 	for k in [["fome", "Fome"], ["sede", "Sede"], ["vida", "Vida"]]:
@@ -545,14 +545,26 @@ func _detalhe(dono: String, i: int) -> void:
 			ef.append("%s %+d" % [k[1], int(d[k[0]])])
 	if not ef.is_empty():
 		L.append(" · ".join(ef))
-	if d.has("dano"):
-		L.append("Dano %d · golpe a cada %.2f s%s%s" % [int(d["dano"]), float(d.get("tempo", 0.6)), " · corta árvore" if d.get("corta", false) else "", " · quebra rocha" if d.get("minera", false) else ""])
+	if Armas.de_fogo(id):
+		var B := Armas.dados(id)
+		L.append("Dano %d%s · pente de %d · %s · balas: %d no pente" % [roundi(float(B["dano"]) * Armas.qual_dano(s)), (" x%d bagos" % int(B["chumbo"])) if B.has("chumbo") else "",
+			int(B["pente"]), Dados.nome(str(B["municao"])), int(s.get("mun", 0))])
+		L.append("Botão esquerdo atira · direito mira · R recarrega")
+	elif id == "arco":
+		L.append("Segure o botão esquerdo para puxar e solte para atirar (puxado até o fim vai longe) · flechas: %d" % main.jogador.inv.conta("flecha"))
+	elif bool(d.get("arremesso", false)):
+		L.append("Botão esquerdo joga para onde a mira aponta (até 26 m)")
+	elif d.has("dano"):
+		L.append("Dano %d · golpe a cada %.2f s%s%s" % [roundi(float(d["dano"]) * Armas.qual_dano(s)), float(d.get("tempo", 0.6)), " · corta árvore" if d.get("corta", false) else "", " · quebra rocha" if d.get("minera", false) else ""])
+	if s.has("q") and int(s["q"]) != 1:
+		L.append("Qualidade %s: dano %+d%%, dura %+d%%" % [Armas.QUAL_NOME[clampi(int(s["q"]), 0, 3)] if int(s["q"]) != 1 else "comum",
+			roundi((float(Armas.QUAL_DANO[clampi(int(s["q"]), 0, 3)]) - 1.0) * 100.0), roundi((float(Armas.QUAL_DUR[clampi(int(s["q"]), 0, 3)]) - 1.0) * 100.0)])
 	if d.has("prot") and float(d["prot"]) > 0.0:
 		L.append("Proteção %d%%" % roundi(float(d["prot"]) * 100.0))
 	if d.has("espaco"):
 		L.append("Mochila: +%d espaços" % int(d["espaco"]))
 	if s.has("dur"):
-		L.append("Estado: %d%%" % roundi(100.0 * float(s["dur"]) / maxf(1.0, float(d.get("durMax", 1.0)))))
+		L.append("Estado: %d%%" % roundi(100.0 * float(s["dur"]) / maxf(1.0, Armas.dur_max(id, s.get("q", 1)))))
 	det_txt.text = "\n".join(L)
 	if dono.begins_with("roupa:"):
 		_botao("Tirar", _tirar.bind(dono.substr(6)))
@@ -570,7 +582,7 @@ func _detalhe(dono: String, i: int) -> void:
 		_botao("Vestir", func(): _usar_slot(i))
 	elif d.has("acao"):
 		_botao(str(d["acao"]), func(): _usar_slot(i))
-	if s.has("dur") and float(s["dur"]) < float(d.get("durMax", 1.0)) and main.construcao.nivel_bancada_perto(main.jogador.global_position) > 0:
+	if s.has("dur") and float(s["dur"]) < Armas.dur_max(id, s.get("q", 1)) and main.construcao.nivel_bancada_perto(main.jogador.global_position) > 0:
 		_botao("Consertar (%s)" % Dados.custo_txt(Fabricacao.custo_conserto(id)), _consertar.bind(i))
 	_botao("Largar", func(): _largar(i))
 
@@ -636,7 +648,7 @@ func _pintar(p: PanelContainer) -> void:
 		tr.texture = Dados.icone_item(str(s["id"]))
 		n.text = str(int(s["n"])) if int(s["n"]) > 1 else ""
 		if s.has("dur"):
-			var f := clampf(float(s["dur"]) / maxf(1.0, float(Dados.item(str(s["id"])).get("durMax", 1.0))), 0.0, 1.0)
+			var f := clampf(float(s["dur"]) / maxf(1.0, Armas.dur_max(str(s["id"]), s.get("q", 1))), 0.0, 1.0)
 			gasto.visible = true
 			gasto.custom_minimum_size.x = (p.custom_minimum_size.x - 6.0) * f
 			gasto.color = Color(0.9, 0.3, 0.2) if f < 0.25 else (Color(0.95, 0.75, 0.25) if f < 0.5 else Color(0.4, 0.85, 0.35))

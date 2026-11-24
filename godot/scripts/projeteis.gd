@@ -102,7 +102,8 @@ func flecha(o: Vector3, dir: Vector3, v: float, dano: float, arma: String, item:
 func _passo_flechas(dt: float) -> void:
 	var sp := get_world_3d().direct_space_state
 	var j = main.jogador
-	var fora: Array[RID] = [j.get_rid()]
+	var fora: Array[RID] = []
+	fora.append(j.get_rid())
 	for i in range(flechas.size() - 1, -1, -1):
 		var f: Dictionary = flechas[i]
 		var no: Node3D = f["no"]
@@ -253,7 +254,8 @@ func _modelo_arremesso(tipo: String) -> Node3D:
 
 func _passo_voando(dt: float) -> void:
 	var sp := get_world_3d().direct_space_state
-	var fora: Array[RID] = [main.jogador.get_rid()]
+	var fora: Array[RID] = []
+	fora.append(main.jogador.get_rid())
 	var g: float = Armas.ARREMESSO["g"]
 	for i in range(voando.size() - 1, -1, -1):
 		var b: Dictionary = voando[i]
