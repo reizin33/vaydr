@@ -28,15 +28,19 @@ const TIPOS := {
 	"inchado": {"nome": "Inchado", "hp": 85.0, "vaga": 0.45, "caca": 1.35, "dano": 8.0, "alcance": 1.4, "r": 0.42, "esc": [1.08, 1.08],
 		"obra": 0.6, "gas": 3.4},
 	"emboscada": {"nome": "Emboscada", "hp": 90.0, "vaga": 0.5, "caca": 3.3, "dano": 15.0, "alcance": 1.5, "r": 0.32, "esc": [0.95, 1.04]},
+	# o Colosso da lua de sangue (42b_chefe.js): uns 4 m, muita vida, não cambaleia; pisão, investida e rugido
+	"colosso": {"nome": "Colosso", "hp": 1800.0, "vaga": 0.9, "caca": 1.5, "dano": 30.0, "alcance": 1.55, "r": 0.7, "esc": [2.25, 2.25],
+		"obra": 6.0, "pesado": true, "chefe": true},
 }
 ## as roupas de cada tipo (cascas: a região do corpo inflada pela normal e pintada), como o ZVISUAL do jogo antigo
 const ROUPAS := {
 	"policial": [["troncoLongo", 0.014, 0x3e5170], ["troncoCurto", 0.036, 0x15181d], ["pernas", 0.008, 0x1c2433], ["pes", 0.012, 0x111111]],
 	"inchado": [["troncoCurto", 0.075, 0x7b8562], ["pernas", 0.009, 0x3a3a30]],
 	"brute": [["troncoCurto", 0.02, 0x2a2622], ["pernas", 0.012, 0x2b2f38], ["pes", 0.014, 0x1a1714]],
+	"colosso": [["troncoCurto", 0.012, 0x3a2420], ["pernas", 0.01, 0x262422], ["pes", 0.012, 0x141210]],
 }
 const TONS := {"walker": Color(1, 1, 1), "runner": Color(0.9, 0.92, 0.96), "brute": Color(0.92, 0.84, 0.8), "screamer": Color(1.06, 1.02, 0.95),
-	"policial": Color(0.86, 0.9, 0.98), "inchado": Color(0.98, 1.02, 0.86), "emboscada": Color(0.82, 0.82, 0.78)}
+	"policial": Color(0.86, 0.9, 0.98), "inchado": Color(0.98, 1.02, 0.86), "emboscada": Color(0.82, 0.82, 0.78), "colosso": Color(0.8, 0.68, 0.66)}
 const TRAPOS := [0x4a3f35, 0x2f3a46, 0x5a4a3a, 0x3d4a3a, 0x6a5a4a, 0x2a2a2e, 0x7a6a55, 0x4a2f2a, 0x55504a, 0x3a2e28]
 const DERRUBADO_T := 2.4    # no chão depois da voadora ou do golpe pesado
 const LEVANTA_T := 1.35
@@ -98,6 +102,7 @@ var _casa_ok := false
 var dist_alvo := 0.0
 var parado := false        # de guarda: não vaga, fica onde está até ver ou ouvir alguém
 var cravadas: Array = []   # as flechas e virotes cravados nele (caem quando ele morre, a maioria inteira)
+var chefe := {}            # o Colosso: a fase do ataque especial (pisão, investida, tonto), o tempo e as esperas
 var queima := 0.0          # pegando fogo: segundos que faltam
 var _fogo_no: CPUParticles3D = null
 
@@ -288,6 +293,8 @@ func ferir(dano: float, de: Vector3, quem := 0, info := {}) -> void:
 		return
 	var k := str(info.get("k", "golpe"))
 	dano = _armadura(dano, info)
+	if k == "fogo" and bool(S.get("chefe", false)):
+		dano *= 1.6
 	if estado == "derrubado" and dano > 0.0:
 		dano *= 1.5
 	dano *= float(S.get("resist", 1.0))
@@ -441,6 +448,11 @@ func morrer(quem := 0) -> void:
 	main.sons.tocar("morte_z", global_position, 0.0)
 	if S.has("gas") and not estourou:
 		_estourar()
+	if bool(S.get("chefe", false)):
+		chefe = {}
+		main.ui.aviso("O Colosso caiu! Ele deixou suprimentos no chão.", 6.0)
+		if main.get("noites") != null:
+			main.noites.deixou_suprimentos(global_position)
 	main.zumbi_morreu(self, quem)
 
 
@@ -451,6 +463,132 @@ func _estourar() -> void:
 	main.efeitos.sangue(global_position + Vector3(0, 1.1, 0), Vector3.UP)
 	main.sons.tocar("estouro", global_position, 2.0)
 	main.barulho(global_position, 18.0)
+
+
+## os jogadores perto (você e, na partida em rede, os amigos que estão no mundo) para o pisão e a investida do Colosso
+func _alvos_perto(raio: float) -> Array:
+	var L := []
+	var j = main.jogador
+	if j.vivo and j.global_position.distance_to(global_position) < raio:
+		L.append(j)
+	if Rede.anfitriao():
+		for b in Rede.no_mundo():
+			if b.vivo and (b.pos_alvo() as Vector3).distance_to(global_position) < raio:
+				L.append(b)
+	return L
+
+
+## o Colosso: o rugido (chama os de perto), o pisão (levanta os braços devagar e bate no chão: a onda pega quem está no chão
+## até 4,8 m; quem pula na hora escapa) e a investida (ruge, abaixa, corre reto 1,7 s; batendo em parede ou árvore fica tonto
+## 3 s). Devolve true quando cuidou dele neste quadro.
+func _chefe_passo(dt: float, j, para: Vector3, dist: float) -> bool:
+	var c := chefe
+	c["cd_pisao"] = float(c.get("cd_pisao", 4.0)) - dt
+	c["cd_inv"] = float(c.get("cd_inv", 7.0)) - dt
+	c["cd_rug"] = float(c.get("cd_rug", 0.5)) - dt
+	var fase := str(c.get("fase", ""))
+	var mesmo := absf(para.y) < 1.8
+	if fase == "":
+		if float(c["cd_rug"]) <= 0.0:
+			c["cd_rug"] = randf_range(16.0, 22.0)
+			main.sons.tocar("grito", global_position, 10.0)
+			main.efeitos.anel(global_position + Vector3(0, 3.6, 0))
+			main.barulho(global_position, 40.0, j.pos_alvo())
+		if dist < 5.5 and mesmo and float(c["cd_pisao"]) <= 0.0 and golpe_t < 0.0 and j.vivo:
+			c["fase"] = "pisao"
+			c["t"] = 0.0
+			c["bateu"] = false
+			golpe_t = 0.0
+			_tocar("sGolpe", 0.42)
+			if j == main.jogador:
+				main.ui.aviso("O Colosso vai bater no chão: pule!", 1.4)
+			return true
+		if dist > 8.0 and dist < 26.0 and mesmo and float(c["cd_inv"]) <= 0.0 and _ve and j.vivo:
+			c["fase"] = "prep"
+			c["t"] = 0.0
+			c["dir"] = Vector3(para.x, 0, para.z).normalized()
+			main.sons.tocar("grito", global_position, 10.0)
+			_tocar("sGolpe", 0.35)
+			return true
+		return false
+	c["t"] = float(c.get("t", 0.0)) + dt
+	var t: float = c["t"]
+	velocity.x = 0.0
+	velocity.z = 0.0
+	match fase:
+		"pisao":
+			rotation.y = lerp_angle(rotation.y, atan2(-para.x, -para.z), 1.0 - exp(-4.0 * dt))
+			if t >= 1.0 and not bool(c.get("bateu", false)):
+				c["bateu"] = true
+				_pisao_onda()
+			if t >= 1.6:
+				c["fase"] = ""
+				c["cd_pisao"] = randf_range(5.0, 8.0)
+				golpe_t = -1.0
+		"prep":
+			var d: Vector3 = c["dir"]
+			rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), 1.0 - exp(-10.0 * dt))
+			if t >= 0.75:
+				c["fase"] = "investida"
+				c["t"] = 0.0
+				c["pegou"] = []
+				_tocar("sDispara", 1.25)
+		"investida":
+			var d: Vector3 = c["dir"]
+			velocity.x = d.x * 6.4
+			velocity.z = d.z * 6.4
+			var pegou: Array = c["pegou"]
+			for a in _alvos_perto(2.6):
+				if not a in pegou:
+					pegou.append(a)
+					a.ferir(36.0, true, global_position)
+					if a == main.jogador:
+						a.velocity += d * 11.0 + Vector3(0, 4.0, 0)
+						a.tremor = maxf(a.tremor, 0.9)
+			if t > 0.25 and is_on_wall():
+				# bateu na parede, na árvore ou na construção: fica tonto
+				c["fase"] = "tonto"
+				c["t"] = 0.0
+				main.sons.tocar("impacto", global_position, 8.0)
+				main.efeitos.lascas(global_position + d * 1.4 + Vector3(0, 1.6, 0), -d, "pedra")
+				_tocar("sCaindo", 0.5)
+				main.ui.aviso("O Colosso bateu e ficou tonto: é a hora de atacar!", 3.0)
+			elif t >= 1.7:
+				c["fase"] = ""
+				c["cd_inv"] = randf_range(8.0, 12.0)
+		"tonto":
+			if t >= 3.0:
+				c["fase"] = ""
+				c["cd_inv"] = randf_range(8.0, 12.0)
+				_tocar("sFeridoParado")
+	if not is_on_floor():
+		velocity.y -= 20.0 * dt
+	move_and_slide()
+	return true
+
+
+## o chão treme: quem está no chão até 4,8 m leva o tranco (quem está pulando escapa); a câmera de quem está perto treme
+func _pisao_onda() -> void:
+	var R := 4.8
+	main.sons.tocar("explosao", global_position, 2.0)
+	main.sons.tocar("impacto", global_position, 8.0)
+	main.efeitos.anel(global_position + Vector3(0, 0.25, 0))
+	main.efeitos.lascas(global_position + Vector3(0, 0.1, 0), Vector3.UP, "pedra")
+	for a in _alvos_perto(R):
+		var no_chao: bool = a.is_on_floor() if a is CharacterBody3D else bool(a.chao)
+		if not no_chao:
+			continue
+		var pa: Vector3 = (a.pos_alvo() if a.has_method("pos_alvo") else a.global_position)
+		var d := Vector2(pa.x - global_position.x, pa.z - global_position.z).length()
+		a.ferir(40.0 * (1.0 - 0.5 * d / R), true, global_position)
+		if a == main.jogador:
+			var fr: Vector3 = a.global_position - global_position
+			fr.y = 0.0
+			a.velocity += fr.normalized() * 7.0 + Vector3(0, 3.5, 0)
+	var j = main.jogador
+	var dj: float = j.global_position.distance_to(global_position)
+	if dj < 25.0:
+		j.tremor = maxf(j.tremor, 1.0 - dj / 25.0)
 
 
 ## pegou fogo (o fogo no chão do molotov, outro zumbi queimando do lado): queima por t segundos (16 de vida por segundo) e
@@ -505,7 +643,7 @@ func _fogo_visual() -> void:
 
 func _queimando(dt: float) -> void:
 	queima -= dt
-	vida -= 16.0 * dt * float(S.get("resist", 1.0))
+	vida -= (28.0 if bool(S.get("chefe", false)) else 16.0) * dt * float(S.get("resist", 1.0))
 	if mat != null and flash <= 0.0:
 		var fl := 0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.023 + uid)
 		mat.albedo_color = tom * Color(1.25 + 0.5 * fl, 0.62 + 0.2 * fl, 0.32)
@@ -774,6 +912,8 @@ func _physics_process(dt: float) -> void:
 		if ouvir_t < 0.0 and estado in ["vaga", "alerta"]:
 			estado = "alerta"
 			alerta_p = ouvir_p
+	if bool(S.get("chefe", false)) and estado == "caca" and _chefe_passo(dt, j, para, dist):
+		return
 	var vel := 0.0
 	var dir := Vector3.ZERO
 	match estado:

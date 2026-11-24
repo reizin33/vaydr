@@ -2948,8 +2948,8 @@ func _fotos() -> void:
 	_limpar_zumbis()
 	# as armas (etapa 5b): a pistola mirando num zumbi, a luneta do rifle, a espingarda em terceira pessoa, o arco puxado e o
 	# zumbi pegando fogo no molotov
-	var la := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
-	var clar := _clareira_teste(la, 45.0)
+	var lw := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clar := _clareira_teste(lw, 45.0)
 	var X3 := Vector3(1, 0, 0)
 	for id_a in ["pistola", "rifle", "espingarda", "arco"]:
 		jogador.inv.por(id_a, 1)
@@ -2958,10 +2958,10 @@ func _fotos() -> void:
 	jogador.inv.por("cartucho", 8)
 	jogador.inv.por("flecha", 8)
 	jogador.inv.por("molotov", 1)
-	var za := _z_teste(la + X3 * 7.0, "walker", la)
+	var za := _z_teste(lw + X3 * 7.0, "walker", lw)
 	za.set_physics_process(false)
 	za.global_position.y -= 0.15
-	_jogador_em(la, za.global_position + Vector3(0, 1.45, 0))
+	_jogador_em(lw, za.global_position + Vector3(0, 1.45, 0))
 	_na_mao("pistola")
 	jogador.item_mao()["mun"] = 8
 	ui.hud_item()
@@ -2969,7 +2969,7 @@ func _fotos() -> void:
 	await _quadros(30)
 	await _foto("16e_pistola_mirando")
 	# a luneta do rifle num zumbi a 35 m
-	var zl := _z_teste(la + X3 * 35.0, "brute", la)
+	var zl := _z_teste(lw + X3 * 35.0, "brute", lw)
 	zl.set_physics_process(false)
 	zl.global_position.y -= 0.15
 	za.queue_free()
@@ -2982,10 +2982,10 @@ func _fotos() -> void:
 	Input.action_release("mirar")
 	_limpar_zumbis()
 	# a espingarda em terceira pessoa, mirando
-	var ze := _z_teste(la + X3 * 6.0, "policial", la)
+	var ze := _z_teste(lw + X3 * 6.0, "policial", lw)
 	ze.set_physics_process(false)
 	ze.global_position.y -= 0.15
-	_jogador_em(la, ze.global_position + Vector3(0, 1.3, 0))
+	_jogador_em(lw, ze.global_position + Vector3(0, 1.3, 0))
 	_na_mao("espingarda")
 	jogador.item_mao()["mun"] = 5
 	jogador.alternar_camera(true)
@@ -2996,10 +2996,10 @@ func _fotos() -> void:
 	jogador.alternar_camera(false)
 	_limpar_zumbis()
 	# o arco puxado
-	var zb := _z_teste(la + X3 * 12.0, "runner", la)
+	var zb := _z_teste(lw + X3 * 12.0, "runner", lw)
 	zb.set_physics_process(false)
 	zb.global_position.y -= 0.15
-	_jogador_em(la, zb.global_position + Vector3(0, 1.3, 0))
+	_jogador_em(lw, zb.global_position + Vector3(0, 1.3, 0))
 	_na_mao("arco")
 	await _quadros(4)
 	jogador.set_physics_process(false)
@@ -3010,8 +3010,8 @@ func _fotos() -> void:
 	jogador.set_physics_process(true)
 	_limpar_zumbis()
 	# o molotov: o fogo no chão e um zumbi pegando fogo
-	var zf := _z_teste(la + X3 * 8.0, "walker", la + X3 * 40.0)
-	_jogador_em(la, zf.global_position + Vector3(0, 0.05, 0))
+	var zf := _z_teste(lw + X3 * 8.0, "walker", lw + X3 * 40.0)
+	_jogador_em(lw, zf.global_position + Vector3(0, 0.05, 0))
 	_na_mao("molotov")
 	await _quadros(3)
 	jogador.cd = 0.0
