@@ -14,7 +14,7 @@ extends CanvasLayer
 ## - Multiplayer: jogar junto na rede local (rede.gd): abrir a partida, entrar com o IP ou pela lista da rede, quem está;
 ## - no jogo: a pausa (Esc), o mapa grande (M), a tela de morte; e a passagem escura ao entrar no mundo.
 
-const VERSAO := "0.5.0"
+const VERSAO := "0.6.0"
 const DICAS := [
 	"Com uma pedra na mão já dá para bater nas árvores e tirar madeira mais rápido.",
 	"Aperte E para pegar, abrir, beber e revistar armários, gavetas e baús.",

@@ -256,6 +256,58 @@ func anel(p: Vector3) -> void:
 		tw.chain().tween_callback(mi.queue_free)
 
 
+## a coluna de fumaça colorida (a caixa de suprimentos solta fumaça vermelha para dar para achar de longe)
+func fumaca(p: Vector3, cor: Color, dur: float) -> Node3D:
+	var no := Node3D.new()
+	add_child(no)
+	no.global_position = p
+	var part := CPUParticles3D.new()
+	part.amount = 56
+	part.lifetime = 7.0
+	part.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	part.emission_sphere_radius = 0.25
+	part.direction = Vector3.UP
+	part.spread = 12.0
+	part.initial_velocity_min = 1.4
+	part.initial_velocity_max = 2.4
+	part.gravity = Vector3(0.35, 0.25, 0.1)
+	part.damping_min = 0.15
+	part.damping_max = 0.3
+	part.scale_amount_min = 0.7
+	part.scale_amount_max = 1.3
+	var cv := Curve.new()
+	cv.add_point(Vector2(0.0, 0.35))
+	cv.add_point(Vector2(0.4, 1.4))
+	cv.add_point(Vector2(1.0, 2.6))
+	part.scale_amount_curve = cv
+	var gr := Gradient.new()
+	gr.set_color(0, Color(cor, 0.62))
+	gr.set_color(1, Color(cor.lerp(Color(0.5, 0.45, 0.45), 0.6), 0.0))
+	part.color_ramp = gr
+	var sm := SphereMesh.new()
+	sm.radius = 0.5
+	sm.height = 1.0
+	sm.radial_segments = 10
+	sm.rings = 5
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(1, 1, 1, 1)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	sm.material = m
+	part.mesh = sm
+	part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	no.add_child(part)
+	part.emitting = true
+	get_tree().create_timer(dur).timeout.connect(func():
+		if is_instance_valid(part):
+			part.emitting = false
+		if is_instance_valid(no):
+			get_tree().create_timer(7.5).timeout.connect(no.queue_free))
+	return no
+
+
 ## a nuvem de gás do inchado
 func gas(p: Vector3, r: float, dur: float) -> void:
 	var n := Nuvem.new(get_parent(), r, dur)

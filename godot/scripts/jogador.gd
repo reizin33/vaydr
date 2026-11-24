@@ -1033,7 +1033,7 @@ func _passo_acao(dt: float) -> void:
 					main.ui.acerto()
 				else:
 					main.sons.tocar("passo", global_position, 0.0)
-	if t >= float(acao["dur"]):
+	if not acao.is_empty() and t >= float(acao.get("dur", 0.0)):
 		acao = {}
 
 
@@ -1534,7 +1534,8 @@ func _disparar(s: Dictionary, id: String) -> void:
 func recarregar() -> void:
 	var s := item_mao()
 	var id := str(s.get("id", ""))
-	if not Armas.de_fogo(id) or not acao.is_empty() or not vivo:
+	# o coice do tiro não impede (dá para recarregar logo depois de atirar)
+	if not Armas.de_fogo(id) or not vivo or (not acao.is_empty() and str(acao.get("tipo", "")) != "tiro"):
 		return
 	var B := Armas.dados(id)
 	var mun := int(s.get("mun", 0))

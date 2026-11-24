@@ -16,6 +16,8 @@ var construcao: Construcao
 var sons: Sons
 var efeitos: Efeitos
 var projeteis: Projeteis
+var noites: Noites          # as noites: as ondas da horda, a lua de sangue e o Colosso (etapa 5c)
+var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
 var palco: Palco          # o palco da criação do personagem (a clareira no começo da noite)
 var ui: UI
@@ -102,6 +104,8 @@ func _ready() -> void:
 	add_child(efeitos)
 	projeteis = Projeteis.new(self)
 	add_child(projeteis)
+	noites = Noites.new(self)
+	add_child(noites)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -304,6 +308,22 @@ func _ciclo() -> void:
 	# ambiente: claro de dia, quente no fim da tarde, azul-escuro de noite (a lua ilumina pouco)
 	amb.ambient_light_color = Color(0.7, 0.74, 0.8).lerp(Color(0.72, 0.62, 0.56), por * 0.6).lerp(Color(0.22, 0.27, 0.4), noite_k)
 	amb.ambient_light_energy = lerpf(1.0, 0.75, noite_k)
+	# a lua de sangue (como no jogo antigo): a lua vermelha e mais forte, o céu, o horizonte e a neblina puxados para o vermelho
+	var sangue := lua_de_sangue()
+	lua.light_color = Color(1.0, 0.3, 0.2) if sangue else Color(0.55, 0.65, 0.95)
+	if sangue and noite_k > 0.05:
+		lua.light_energy *= 1.25
+		ceu.sky_horizon_color = ceu.sky_horizon_color.lerp(Color(0.34, 0.1, 0.1), 0.4 * noite_k)
+		ceu.sky_top_color = ceu.sky_top_color.lerp(Color(0.12, 0.02, 0.03), 0.35 * noite_k)
+		amb.fog_light_color = amb.fog_light_color.lerp(Color(0.3, 0.09, 0.08), 0.45 * noite_k)
+		amb.ambient_light_color = amb.ambient_light_color.lerp(Color(0.75, 0.2, 0.15), 0.4 * noite_k)
+
+
+## a lua de sangue agora (no convidado vem de quem abriu, junto com a hora)
+func lua_de_sangue() -> bool:
+	if Rede.convidado():
+		return lua_rede
+	return noites != null and noites.lua_sangue
 
 
 func _process(dt: float) -> void:
@@ -339,6 +359,7 @@ func _process(dt: float) -> void:
 	if not modo_teste and not conv:
 		_zumbis_dos_lugares(dt)
 		_emboscadas(dt)
+		noites.passo(dt)
 	spawn_t -= dt
 	if spawn_t <= 0.0:
 		spawn_t = 12.0
@@ -352,6 +373,8 @@ func _process(dt: float) -> void:
 				var teto := 10 if noite() else 5
 				if na_cidade(p):
 					teto += 4
+				if lua_de_sangue():
+					teto += 6
 				if soltos < teto:
 					_nascer_perto(p, q["frente"])
 	if Input.is_action_just_pressed("mochila") and jogador.vivo and not digitando:
@@ -653,6 +676,13 @@ var z_rede := {}   # convidado: uid -> o boneco de cada zumbi de quem abriu
 ## convidado: a hora e os zumbis de quem abriu (h < 0: quem abriu está no lobby)
 func mundo_rede(h: float, L: PackedFloat32Array) -> void:
 	if h >= 0.0:
+		# a hora vem com 100 a mais quando é lua de sangue lá
+		var sangue := h >= 100.0
+		if sangue:
+			h -= 100.0
+		if sangue and not lua_rede:
+			ui.aviso("Lua de sangue! Esta noite a horda vem maior e tem algo enorme andando com ela.", 8.0)
+		lua_rede = sangue
 		h = fposmod(h, 24.0)
 		if h < hora - 12.0:
 			dia += 1
@@ -893,7 +923,7 @@ func salvar_jogo() -> bool:
 		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
-		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats}
+		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -940,6 +970,9 @@ func carregar_jogo() -> bool:
 	j.selecionar(int(jd.get("sel", 0)))
 	construcao.carregar(d.get("base", {}))
 	mundo.carregar(d.get("mundo", {}))
+	var nd = d.get("noites", {})
+	if nd is Dictionary:
+		noites.carregar(nd)
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -1130,9 +1163,11 @@ func _teste_armas(livre: Vector3) -> void:
 	var z2 := _z_teste(c + X * 12.5, "walker", c)
 	await _quadros(25)
 	var luneta := jogador.cam.fov < 25.0
+	var mun_r := int(jogador.item_mao().get("mun", 0))
 	_atirar_em(z1.global_position + Vector3(0, 1.15 * z1.escala, 0))
 	var d_z2 := z2.vida_max - maxf(z2.vida, 0.0)
-	_confere(luneta and z1.estado == "morto" and d_z2 > 40.0, "rifle: a luneta no olho (%.0f°); o tiro mata o da frente e atravessa no de trás (%.0f)" % [jogador.cam.fov, d_z2])
+	_confere(luneta and z1.estado == "morto" and d_z2 > 40.0, "rifle: a luneta no olho (%.0f°); o tiro mata o da frente e atravessa no de trás (%.0f) · %d balas no pente, o da frente %s" % [
+		jogador.cam.fov, d_z2, mun_r, z1.estado])
 	_limpar_zumbis()
 	await _quadros(3)
 	# a besta: o virote voa e crava; arma sozinha depois do tiro
@@ -1219,10 +1254,16 @@ func _teste_armas(livre: Vector3) -> void:
 	jogador.atacar()
 	await _quadros(60)
 	var lp: Vector3 = projeteis.iscas[0]["p"] if projeteis.iscas.size() > 0 else Vector3.INF
-	var ea1: String = await _z_ate(a1, ["alerta", "caca"], 120)
-	var ea2: String = await _z_ate(a2, ["alerta", "caca"], 60)
+	var ea1: String = await _z_ate(a1, ["alerta", "caca"], 240)
+	var ea2: String = await _z_ate(a2, ["alerta", "caca"], 120)
+	var diag_i := ""
+	if lp != Vector3.INF:
+		var rel := lp - c
+		diag_i = " · isca em x %.1f z %.1f (y %.1f) do lugar; zumbis a %.1f e %.1f m dela; ouvindo %.2f e %.2f; para %.1f m e %.1f m" % [
+			rel.x, rel.z, rel.y, a1.global_position.distance_to(lp), a2.global_position.distance_to(lp), a1.ouvir_t, a2.ouvir_t,
+			a1.alerta_p.distance_to(lp), a2.alerta_p.distance_to(lp)]
 	_confere(lp != Vector3.INF and ea1 in ["alerta", "caca"] and ea2 in ["alerta", "caca"] and a1.alerta_p.distance_to(lp) < 4.0,
-		"isca: caiu a uns 10 m, tocou e os dois zumbis foram até ela (%s, %s)" % [ea1, ea2])
+		"isca: caiu a uns 10 m, tocou e os dois zumbis foram até ela (%s, %s)%s" % [ea1, ea2, diag_i])
 	projeteis.limpar()
 	_limpar_zumbis()
 	for id in ["pistola", "municao9", "espingarda", "cartucho", "rifle", "balaRifle", "besta", "virote", "arco", "flecha", "molotov", "bombaCaseira", "isca"]:
@@ -1232,6 +1273,235 @@ func _teste_armas(livre: Vector3) -> void:
 	_mao_vazia()
 	await _quadros(3)
 	_devolver_clareira(clareira)
+	jogador.vida = 100.0
+	spawn_t = spawn_antes
+
+
+## a distância média de um grupo de zumbis até um ponto (no chão)
+func _dist_media(L: Array, p: Vector3) -> float:
+	var s := 0.0
+	var n := 0
+	for z in L:
+		if is_instance_valid(z) and z.estado != "morto":
+			s += Vector2(z.global_position.x - p.x, z.global_position.z - p.z).length()
+			n += 1
+	return s / float(n) if n > 0 else 0.0
+
+
+## espera o ataque especial do Colosso chegar numa fase (e num tempo dela); devolve se chegou
+func _chefe_ate(z: Zumbi, fase: String, t: float, n: int) -> bool:
+	for i in n:
+		if not is_instance_valid(z):
+			return false
+		if str(z.chefe.get("fase", "")) == fase and float(z.chefe.get("t", 0.0)) >= t:
+			return true
+		await get_tree().physics_frame
+	return false
+
+
+## as noites (etapa 5c): a conta das noites e a lua de sangue (3ª, 7ª, 11ª), as ondas da horda (de longe, vêm para você), o
+## céu vermelho, a lua de sangue que vai para quem entrou na partida, o Colosso (chega perto, a barra da vida dele aparece, o
+## pisão pega quem está no chão e não quem pula, a investida derruba, batendo na parede ele fica tonto, o fogo machuca mais e
+## derrubado ele deixa suprimentos), a caixa de suprimentos da manhã e o jogo salvo
+func _teste_noites(livre: Vector3) -> void:
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	_limpar_zumbis()
+	var hora_antes := hora
+	var salvo := noites.salvar()
+	var sangue: Array = []
+	for n in range(1, 13):
+		if Noites.e_lua_sangue(n):
+			sangue.append(n)
+	_confere(sangue == [3, 7, 11] and Noites.horas_ondas(1, false).size() == 3 and Noites.horas_ondas(2, false).size() == 4
+		and Noites.horas_ondas(3, true).size() == 6 and Noites.qtd_onda(1, false) == 4 and Noites.qtd_onda(3, true) == 11,
+		"noites: lua de sangue na %s noite; 3 ondas na 1ª, 4 nas outras e 6 na lua de sangue; 4 zumbis por onda na 1ª, 11 na lua de sangue" % str(sangue))
+	_confere(Noites.passou(18.9, 19.1, 19.0) and Noites.passou(23.9, 0.2, 0.1) and not Noites.passou(23.9, 0.2, 23.5) and Noites.passou(23.8, 0.3, 23.9)
+		and Noites.tipo_onda(3, 0, 0.5, false) == "brute" and Noites.tipo_onda(1, 2, 0.1, false) == "walker" and Noites.tipo_onda(2, 2, 0.1, false) == "runner",
+		"noites: a hora que passou (também na virada da meia-noite) e quem vem na onda (da 3ª noite em diante um brutamontes na frente)")
+	# a 3ª noite cai às 19h: lua de sangue
+	noites.noite_n = 2
+	noites.lua_sangue = false
+	noites._hora_antes = -1.0
+	hora = 18.95
+	noites.passo(0.0)
+	hora = 19.05
+	noites.passo(0.0)
+	_confere(noites.noite_n == 3 and noites.lua_sangue and noites.ondas.size() == 6, "lua de sangue: a 3ª noite caiu às 19h (%d ondas marcadas)" % noites.ondas.size())
+	hora = 0.0
+	_ciclo()
+	var hz: Color = ceu.sky_horizon_color
+	var cl: Color = lua.light_color
+	_confere(hz.r > hz.b * 1.4 and cl.r > 0.9 and cl.g < 0.4, "lua de sangue: o céu da noite fica vermelho (horizonte %.2f %.2f %.2f) e a lua também" % [hz.r, hz.g, hz.b])
+	# quem entrou na partida recebe a lua de sangue junto com a hora (101,5 = 1h30 com lua de sangue)
+	lua_rede = false
+	mundo_rede(101.5, PackedFloat32Array())
+	var rede_ok := lua_rede and absf(hora - 1.5) < 0.01
+	mundo_rede(2.0, PackedFloat32Array())
+	rede_ok = rede_ok and not lua_rede and absf(hora - 2.0) < 0.01
+	_confere(rede_ok, "partida em rede: a lua de sangue vai junto com a hora para quem entrou")
+	# uma onda: de 42 a 56 m de você, todos vindo para onde você está (e a horda anda)
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clareira := _clareira_teste(c, 60.0)
+	var X := Vector3(1, 0, 0)
+	var Zv := Vector3(0, 0, 1)
+	_jogador_em(c, c + Vector3(0, 1.5, -10))
+	await _quadros(5)
+	hora = 21.0
+	var antes_n := zumbis.size()
+	var feitos := noites.onda()
+	var novos: Array = zumbis.slice(antes_n)
+	var longe_ok := true
+	var vem := 0
+	for z in novos:
+		var d: float = Vector2(z.global_position.x - c.x, z.global_position.z - c.z).length()
+		if d < 40.0 or d > 58.0:
+			longe_ok = false
+		if float(z.ouvir_t) >= 0.0 and (z.ouvir_p as Vector3).distance_to(jogador.global_position) < 2.0:
+			vem += 1
+	var t0: String = novos[0].tipo if novos.size() > 0 else "-"
+	_confere(feitos >= 8 and novos.size() == feitos and longe_ok and vem == feitos and t0 == "brute",
+		"onda da lua de sangue: %d zumbis de 42 a 56 m, todos vindo para você (%d), com um brutamontes na frente (%s)" % [feitos, vem, t0])
+	var d0 := _dist_media(novos, c)
+	noites._marcha_t = 0.0
+	for i in 240:
+		noites._marchar(1.0 / 60.0)
+		await get_tree().physics_frame
+	var d1 := _dist_media(novos, c)
+	_confere(d1 < d0 - 3.0, "a horda anda para você (de %.0f m para %.0f m em 4 s)" % [d0, d1])
+	_limpar_zumbis()
+	noites.marcha.clear()
+	await _quadros(3)
+	# o Colosso chega a uns 35 m, já atrás de você; a barra da vida dele aparece
+	hora = 12.0
+	_jogador_em(c, c + Vector3(0, 1.5, -10))
+	await _quadros(3)
+	noites.colosso_veio = false
+	var co := noites.colosso()
+	var dco: float = Vector2(co.global_position.x - c.x, co.global_position.z - c.z).length() if co != null else -1.0
+	_confere(co != null and noites.colosso_veio and dco > 28.0 and dco < 44.0 and co.estado == "caca" and co.vida_max >= 1800.0 and co.escala > 2.2,
+		"Colosso: chegou a %.0f m, já atrás de você, com %.0f de vida e %.2f vezes o tamanho" % [dco, co.vida_max if co != null else 0.0, co.escala if co != null else 0.0])
+	if co == null:
+		co = _z_teste(c + X * 30.0, "colosso", c)
+		co.estado = "caca"
+	ui.hud._chefe_ver(jogador)
+	_confere(ui.hud.chefe_painel.visible and ui.hud.chefe_k > 0.99, "Colosso: a barra da vida dele aparece no alto da tela")
+	# o pisão: quem está no chão leva o tranco
+	co.parado = false
+	co.global_position = Vector3(c.x + 3.6, co.global_position.y, c.z)
+	co.global_position.y = terreno.h(co.global_position.x, co.global_position.z) + 0.1
+	co.rotation.y = atan2(3.6, 0.0)
+	co.chefe = {"cd_pisao": 0.0, "cd_inv": 99.0, "cd_rug": 99.0}
+	_jogador_em(c, co.global_position + Vector3(0, 2.0, 0))
+	jogador.set_physics_process(true)
+	var chegou: bool = await _chefe_ate(co, "pisao", 1.05, 150)
+	var v1 := jogador.vida
+	_confere(chegou and v1 < 90.0 and v1 > 40.0, "Colosso: o pisão pega quem está no chão (vida %.0f)" % v1)
+	await _quadros(60)
+	# o pisão de novo: pulando na hora, a onda não pega
+	_jogador_em(c, co.global_position + Vector3(0, 2.0, 0))
+	co.chefe = {"cd_pisao": 0.0, "cd_inv": 99.0, "cd_rug": 99.0}
+	var armou: bool = await _chefe_ate(co, "pisao", 0.72, 150)
+	jogador.vida = 100.0
+	jogador.energia = 100.0
+	Input.action_press("pular")
+	await _quadros(1)
+	Input.action_release("pular")
+	var bateu := false
+	for i in 40:
+		await get_tree().physics_frame
+		if bool(co.chefe.get("bateu", false)):
+			bateu = true
+			break
+	_confere(armou and bateu and jogador.vida >= 99.0, "Colosso: pulando na hora do pisão a onda não pega (vida %.0f)" % jogador.vida)
+	await _quadros(60)
+	# a investida: ruge, abaixa e corre reto; pega você e te joga longe
+	co.global_position = Vector3(c.x + 11.0, co.global_position.y, c.z)
+	co.global_position.y = terreno.h(co.global_position.x, co.global_position.z) + 0.1
+	co.rotation.y = atan2(11.0, 0.0)
+	_jogador_em(c, co.global_position + Vector3(0, 2.0, 0))
+	await _quadros(2)
+	co.chefe = {"cd_pisao": 99.0, "cd_inv": 0.0, "cd_rug": 99.0}
+	var correu: bool = await _chefe_ate(co, "investida", 0.0, 120)
+	jogador.vida = 100.0
+	for i in 120:
+		await get_tree().physics_frame
+		if jogador.vida < 99.0:
+			break
+	var v2 := jogador.vida
+	_confere(correu and v2 < 75.0, "Colosso: a investida pega quem está na frente (vida %.0f)" % v2)
+	await _quadros(90)
+	# batendo na parede na investida ele fica tonto
+	var parede := StaticBody3D.new()
+	var ps := CollisionShape3D.new()
+	var pb := BoxShape3D.new()
+	pb.size = Vector3(0.8, 6.0, 10.0)
+	ps.shape = pb
+	parede.add_child(ps)
+	add_child(parede)
+	parede.global_position = Vector3(c.x - 1.0, terreno.h(c.x - 1.0, c.z) + 2.5, c.z)
+	co.global_position = Vector3(c.x - 7.0, 0, c.z)
+	co.global_position.y = terreno.h(co.global_position.x, co.global_position.z) + 0.1
+	co.rotation.y = atan2(-1.0, 0.0)
+	_jogador_em(c + Zv * 14.0 + X * 4.0, c + Zv * 14.0)
+	await _quadros(3)
+	co.estado = "caca"
+	co.chefe = {"fase": "investida", "t": 0.0, "dir": X, "pegou": [], "cd_pisao": 99.0, "cd_inv": 99.0, "cd_rug": 99.0}
+	var tonto: bool = await _chefe_ate(co, "tonto", 0.0, 120)
+	_confere(tonto, "Colosso: na investida bateu na parede e ficou tonto (%s)" % str(co.chefe.get("fase", "")))
+	parede.queue_free()
+	# o fogo machuca mais (1,6 vez)
+	co.chefe = {"cd_pisao": 99.0, "cd_inv": 99.0, "cd_rug": 99.0}
+	var va := co.vida
+	co.ferir(10.0, co.global_position + X, 0, {"k": "bala"})
+	var vb := co.vida
+	co.ferir(10.0, co.global_position + X, 0, {"k": "fogo"})
+	var vc := co.vida
+	_confere(absf((va - vb) - 10.0) < 0.5 and absf((vb - vc) - 16.0) < 0.5, "Colosso: o fogo machuca mais (bala 10, fogo %.0f)" % (vb - vc))
+	# derrubado, deixa os suprimentos no chão (e a barra some)
+	var baus_antes := construcao.baus.size()
+	co.ferir(5000.0, co.global_position + X, 0, {"k": "bala"})
+	var inv_c: Inventario = null
+	for i in range(baus_antes, construcao.baus.size()):
+		if str(construcao.baus[i]["titulo"]) == "O que o Colosso deixou":
+			inv_c = construcao.baus[i]["inv"]
+	var deixou := inv_c != null
+	_confere(co.estado == "morto" and deixou and inv_c != null and inv_c.conta("molotov") >= 2 and inv_c.conta("flecha") >= 10 and inv_c.conta("kit") >= 1,
+		"Colosso: derrubado, deixou no chão o kit médico, molotovs, flechas e suprimentos (%d coisas)" % (inv_c.slots.filter(func(s): return s != null).size() if inv_c != null else 0))
+	ui.hud._chefe_ver(jogador)
+	_confere(not ui.hud.chefe_painel.visible, "Colosso: caiu e a barra da vida some")
+	_limpar_zumbis()
+	# amanheceu depois da lua de sangue: às 7h12 a caixa de suprimentos cai perto, com fumaça vermelha
+	noites._hora_antes = -1.0
+	hora = 5.9
+	noites.passo(0.0)
+	hora = 6.05
+	noites.passo(0.0)
+	var amanheceu := not noites.lua_sangue and noites.ondas.is_empty() and absf(noites.caixa_h - 7.2) < 0.01
+	var baus_c := construcao.baus.size()
+	hora = 7.1
+	noites.passo(0.0)
+	hora = 7.3
+	noites.passo(0.0)
+	var caixa_ok := construcao.baus.size() == baus_c + 1 and str(construcao.baus[-1]["titulo"]) == "Caixa de suprimentos"
+	var dcx := -1.0
+	if caixa_ok:
+		var pc: Vector3 = (construcao.baus[-1]["no"] as Node3D).global_position
+		dcx = Vector2(pc.x - jogador.global_position.x, pc.z - jogador.global_position.z).length()
+	_confere(amanheceu and caixa_ok and dcx > 25.0 and dcx < 65.0 and noites.caixa_h < 0.0,
+		"amanheceu depois da lua de sangue: às 7h12 caiu a caixa de suprimentos a %.0f m, com fumaça vermelha" % dcx)
+	# o jogo salvo guarda as noites
+	var sv := noites.salvar()
+	noites.carregar({})
+	var zerou := noites.noite_n == 0
+	noites.carregar(sv)
+	_confere(zerou and noites.noite_n == 3 and not noites.lua_sangue, "jogo salvo: as noites voltam como estavam (noite %d)" % noites.noite_n)
+	noites.carregar(salvo)
+	_limpar_zumbis()
+	await _quadros(3)
+	_devolver_clareira(clareira)
+	hora = hora_antes
+	_ciclo()
 	jogador.vida = 100.0
 	spawn_t = spawn_antes
 
@@ -2509,6 +2779,7 @@ func _teste() -> void:
 	hora = 10.0
 	await _teste_zumbis(livre)
 	await _teste_armas(livre)
+	await _teste_noites(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -3029,6 +3300,60 @@ func _fotos() -> void:
 		if n_a > 0:
 			jogador.inv.tirar(id_a, n_a)
 	_mao_vazia()
+	# a lua de sangue (etapa 5c): o céu vermelho e o Colosso chegando com a horda, a barra da vida dele no alto; em terceira
+	# pessoa, com a lanterna acesa
+	var noites_antes := noites.salvar()
+	var hora_f := hora
+	noites.lua_sangue = true
+	hora = 23.3
+	_ciclo()
+	var zc := _z_teste(lw + X3 * 12.0, "colosso", lw)
+	zc.set_physics_process(false)
+	zc.global_position.y = terreno.h(zc.global_position.x, zc.global_position.z) + 0.02
+	var Zf := Vector3(0, 0, 1)
+	var acomp: Array = []
+	for k in [-1.0, 1.0]:
+		var zk := _z_teste(lw + X3 * 9.5 + Zf * 3.2 * k, "walker", lw)
+		zk.set_physics_process(false)
+		zk.global_position.y = terreno.h(zk.global_position.x, zk.global_position.z) - 0.1
+		acomp.append(zk)
+		if zk.anim != null and zk.anim.has_animation("sFeridoAnda"):
+			zk.anim.play("sFeridoAnda", 0.0, 1.0)
+			zk.anim.seek(0.4 + 0.3 * k, true)
+			zk.anim.pause()
+	if zc.anim != null and zc.anim.has_animation("sGolpe"):
+		zc.anim.play("sGolpe", 0.0, 1.0)
+		zc.anim.seek(0.3, true)
+		zc.anim.pause()
+	_jogador_em(lw, zc.global_position + Vector3(0, 2.4 * zc.escala, 0))
+	if not jogador.luz_mao.visible:
+		jogador.alternar_lanterna()
+	jogador.alternar_camera(true)
+	ui.aviso("Lua de sangue! O Colosso chegou: pule na hora do pisão, saia da frente da investida.", 6.0)
+	await _quadros(20)
+	await _foto("16j_lua_de_sangue_colosso")
+	jogador.alternar_camera(false)
+	if jogador.luz_mao.visible:
+		jogador.alternar_lanterna()
+	_limpar_zumbis()
+	# a caixa de suprimentos da manhã depois da lua de sangue: o caixote com a fumaça vermelha subindo
+	noites.lua_sangue = false
+	hora = 7.4
+	_ciclo()
+	var pcx := lw + X3 * 9.0 + Zf * 2.0
+	pcx.y = terreno.h(pcx.x, pcx.z)
+	var inv_f := Inventario.new(20, false)
+	inv_f.por("municao9", 10)
+	construcao.por_mochila(pcx, inv_f, "Caixa de suprimentos", true)
+	var fum := efeitos.fumaca(pcx + Vector3(0, 0.5, 0), Color(0.85, 0.16, 0.12), 30.0)
+	_jogador_em(lw, pcx + Vector3(0, 2.6, 0))
+	await _quadros(260)
+	await _foto("16k_caixa_de_suprimentos")
+	if is_instance_valid(fum):
+		fum.queue_free()
+	noites.carregar(noites_antes)
+	hora = hora_f
+	_ciclo()
 	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()

@@ -450,9 +450,12 @@ func morrer(quem := 0) -> void:
 		_estourar()
 	if bool(S.get("chefe", false)):
 		chefe = {}
-		main.ui.aviso("O Colosso caiu! Ele deixou suprimentos no chão.", 6.0)
+		main.jogador.tremor = maxf(main.jogador.tremor, 0.6)
+		main.efeitos.lascas(global_position + Vector3(0, 0.3, 0), Vector3.UP, "pedra")
 		if main.get("noites") != null:
 			main.noites.deixou_suprimentos(global_position)
+		else:
+			main.ui.aviso("O Colosso caiu!", 6.0)
 	main.zumbi_morreu(self, quem)
 
 

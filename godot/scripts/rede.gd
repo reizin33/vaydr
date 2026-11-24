@@ -750,7 +750,9 @@ func _mandar_mundo(j) -> void:
 				break
 		if ok:
 			L.append_array(z.para_rede())
-	_mundo.rpc(main.hora, L)
+	# a lua de sangue vai junto com a hora (100 a mais)
+	var sangue: bool = main.noites != null and main.noites.lua_sangue
+	_mundo.rpc(main.hora + (100.0 if sangue else 0.0), L)
 
 
 ## o zumbi de quem abriu bateu num convidado (o boneco dele aqui): o golpe vai para o jogo dele

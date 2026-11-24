@@ -61,6 +61,10 @@ var rede: HudRede
 var acerto_t := 0.0
 var acerto_cab := false    # o último acerto foi na cabeça (o X fica maior)
 var luneta: Control        # a tela da luneta do rifle (mirando)
+var chefe_painel: PanelContainer   # a vida do Colosso (aparece quando ele está perto)
+var chefe_barra: Control
+var chefe_k := 0.0
+var _chefe_t := 0.0
 var dano_ang := 0.0
 var dano_t := 0.0
 var _t := 0.0
@@ -82,6 +86,7 @@ func _ready() -> void:
 	_veus()
 	_minimapa()
 	_topo()
+	_chefe()
 	_teclas()
 	_barra()
 	_vitais()
@@ -370,6 +375,65 @@ func _relogio() -> void:
 		dia_chip.add_theme_stylebox_override("panel", b)
 		dia_chip_lbl.text = txt
 		dia_chip_lbl.add_theme_color_override("font_color", cor)
+
+
+# ---------------------------------------------------------------- o chefe (o Colosso da lua de sangue)
+func _chefe() -> void:
+	var centro := CenterContainer.new()
+	add_child(centro)
+	Estilo.prender(centro, 0.5, 0.0, 0, 96, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_END)
+	chefe_painel = PanelContainer.new()
+	var cx := Estilo.caixa_hud(12, 8)
+	cx.border_color = Color(Estilo.SANGUE, 0.55)
+	chefe_painel.add_theme_stylebox_override("panel", cx)
+	centro.add_child(chefe_painel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 5)
+	chefe_painel.add_child(v)
+	var nome := Estilo.rotulo("COLOSSO · LUA DE SANGUE", 13, Estilo.SANGUE_TINTA, "titulo", 700, 3)
+	nome.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(nome)
+	chefe_barra = BarraChefe.new(self)
+	chefe_barra.custom_minimum_size = Vector2(360, 10)
+	v.add_child(chefe_barra)
+	chefe_painel.visible = false
+
+
+## o Colosso vivo a menos de 80 m de você: a barra aparece com a vida dele
+func _chefe_ver(j) -> void:
+	var melhor := -1.0
+	var bd := 80.0
+	for z in main.zumbis:
+		if not is_instance_valid(z) or z.estado == "morto" or not bool(z.S.get("chefe", false)):
+			continue
+		var d: float = z.global_position.distance_to(j.global_position)
+		if d < bd:
+			bd = d
+			melhor = clampf(float(z.vida) / float(z.vida_max), 0.0, 1.0)
+	var ver := melhor >= 0.0
+	if chefe_painel.visible != ver:
+		chefe_painel.visible = ver
+	if ver and absf(melhor - chefe_k) > 0.001:
+		chefe_k = melhor
+		chefe_barra.queue_redraw()
+
+
+class BarraChefe extends Control:
+	var hud
+
+	func _init(h) -> void:
+		hud = h
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(0.06, 0.03, 0.03, 0.85))
+		var k: float = hud.chefe_k
+		draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2.0) * k, size.y - 2.0)), Estilo.SANGUE)
+		draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2.0) * k, (size.y - 2.0) * 0.4)), Color(1.0, 0.55, 0.5, 0.35))
+		for i in range(1, 10):
+			var x := size.x * i / 10.0
+			draw_line(Vector2(x, 1), Vector2(x, size.y - 1), Color(0, 0, 0, 0.35), 1.0)
+		draw_rect(r, Color(Estilo.SANGUE, 0.7), false, 1.0)
 
 
 # ---------------------------------------------------------------- comandos (embaixo à esquerda)
@@ -718,6 +782,10 @@ func _process(dt: float) -> void:
 		var base_y: float = (teclas.get_global_rect().position.y - get_global_rect().position.y - 10.0) if teclas.visible else size.y - 44.0
 		rede.position = Vector2(16.0, base_y - rede.size.y)
 	_prompt()
+	_chefe_t -= dt
+	if _chefe_t <= 0.0:
+		_chefe_t = 0.1
+		_chefe_ver(j)
 	_lento -= dt
 	if _lento <= 0.0:
 		_lento = 0.25

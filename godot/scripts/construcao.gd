@@ -1195,24 +1195,27 @@ func _saco_no(p: Vector3, yaw: float) -> void:
 
 
 ## mochila caída (quando o jogador morre, tudo o que ele tinha fica nela) e coisas soltas no chão: E abre e pega
-func por_mochila(p: Vector3, inv: Inventario, titulo := "Sua mochila (caiu quando você morreu)") -> void:
+func por_mochila(p: Vector3, inv: Inventario, titulo := "Sua mochila (caiu quando você morreu)", caixa := false) -> void:
 	var sp := get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(p + Vector3(0, 1.0, 0), p + Vector3(0, -6.0, 0), 1)
 	var h := sp.intersect_ray(q)
 	var no := Node3D.new()
 	no.position = h["position"] if not h.is_empty() else p
 	add_child(no)
-	var m := MeshInstance3D.new()
-	var cm := CapsuleMesh.new()
-	cm.radius = 0.22
-	cm.height = 0.62
-	m.mesh = cm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.34, 0.27, 0.18)
-	mat.roughness = 0.95
-	m.material_override = mat
-	m.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0).scaled(Vector3(1.0, 0.7, 1.0)), Vector3(0, 0.16, 0))
-	no.add_child(m)
+	if caixa:
+		_caixa_militar(no)
+	else:
+		var m := MeshInstance3D.new()
+		var cm := CapsuleMesh.new()
+		cm.radius = 0.22
+		cm.height = 0.62
+		m.mesh = cm
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.34, 0.27, 0.18)
+		mat.roughness = 0.95
+		m.material_override = mat
+		m.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0).scaled(Vector3(1.0, 0.7, 1.0)), Vector3(0, 0.16, 0))
+		no.add_child(m)
 	var corpo := StaticBody3D.new()
 	corpo.collision_layer = 2   # a mira pega, mas ninguém tropeça nela
 	corpo.collision_mask = 0
@@ -1225,6 +1228,34 @@ func por_mochila(p: Vector3, inv: Inventario, titulo := "Sua mochila (caiu quand
 	no.add_child(corpo)
 	corpo.set_meta("bau", baus.size())
 	baus.append({"no": no, "inv": inv, "mochila": true, "titulo": titulo})
+
+
+## a caixa de suprimentos que o avião larga: caixote verde-oliva com cintas e o paraquedas murcho do lado
+func _caixa_militar(no: Node3D) -> void:
+	var verde := StandardMaterial3D.new()
+	verde.albedo_color = Color(0.27, 0.31, 0.18)
+	verde.roughness = 0.85
+	var cinta := StandardMaterial3D.new()
+	cinta.albedo_color = Color(0.12, 0.12, 0.1)
+	cinta.roughness = 0.7
+	var pano := StandardMaterial3D.new()
+	pano.albedo_color = Color(0.78, 0.74, 0.62)
+	pano.roughness = 1.0
+	var partes := [
+		[Vector3(0.95, 0.6, 0.62), Vector3(0, 0.3, 0), verde],
+		[Vector3(1.0, 0.07, 0.66), Vector3(0, 0.62, 0), verde],
+		[Vector3(0.07, 0.62, 0.64), Vector3(-0.3, 0.31, 0), cinta],
+		[Vector3(0.07, 0.62, 0.64), Vector3(0.3, 0.31, 0), cinta],
+		[Vector3(1.4, 0.05, 1.1), Vector3(0.55, 0.03, 0.7), pano],
+	]
+	for pt in partes:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = pt[0]
+		mi.mesh = bm
+		mi.position = pt[1]
+		mi.material_override = pt[2]
+		no.add_child(mi)
 
 
 ## o que não coube na mochila (ou o que o zumbi deixou) fica num saquinho no chão
