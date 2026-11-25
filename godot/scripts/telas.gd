@@ -1232,10 +1232,19 @@ func _montar_ajustes() -> void:
 	match aj_aba:
 		0:
 			aj_corpo.add_child(_linha("Gráficos", Estilo.segmentos(Ajustes.QUALIDADES, int(v["qualidade"]), func(i): Ajustes.mudar("qualidade", i, main)), Ajustes.DESC_QUALIDADE))
+			# o modo de desenho (completo ou leve, desenho.gd): vale quando o jogo abre de novo
+			aj_corpo.add_child(_linha("Modo de desenho", Estilo.segmentos(Desenho.MODOS, 1 if Desenho.escolhido() == "leve" else 0, func(i):
+				Desenho.escolher("leve" if i == 1 else "completo")
+				_montar_ajustes()), Desenho.DESC + "\n" + Desenho.situacao()))
+			if Desenho.pendente():
+				var br := Estilo.botao("Abrir de novo agora", true, 13)
+				br.pressed.connect(func(): Desenho.reiniciar(main))
+				aj_corpo.add_child(_linha("O modo escolhido vale quando o jogo abre de novo", br, "Salva o mundo, fecha e abre o jogo de novo sozinho."))
 			aj_corpo.add_child(_linha("Resolução 3D", _deslizar(50, 100, 5, float(v["escala"]), "%d%%", func(x): Ajustes.mudar("escala", int(x), main)),
 				"Menos que 100% desenha o mundo em resolução menor (o HUD continua nítido): mais quadros por segundo em PC fraco."))
 			aj_corpo.add_child(_linha("Campo de visão", _deslizar(60, 100, 1, float(v["fov"]), "%d°", func(x): Ajustes.mudar("fov", int(x), main))))
-			aj_corpo.add_child(_linha("Mostrar quadros por segundo (FPS)", Estilo.segmentos(["Não", "Sim"], 1 if v["fps"] else 0, func(i): Ajustes.mudar("fps", i == 1, main))))
+			aj_corpo.add_child(_linha("Mostrar quadros por segundo (FPS)", Estilo.segmentos(["Não", "Sim"], 1 if v["fps"] else 0, func(i): Ajustes.mudar("fps", i == 1, main)),
+				"Em cima à direita: a média de quadros por segundo, o quadro mais demorado do último segundo (os trancos) e o modo de desenho."))
 		1:
 			aj_corpo.add_child(_linha("Tela cheia (F11)", Estilo.segmentos(["Não", "Sim"], 1 if v["tela_cheia"] else 0, func(i): Ajustes.mudar("tela_cheia", i == 1, main))))
 			aj_corpo.add_child(_linha("Câmera (V)", Estilo.segmentos(["1ª pessoa", "3ª pessoa"], 1 if v["terceira"] else 0, func(i): Ajustes.mudar("terceira", i == 1, main)),

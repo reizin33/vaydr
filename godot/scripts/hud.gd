@@ -72,6 +72,9 @@ var dano_ang := 0.0
 var dano_t := 0.0
 var _t := 0.0
 var _lento := 0.0
+var _pior := 0.0          # o quadro mais demorado do último segundo (s)
+var _pior_agora := 0.0
+var _pior_t := 0.0
 var _chip_cache := ""
 var construindo := false
 var cidade := Rect2()      # o retângulo da cidade (calculado uma vez, para o minimapa)
@@ -904,6 +907,13 @@ func _process(dt: float) -> void:
 	if main.jogador == null or not main.em_jogo:
 		return
 	_t += dt
+	# o quadro mais demorado do último segundo (o tranco que o FPS médio esconde)
+	_pior_agora = maxf(_pior_agora, dt)
+	_pior_t += dt
+	if _pior_t >= 1.0:
+		_pior = _pior_agora
+		_pior_agora = 0.0
+		_pior_t = 0.0
 	acerto_t = maxf(0.0, acerto_t - dt)
 	dano_t = maxf(0.0, dano_t - dt)
 	_mini_atualizar()
@@ -944,7 +954,12 @@ func _process(dt: float) -> void:
 		var l: Dictionary = main.mundo.lugar_em(j.global_position.x, j.global_position.z)
 		lugar_lbl.text = str(l["nome"]).to_upper() + ("  ·  %d M" % roundi(float(l["d"])) if float(l["d"]) >= 0.0 else "")
 		if fps_lbl.visible:
-			fps_lbl.text = "%d FPS" % Engine.get_frames_per_second()
+			fps_lbl.text = texto_fps()
+
+
+## o contador de quadros (Configurações › Gráficos): a média, o quadro mais demorado do último segundo e o modo de desenho
+func texto_fps() -> String:
+	return "%d FPS · pior quadro %d ms · %s (%s)" % [Engine.get_frames_per_second(), roundi(_pior * 1000.0), Desenho.atual(), Desenho.nome_driver()]
 
 
 # ================================================================ pedaços desenhados

@@ -1,5 +1,6 @@
 # VAYDR no Godot (protótipo): importa o projeto da pasta godot/, roda o teste automático sem tela, tira as fotos de
-# conferência num Linux sem placa de vídeo (OpenGL por software) e monta o .exe do Windows.
+# conferência num Linux sem placa de vídeo (no modo leve, com o OpenGL por software; e as do modo completo, o Forward+,
+# com o Vulkan por software) e monta o .exe do Windows.
 # - Roda sozinho a cada envio que mexe em godot/ no ramo correcoes-10-2-2 (só monta, testa e fotografa).
 # - Rodar à mão com uma versão (ex.: 0.1.0) também publica o .exe como pré-lançamento "godot-v0.1.0".
 # Segurança: as ações ficam presas a um commit; a montagem só lê o repositório; só o job de publicar escreve.
@@ -149,7 +150,7 @@ jobs:
           ./godot-bin --headless --path godot --import 2>&1 | tee importar.log | tail -40
           if grep -E "SCRIPT ERROR|Parse Error|ERROR: Failed" importar.log; then echo "erros na importação"; fi
 
-      - name: Fotos (OpenGL por software)
+      - name: Fotos (modo leve, OpenGL por software)
         if: ${{ always() && (github.event_name == 'push' || inputs.fotos) }}
         env:
           ABRIU: ${{ needs.testes.outputs.abriu }}
@@ -201,9 +202,74 @@ jobs:
             exportar.log
           retention-days: 14
 
+  # o modo de desenho completo (Forward+, o padrão do jogo): as fotos com o Vulkan por software (lavapipe), num job à parte
+  # (as fotos de conferência do job de montar saem no modo leve, com o OpenGL por software). Erro de shader no Vulkan
+  # aparece aqui e segura a publicação.
+  desenho:
+    needs: testes
+    if: ${{ always() && needs.testes.outputs.abriu == 'sim' && (github.event_name == 'push' || inputs.fotos) }}
+    concurrency:
+      group: godot-desenho-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Godot e o Vulkan por software
+        run: |
+          set -e
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb mesa-vulkan-drivers libvulkan1 vulkan-tools libxcursor1 libxinerama1 libxrandr2 libxi6 libfontconfig1 > /dev/null
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable"
+          curl -sSfL -o godot.zip "$base/Godot_v${GODOT_VER}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VER}-stable_linux.x86_64" godot-bin
+          chmod +x godot-bin
+          vulkaninfo --summary 2>&1 | head -40 || true
+
+      - name: Importar o projeto
+        run: |
+          ./godot-bin --headless --path godot --import 2>&1 | tee importar.log | tail -20
+
+      - name: Fotos do modo completo (Vulkan por software)
+        run: |
+          set +e
+          timeout 2700 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver vulkan --resolution 1280x720 -- --fotos-desenho 2>&1 | tee desenho.log | awk '!visto[$0]++ && n++ < 300'
+          echo "----- erros (shader, script, motor) -----"
+          grep -E "SHADER ERROR|SCRIPT ERROR|Parse Error|ERROR:" desenho.log | awk '!visto[$0]++' | head -40
+          grep -E "SHADER ERROR|SCRIPT ERROR|Parse Error" desenho.log | awk '!visto[$0]++' | head -12 | while IFS= read -r l; do echo "::error title=Desenho completo::${l//%/%25}"; done
+          ls -la godot/fotos || true
+          grep -q "FOTOS-DESENHO OK" desenho.log && ! grep -q -E "SHADER ERROR|SCRIPT ERROR|Parse Error" desenho.log
+
+      - name: Fotos no registro
+        if: always()
+        run: |
+          for f in godot/fotos/*.jpg; do
+            [ -f "$f" ] || continue
+            echo "FOTO-INICIO $(basename "$f") $(stat -c %s "$f")"
+            base64 -w 3000 "$f" | sed 's/^/FOTO|/'
+            echo "FOTO-FIM $(basename "$f")"
+          done
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: fotos-modo-completo
+          path: |
+            godot/fotos/
+            importar.log
+            desenho.log
+          retention-days: 14
+
   publicar:
-    needs: montar
-    if: ${{ inputs.versao != '' }}
+    # só publica com os testes, a montagem e as fotos do modo completo (quando tiradas) certos
+    needs: [testes, montar, desenho]
+    if: ${{ !cancelled() && inputs.versao != '' && needs.testes.result == 'success' && needs.montar.result == 'success' && (needs.desenho.result == 'success' || needs.desenho.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

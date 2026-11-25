@@ -607,6 +607,9 @@ func ambiente(sol: DirectionalLight3D, lua: DirectionalLight3D, ceu: ProceduralS
 	var ec := eclipse_k()
 	# a neblina e a tempestade fecham a vista
 	amb.fog_density = neblina_base * (1.0 + 2.4 * neb) * (1.0 + 0.6 * tem) * (1.0 + 0.4 * kk("garoa"))
+	# a neblina com volume (gráfico alto no modo completo) engrossa junto, mais ainda na neblina
+	if amb.volumetric_fog_enabled:
+		amb.volumetric_fog_density = float(main.neblina_vol) * (1.0 + 4.0 * neb) * (1.0 + 0.8 * tem) * (1.0 + 0.5 * kk("garoa"))
 	# o céu fechado: menos sol, o céu e a luz puxando para o cinza
 	var cinza := Color(0.42, 0.45, 0.48)
 	ceu.sky_top_color = ceu.sky_top_color.lerp(cinza * lerpf(1.0, 0.45, tem), 0.55 * nub)

@@ -6,8 +6,9 @@ config_version=5
 config/name="VAYDR"
 config/description="Sobrevivência com zumbis: colete, fabrique, construa e defenda."
 run/main_scene="res://cenas/main.tscn"
-config/features=PackedStringArray("4.7", "GL Compatibility")
+config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
+config/project_settings_override="user://desenho.cfg"
 
 [autoload]
 
@@ -29,8 +30,10 @@ common/physics_ticks_per_second=60
 
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method="forward_plus"
+rendering_device/driver.windows="vulkan"
+rendering_device/fallback_to_d3d12=true
+rendering_device/fallback_to_opengl3=true
 lights_and_shadows/directional_shadow/size=4096
 lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
 anti_aliasing/quality/msaa_3d=0

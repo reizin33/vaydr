@@ -6,7 +6,7 @@ extends RefCounted
 
 const ARQ := "user://opcoes.cfg"
 const QUALIDADES := ["Baixo", "Médio", "Alto"]
-const DESC_QUALIDADE := "Baixo: menos mato, vista mais curta e resolução menor (para PC fraco). Médio: sombra e brilho. Alto: sombras maiores e mais nítidas, mais mato e mais longe."
+const DESC_QUALIDADE := "Baixo: menos mato, vista mais curta e resolução menor (para PC fraco). Médio: sombra, brilho e, no modo completo, sombra nos cantos. Alto: sombras maiores e mais nítidas, mais mato e mais longe; no modo completo, luz que rebate e neblina com volume."
 const CORES_MIRA := [Color(0.925, 0.894, 0.824), Color(0.55, 0.95, 0.45), Color(1.0, 0.84, 0.3), Color(1.0, 0.38, 0.32), Color(0.45, 0.85, 1.0)]
 const NOMES_CORES := ["Clara", "Verde", "Amarela", "Vermelha", "Azul"]
 
@@ -43,6 +43,7 @@ static func aplicar(main) -> void:
 	main.aplicar_qualidade(int(v["qualidade"]))
 	var vp: Viewport = main.get_viewport()
 	vp.scaling_3d_scale = vp.scaling_3d_scale * clampf(float(v["escala"]) / 100.0, 0.5, 1.0)
+	main.modo_escala()
 	main.jogador.fov_base = clampf(float(v["fov"]), 60.0, 100.0)
 	main.jogador.cam.fov = main.jogador.fov_base
 	main.jogador.sens = 0.0022 * clampf(float(v["sens"]), 0.2, 3.0)

@@ -141,6 +141,8 @@ func _ready() -> void:
 	luz_mao.spot_angle = 26.0
 	luz_mao.spot_attenuation = 0.9
 	luz_mao.shadow_enabled = true
+	# no modo completo, com a neblina com volume (gráfico alto), o facho aparece no ar
+	luz_mao.light_volumetric_fog_energy = 2.5
 	luz_mao.position = Vector3(0.25, -0.2, -0.3)
 	luz_mao.visible = false
 	# a lanterna sai de dentro da cabeça: o corpo não pode fazer sombra dela

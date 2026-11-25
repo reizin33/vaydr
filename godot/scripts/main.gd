@@ -51,13 +51,18 @@ var _ini_sessao := 0
 var _tempo_base := 0.0
 var lugares_z := {}       # zumbis de cada lugar do mapa: id -> {ativo, zumbis, volta}
 var _lugares_t := 0.0
+var _desenho_t := 0.0     # segundos desenhando o mundo nesta abertura (até contar como abertura boa)
 const SPAWN := Vector3(8, 0, 44)   # onde o jogo antigo começa: na mata, ao sul da clareira
 const SEG_POR_HORA := 50.0
 
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	modo_teste = "--teste" in args or "--fotos" in args or "--teste-rede" in args or "--fotos-rede" in args
+	modo_teste = "--teste" in args or "--fotos" in args or "--teste-rede" in args or "--fotos-rede" in args or "--fotos-desenho" in args
+	# da última vez o jogo fechou sozinho abrindo no modo de desenho completo: abre de novo no leve (desenho.gd)
+	if not modo_teste and Desenho.abrindo():
+		get_tree().quit()
+		return
 	Rede.ligar(self)
 	Dados.carregar()
 	Ajustes.carregar()
@@ -158,6 +163,10 @@ func _ready() -> void:
 		_entrar_teste()
 		_vigia(3600.0, "FOTOS")
 		_fotos.call_deferred()
+	elif "--fotos-desenho" in args:
+		_entrar_teste()
+		_vigia(2400.0, "FOTOS-DESENHO")
+		_fotos_desenho.call_deferred()
 	elif "--teste-rede" in args or "--fotos-rede" in args:
 		# a partida em rede de verdade: dois jogos neste computador (quem abriu e quem entrou), cada um no seu mundo de teste
 		var papel := str(args[args.find("--teste-rede" if "--teste-rede" in args else "--fotos-rede") + 1]) if args.size() > 1 else "anfitriao"
@@ -229,6 +238,8 @@ func comecar(m: Dictionary) -> void:
 		ui.aviso("Na mão, a cada 3 socos a árvore dá 1 madeira. Tab abre a mochila e a fabricação.", 10.0)
 		salvar_jogo()
 	ui.aviso("Esc: pausa e configurações · M: mapa · F5 salva", 7.0)
+	if not modo_teste and Desenho.aviso_queda():
+		ui.aviso("Da última vez o jogo fechou sozinho abrindo no modo de desenho completo, então agora ele abriu no leve. Dá para voltar ao completo em Configurações › Gráficos.", 12.0)
 
 
 ## salva e volta para o lobby (o mundo é montado de novo, limpo, para o próximo)
@@ -294,6 +305,29 @@ func _ambiente() -> void:
 	amb.adjustment_enabled = true
 	amb.adjustment_saturation = 1.0
 	amb.adjustment_contrast = 1.03
+	# o que só o modo de desenho completo (Forward+) desenha; quem liga e desliga é o gráfico (aplicar_qualidade)
+	# a sombra dos cantos (SSAO): só na luz do céu (a do sol já tem a sombra de verdade)
+	amb.ssao_radius = 1.2
+	amb.ssao_intensity = 1.6
+	amb.ssao_power = 1.4
+	amb.ssao_detail = 0.5
+	amb.ssao_horizon = 0.06
+	amb.ssao_sharpness = 0.98
+	amb.ssao_light_affect = 0.0
+	# a luz que rebate (SSIL): o chão iluminado clareia o tronco de perto, a parede clara clareia a sala
+	amb.ssil_radius = 4.0
+	amb.ssil_intensity = 0.8
+	amb.ssil_sharpness = 0.98
+	amb.ssil_normal_rejection = 1.0
+	# a neblina com volume: rala (a neblina de sempre continua cobrindo o longe), o sol espalhando para a frente (os raios de
+	# luz quando se olha para ele, entrando pela mata) e um pouco da luz do céu (sem ela a neblina na sombra fica preta)
+	amb.volumetric_fog_density = 0.0
+	amb.volumetric_fog_albedo = Color(0.92, 0.94, 0.96)
+	amb.volumetric_fog_anisotropy = 0.6
+	amb.volumetric_fog_length = 80.0
+	amb.volumetric_fog_detail_spread = 2.0
+	amb.volumetric_fog_ambient_inject = 0.35
+	amb.volumetric_fog_sky_affect = 0.3
 	we.environment = amb
 	add_child(we)
 	sol = DirectionalLight3D.new()
@@ -301,6 +335,8 @@ func _ambiente() -> void:
 	sol.directional_shadow_max_distance = 110.0
 	sol.light_color = Color(1.0, 0.96, 0.89)
 	sol.light_energy = 2.0
+	# na neblina com volume o sol pesa menos que as luzes de perto (senão o dia inteiro fica leitoso)
+	sol.light_volumetric_fog_energy = 0.7
 	add_child(sol)
 	lua = DirectionalLight3D.new()
 	lua.light_color = Color(0.55, 0.65, 0.95)
@@ -368,6 +404,11 @@ func lua_de_sangue() -> bool:
 func _process(dt: float) -> void:
 	if not pronto or not em_jogo:
 		return
+	# a abertura deu certo: o mundo já foi desenhado uns segundos (a guarda do modo de desenho, desenho.gd)
+	if not modo_teste and _desenho_t < Desenho.ABRIU_SEG:
+		_desenho_t += dt
+		if _desenho_t >= Desenho.ABRIU_SEG:
+			Desenho.abriu()
 	var digitando: bool = Rede.digitando or Rede.chat_acabou_de_fechar()
 	# teclas do jogo: B constrói, F lanterna, H esconde os comandos
 	if jogador.vivo and not ui.aberto and telas.atual == "" and not digitando:
@@ -445,16 +486,24 @@ func _process(dt: float) -> void:
 
 
 ## Gráficos: baixo (PC fraco), médio e alto. Mexe no antisserrilhado, na resolução 3D, nas sombras, no brilho,
-## na neblina e até onde a mata aparece.
+## na neblina e até onde a mata aparece. No modo de desenho completo (Forward+, desenho.gd) também na sombra dos cantos
+## (SSAO: médio e alto), na luz que rebate (SSIL) e na neblina com volume (só no alto); o antisserrilhado da tela é o FXAA no
+## baixo e o SMAA no médio e no alto; e a resolução menor é ampliada com o FSR (mais nítido que esticar).
+const QUALIDADE := [
+	{"msaa": Viewport.MSAA_DISABLED, "escala": 0.75, "sombra": 2048, "dist": 40.0, "brilho": false, "mata": 0.55, "longe": 420.0, "neblina": 0.0075,
+		"capim": 56, "capim_passo": 0.9, "predios": 0.75, "aa": Viewport.SCREEN_SPACE_AA_FXAA, "ssao": false, "ssil": false, "vol": false},
+	{"msaa": Viewport.MSAA_DISABLED, "escala": 1.0, "sombra": 2048, "dist": 75.0, "brilho": true, "mata": 0.8, "longe": 650.0, "neblina": 0.0046,
+		"capim": 90, "capim_passo": 0.8, "predios": 1.0, "aa": Viewport.SCREEN_SPACE_AA_SMAA, "ssao": true, "ssil": false, "vol": false},
+	{"msaa": Viewport.MSAA_2X, "escala": 1.0, "sombra": 4096, "dist": 110.0, "brilho": true, "mata": 1.0, "longe": 900.0, "neblina": 0.0036,
+		"capim": 120, "capim_passo": 0.75, "predios": 1.35, "aa": Viewport.SCREEN_SPACE_AA_SMAA, "ssao": true, "ssil": true, "vol": true},
+]
+## a neblina com volume (gráfico alto, modo completo): bem rala (a de sempre continua cobrindo o longe); o tempo engrossa
+var neblina_vol := 0.0
+const NEBLINA_VOL := 0.0025
+
+
 func aplicar_qualidade(q: int) -> void:
-	var cfg: Dictionary = [
-		{"msaa": Viewport.MSAA_DISABLED, "escala": 0.75, "sombra": 2048, "dist": 40.0, "brilho": false, "mata": 0.55, "longe": 420.0, "neblina": 0.0075,
-			"capim": 56, "capim_passo": 0.9, "predios": 0.75},
-		{"msaa": Viewport.MSAA_DISABLED, "escala": 1.0, "sombra": 2048, "dist": 75.0, "brilho": true, "mata": 0.8, "longe": 650.0, "neblina": 0.0046,
-			"capim": 90, "capim_passo": 0.8, "predios": 1.0},
-		{"msaa": Viewport.MSAA_2X, "escala": 1.0, "sombra": 4096, "dist": 110.0, "brilho": true, "mata": 1.0, "longe": 900.0, "neblina": 0.0036,
-			"capim": 120, "capim_passo": 0.75, "predios": 1.35},
-	][clampi(q, 0, 2)]
+	var cfg: Dictionary = QUALIDADE[clampi(q, 0, 2)]
 	var vp := get_viewport()
 	vp.msaa_3d = cfg["msaa"]
 	vp.scaling_3d_scale = cfg["escala"]
@@ -468,6 +517,29 @@ func aplicar_qualidade(q: int) -> void:
 	malhas_mapa.alcance(cfg["predios"])
 	objetos.alcance(cfg["predios"])
 	grama.densidade(cfg["capim"], cfg["capim_passo"])
+	# o que só o modo completo desenha (no leve fica tudo desligado, como antes)
+	var completo := Desenho.atual() == "completo"
+	if completo:
+		vp.screen_space_aa = cfg["aa"]
+	else:
+		vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+	vp.use_debanding = completo and q >= 1
+	amb.ssao_enabled = completo and bool(cfg["ssao"])
+	amb.ssil_enabled = completo and bool(cfg["ssil"])
+	amb.volumetric_fog_enabled = completo and bool(cfg["vol"])
+	neblina_vol = NEBLINA_VOL if amb.volumetric_fog_enabled else 0.0
+	amb.volumetric_fog_density = neblina_vol
+	if completo:
+		# a sombra dos cantos: no médio a de qualidade baixa (metade do custo), no alto a média
+		RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_LOW if q < 2 else RenderingServer.ENV_SSAO_QUALITY_MEDIUM, true, 0.5, 2, 50.0, 300.0)
+	modo_escala()
+
+
+## a resolução 3D menor que a tela: no modo completo é ampliada com o FSR (fica mais nítido), no leve só esticada
+func modo_escala() -> void:
+	var vp := get_viewport()
+	var fsr := Desenho.atual() == "completo" and vp.scaling_3d_scale < 0.999
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if fsr else Viewport.SCALING_3D_MODE_BILINEAR
 
 
 func na_cidade(p: Vector3) -> bool:
@@ -879,6 +951,9 @@ func ir_para(p: Vector3) -> void:
 
 func _exit_tree() -> void:
 	Rede.soltar(self)
+	# fechou direito (ou voltou para o lobby): a guarda da abertura não conta isto como travada
+	if not modo_teste:
+		Desenho.abriu()
 
 
 func fabricar(r: Dictionary) -> void:
@@ -4808,12 +4883,84 @@ func _teste() -> void:
 	await _teste_barcos()
 	await _teste_rolamento(livre)
 	await _teste_acabamento(livre)
+	await _teste_desenho()
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
 	else:
 		print("TESTE FALHOU: ", _erros)
 	get_tree().quit(0 if _erros.is_empty() else 1)
+
+
+## o modo de desenho (desenho.gd): o completo (Forward+) é o padrão, o leve fica gravado no arquivo que o Godot lê antes de
+## abrir a janela, a guarda da abertura troca para o leve quando o jogo fechou sozinho abrindo, e o que cada gráfico liga
+func _teste_desenho() -> void:
+	print("--- modo de desenho: %s (%s)" % [RenderingServer.get_current_rendering_method(), RenderingServer.get_current_rendering_driver_name()])
+	_confere(str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "")) == "forward_plus" and Desenho.atual() == "completo",
+		"o modo de desenho padrão é o completo (Forward+)")
+	_confere(str(ProjectSettings.get_setting("application/config/project_settings_override", "")) == Desenho.ARQ,
+		"o Godot lê o modo escolhido de %s antes de abrir a janela" % Desenho.ARQ)
+	_confere(bool(ProjectSettings.get_setting("rendering/rendering_device/fallback_to_opengl3", false)),
+		"placa sem Vulkan e sem DirectX 12 abre no leve sozinha (fallback_to_opengl3)")
+	# escolher o leve grava o arquivo; voltar ao completo apaga
+	Desenho.escolher("leve")
+	var cf := ConfigFile.new()
+	var leu := cf.load(Desenho.ARQ) == OK
+	_confere(leu and str(cf.get_value("rendering", "renderer/rendering_method", "")) == "gl_compatibility" and Desenho.escolhido() == "leve",
+		"escolher o leve grava rendering/renderer/rendering_method = gl_compatibility (escolhido: %s)" % Desenho.escolhido())
+	_confere(Desenho.pendente(), "trocado o modo, as configurações oferecem abrir o jogo de novo")
+	Desenho.escolher("completo")
+	_confere(not FileAccess.file_exists(Desenho.ARQ) and Desenho.escolhido() == "completo" and not Desenho.pendente(),
+		"voltar ao completo apaga o arquivo do modo")
+	# a guarda da abertura: com a marca da abertura de antes ainda lá (fechou sozinho abrindo no completo), passa para o leve
+	var fm := FileAccess.open(Desenho.MARCA, FileAccess.WRITE)
+	if fm != null:
+		fm.store_string("completo")
+		fm = null
+	var reabre := Desenho.abrindo(false)
+	_confere(reabre and Desenho.escolhido() == "leve" and Desenho.motivo() == "caiu" and not FileAccess.file_exists(Desenho.MARCA),
+		"o jogo que fechou sozinho abrindo no completo abre de novo no leve (escolhido: %s, motivo: %s)" % [Desenho.escolhido(), Desenho.motivo()])
+	var av1 := Desenho.aviso_queda()
+	var av2 := Desenho.aviso_queda()
+	_confere(av1 and not av2 and Desenho.situacao().contains("fechou sozinho"), "o aviso da troca aparece uma vez só (%s)" % Desenho.situacao())
+	Desenho.escolher("completo")
+	Desenho.abriu()
+	# o que cada gráfico liga no modo completo
+	var vp := get_viewport()
+	aplicar_qualidade(2)
+	_confere(amb.ssao_enabled and amb.ssil_enabled and amb.volumetric_fog_enabled and amb.volumetric_fog_density > 0.0
+		and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_SMAA and vp.msaa_3d == Viewport.MSAA_2X,
+		"gráfico alto no completo: sombra nos cantos, luz que rebate, neblina com volume, SMAA e MSAA 2x")
+	aplicar_qualidade(1)
+	_confere(amb.ssao_enabled and not amb.ssil_enabled and not amb.volumetric_fog_enabled and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_SMAA
+		and vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_BILINEAR, "gráfico médio no completo: só a sombra nos cantos e o SMAA")
+	aplicar_qualidade(0)
+	_confere(not amb.ssao_enabled and not amb.ssil_enabled and not amb.volumetric_fog_enabled and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_FXAA
+		and vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_FSR, "gráfico baixo: nada disso, FXAA e a resolução de 75%% ampliada com o FSR")
+	Ajustes.aplicar(self)
+	# a neblina com volume engrossa com o tempo (no alto)
+	aplicar_qualidade(2)
+	var clima_antes := clima.salvar()
+	clima.atual = "neblina"
+	clima.antes = "neblina"
+	clima.k = 1.0
+	await _quadros(3)
+	var vol_neb := amb.volumetric_fog_density
+	clima.carregar(clima_antes)
+	_confere(vol_neb > NEBLINA_VOL * 3.0, "a neblina do tempo engrossa a neblina com volume (%.4f)" % vol_neb)
+	Ajustes.aplicar(self)
+	# o contador de FPS e a linha do modo nas configurações
+	var tf: String = ui.hud.texto_fps()
+	_confere(tf.contains("FPS") and tf.contains("pior quadro") and tf.contains(Desenho.atual()), "o contador mostra o pior quadro e o modo de desenho (%s)" % tf)
+	telas.aj_aba = 0
+	telas.mostrar("ajustes")
+	await _quadros(2)
+	var tem_linha := false
+	for l in telas.aj_corpo.find_children("*", "Label", true, false):
+		if (l as Label).text == "Modo de desenho":
+			tem_linha = true
+	telas.esconder()
+	_confere(tem_linha, "as configurações de gráficos têm o modo de desenho")
 
 
 func _foto(nome: String) -> void:
@@ -5683,4 +5830,88 @@ func _fotos() -> void:
 	var tr := TesteRede.new(self, "fotos", true)
 	add_child(tr)
 	await tr.fotos_principal()
+	get_tree().quit()
+
+
+## as fotos do modo de desenho completo (Forward+, no Linux sem placa de vídeo com o Vulkan por software): os mesmos lugares
+## das fotos de conferência no gráfico médio (para comparar com o modo leve lado a lado) e, no gráfico alto, o que só o
+## completo tem: a luz que rebate, a neblina com volume, o sol baixo entrando na mata e o facho da lanterna de noite
+func _fotos_desenho() -> void:
+	_marcas_fotos()
+	await _quadros(30)
+	print("desenho: %s · %s · placa: %s (%s)" % [RenderingServer.get_current_rendering_method(), RenderingServer.get_current_rendering_driver_name(),
+		RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor()])
+	jogador.aparencia({})
+	clima.atual = "limpo"
+	clima.antes = "limpo"
+	Ajustes.v["qualidade"] = 1
+	Ajustes.aplicar(self)
+	hora = 9.6
+	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
+	await _foto("01_comeco_na_mata")
+	hora = 9.7
+	await _cam(Vector3(14, 0, 16), Vector3(-6, 2.0, -8))
+	await _foto("03_clareira")
+	await _cam(Vector3(205, 0, 12), Vector3(300, 8.0, 14))
+	await _foto("05_avenida_da_cidade")
+	_por_em(Vector3(214.5, 0.4, 20.6))
+	await _quadros(4)
+	_olhar(Vector3(218.0, 1.4, 24.0))
+	await _foto("06_dentro_do_predio")
+	await _cam(Vector3(40, 0, -60), Vector3(62, 2.0, -76))
+	await _foto("10_vila")
+	await _cam(Vector3(30, 0, 100), Vector3(66, 0.5, 104))
+	await _foto("11_lago")
+	# terceira pessoa: a pele, a roupa e a sombra no corpo
+	var la := _lugar_livre(Vector2(10, 12), 12.0)
+	_por_em(Vector3(la.x, la.y + 0.3, la.z))
+	await _quadros(8)
+	jogador.rotation.y = atan2(la.x - 0.0, la.z - 0.0) + 0.5
+	jogador.cabeca.rotation.x = -0.12
+	jogador.alternar_camera(true)
+	await _quadros(70)
+	await _foto("13b_terceira_pessoa")
+	jogador.alternar_camera(false)
+	await _quadros(10)
+	# o gráfico alto: a luz que rebate (SSIL) e a neblina com volume
+	Ajustes.v["qualidade"] = 2
+	Ajustes.aplicar(self)
+	hora = 9.6
+	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
+	await _foto("A01_comeco_na_mata_alto")
+	_por_em(Vector3(214.5, 0.4, 20.6))
+	await _quadros(4)
+	_olhar(Vector3(218.0, 1.4, 24.0))
+	await _foto("A06_dentro_do_predio_alto")
+	# o fim da tarde olhando para o sol, que entra baixo pela mata
+	hora = 17.3
+	_ciclo()
+	var pm := Vector3(SPAWN.x, 0, SPAWN.z)
+	await _cam(pm, pm + Vector3(0, 2.0, 1.0))
+	var para_sol := sol.global_transform.basis.z
+	para_sol.y = 0.0
+	_olhar(jogador.cam.global_position + para_sol.normalized() * 30.0 + Vector3(0, 3.0, 0))
+	await _quadros(20)
+	await _foto("A02_fim_de_tarde_contra_o_sol")
+	# de noite na mata, só com a lanterna
+	hora = 22.0
+	jogador.inv.por("lanterna", 1)
+	jogador.bateria = 100.0
+	if not jogador.luz_mao.visible:
+		jogador.alternar_lanterna()
+	await _cam(pm, Vector3(4, 1.2, 10))
+	await _quadros(20)
+	await _foto("A03_lanterna_de_noite")
+	if jogador.luz_mao.visible:
+		jogador.alternar_lanterna()
+	# a neblina de manhã cedo
+	clima.atual = "neblina"
+	clima.antes = "neblina"
+	hora = 7.1
+	await _cam(Vector3(14, 0, 16), Vector3(-6, 2.0, -8))
+	await _quadros(20)
+	await _foto("A04_neblina_de_manha")
+	clima.atual = "limpo"
+	clima.antes = "limpo"
+	print("FOTOS-DESENHO OK")
 	get_tree().quit()
