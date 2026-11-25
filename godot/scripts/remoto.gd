@@ -73,7 +73,7 @@ func _ready() -> void:
 	add_child(etiqueta)
 	luz = SpotLight3D.new()
 	luz.light_color = Color(1.0, 0.95, 0.82)
-	luz.light_energy = 3.0
+	luz.light_energy = 3.0 * Desenho.forca_perto()
 	luz.spot_range = 30.0
 	luz.spot_angle = 26.0
 	luz.spot_attenuation = 0.9

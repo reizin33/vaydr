@@ -371,7 +371,7 @@ func _ciclo() -> void:
 	sol.visible = dia_k > 0.01
 	var por := clampf(1.0 - absf(alt) * 4.0, 0.0, 1.0) * (1.0 if alt > -0.1 else 0.0)
 	sol.light_color = Color(1.0, 0.96, 0.89).lerp(Color(1.0, 0.62, 0.38), por)
-	lua.light_energy = 0.3 * (1.0 - dia_k) * luz_k
+	lua.light_energy = 0.3 * (1.0 - dia_k)
 	var noite_k := 1.0 - clampf((alt + 0.15) * 4.0, 0.0, 1.0)
 	ceu.sky_top_color = Color(0.2, 0.38, 0.68).lerp(Color(0.02, 0.03, 0.07), noite_k)
 	ceu.sky_horizon_color = Color(0.6, 0.7, 0.8).lerp(Color(0.95, 0.6, 0.4), por * 0.7).lerp(Color(0.05, 0.06, 0.1), noite_k)
@@ -500,8 +500,9 @@ const QUALIDADE := [
 ## a neblina com volume (gráfico alto, modo completo): bem rala (a de sempre continua cobrindo o longe); o tempo engrossa
 var neblina_vol := 0.0
 const NEBLINA_VOL := 0.0025
-## a força do sol e da lua: no modo leve cada luz é somada já em sRGB (o sol forte e a sombra escura do desenho de
-## antes); no completo a soma é em luz linear e o mesmo sol fica bem mais fraco: o dobro deixa o dia parecido
+## a força do sol: no modo leve cada luz é somada já em sRGB (o sol forte e a sombra escura do desenho de antes); no
+## completo a soma é em luz linear e o mesmo sol fica bem mais fraco: o dobro deixa o dia parecido (a lua não: de noite
+## a soma quase não muda e o dobro dela deixava a noite clara demais; as luzes de perto, Desenho.forca_perto)
 const LUZ_COMPLETO := 2.0
 var luz_k := 1.0
 var sol_teste := 1.0     # as fotos do modo completo comparam outras forças do sol com esta
@@ -4939,8 +4940,8 @@ func _teste_desenho() -> void:
 	_confere(amb.ssao_enabled and amb.ssil_enabled and amb.volumetric_fog_enabled and amb.volumetric_fog_density > 0.0
 		and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_SMAA and vp.msaa_3d == Viewport.MSAA_2X,
 		"gráfico alto no completo: sombra nos cantos, luz que rebate, neblina com volume, SMAA e MSAA 2x")
-	_confere(is_equal_approx(luz_k, LUZ_COMPLETO) and is_equal_approx(sol.light_volumetric_fog_energy, 0.7 / LUZ_COMPLETO),
-		"no completo o sol e a lua ficam %.1f vezes mais fortes (lá a luz soma em luz linear) sem engrossar a neblina" % LUZ_COMPLETO)
+	_confere(is_equal_approx(luz_k, LUZ_COMPLETO) and is_equal_approx(sol.light_volumetric_fog_energy, 0.7 / LUZ_COMPLETO) and Desenho.forca_perto() > 1.0,
+		"no completo o sol fica %.1f vezes mais forte (lá a luz soma em luz linear) sem engrossar a neblina, e as luzes de perto %.1f" % [LUZ_COMPLETO, Desenho.forca_perto()])
 	aplicar_qualidade(1)
 	_confere(amb.ssao_enabled and not amb.ssil_enabled and not amb.volumetric_fog_enabled and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_SMAA
 		and vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_BILINEAR, "gráfico médio no completo: só a sombra nos cantos e o SMAA")

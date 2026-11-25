@@ -86,7 +86,7 @@ func faiscas(p: Vector3) -> void:
 func boca(p: Vector3, d: Vector3, grande := false) -> void:
 	var luz := OmniLight3D.new()
 	luz.light_color = Color(1.0, 0.78, 0.45)
-	luz.light_energy = 4.0 if grande else 2.6
+	luz.light_energy = (4.0 if grande else 2.6) * Desenho.forca_perto()
 	luz.omni_range = 7.0 if grande else 5.0
 	luz.shadow_enabled = false
 	add_child(luz)
@@ -168,7 +168,7 @@ func rastro(a: Vector3, b: Vector3) -> void:
 func explosao(p: Vector3) -> void:
 	var luz := OmniLight3D.new()
 	luz.light_color = Color(1.0, 0.62, 0.3)
-	luz.light_energy = 9.0
+	luz.light_energy = 9.0 * Desenho.forca_perto()
 	luz.omni_range = 22.0
 	add_child(luz)
 	luz.global_position = p + Vector3(0, 1.0, 0)

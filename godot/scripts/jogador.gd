@@ -138,7 +138,7 @@ func _ready() -> void:
 	# lanterna: um facho de luz que sai da câmera quando ela está na mão
 	luz_mao = SpotLight3D.new()
 	luz_mao.light_color = Color(1.0, 0.95, 0.82)
-	luz_mao.light_energy = 3.2
+	luz_mao.light_energy = 3.2 * Desenho.forca_perto()
 	luz_mao.spot_range = 34.0
 	luz_mao.spot_angle = 26.0
 	luz_mao.spot_attenuation = 0.9

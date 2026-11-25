@@ -54,7 +54,7 @@ func _ready() -> void:
 	add_child(fg)
 	fogo = OmniLight3D.new()
 	fogo.light_color = Color(1.0, 0.58, 0.26)
-	fogo.light_energy = 2.6
+	fogo.light_energy = 2.6 * Desenho.forca_perto()
 	fogo.omni_range = 10.0
 	fogo.position = Vector3(0, 0.6, 0)
 	fogo.shadow_enabled = true
@@ -64,7 +64,7 @@ func _ready() -> void:
 	# a luz de frente (acompanha a câmera, fraca e morna: o rosto não fica no escuro)
 	frente = OmniLight3D.new()
 	frente.light_color = Color(1.0, 0.9, 0.78)
-	frente.light_energy = 0.7
+	frente.light_energy = 0.7 * Desenho.forca_perto()
 	frente.omni_range = 9.0
 	add_child(frente)
 	# o retrato: outra câmera no mesmo mundo, numa tela pequena
@@ -130,7 +130,7 @@ func _quadro(dt: float) -> void:
 	ang += (ang_alvo - ang) * minf(1.0, dt * 7.0)
 	zoom += (zoom_alvo - zoom) * minf(1.0, dt * 6.0)
 	corpo.animar(dt, {"vel": Vector3.ZERO, "chao": true, "vivo": true, "primeira": true, "yaw": corpo.yaw, "energia": 100.0})
-	fogo.light_energy = 2.4 + sin(_t * 9.1) * 0.18 + sin(_t * 23.7 + 1.3) * 0.1
+	fogo.light_energy = (2.4 + sin(_t * 9.1) * 0.18 + sin(_t * 23.7 + 1.3) * 0.1) * Desenho.forca_perto()
 	# a câmera do palco: o corpo inteiro na área do personagem (de perto: cabeça e ombros)
 	var vp := get_viewport().get_visible_rect().size
 	var r := foco if foco.size.x > 20.0 and foco.size.y > 20.0 else Rect2(Vector2.ZERO, vp)

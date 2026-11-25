@@ -1135,7 +1135,7 @@ func _modelo(no: Node3D, id_m: String, tam: Vector3) -> Node3D:
 func _luz(no: Node3D, idx: int, pos: Vector3, cor: Color, energia: float, alcance: float) -> void:
 	var luz := OmniLight3D.new()
 	luz.light_color = cor
-	luz.light_energy = energia
+	luz.light_energy = energia * Desenho.forca_perto()
 	luz.omni_range = alcance
 	luz.position = pos
 	luz.shadow_enabled = true

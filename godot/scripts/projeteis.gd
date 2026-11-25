@@ -354,7 +354,7 @@ func fogo(p: Vector3, r: float, dur: float) -> void:
 	part.emitting = true
 	var luz := OmniLight3D.new()
 	luz.light_color = Color(1.0, 0.55, 0.2)
-	luz.light_energy = 2.5
+	luz.light_energy = 2.5 * Desenho.forca_perto()
 	luz.omni_range = r * 3.2
 	luz.position.y = 0.9
 	no.add_child(luz)
@@ -410,7 +410,7 @@ func _passo_chamas(dt: float) -> void:
 			continue
 		var k := minf(1.0, t * 4.0) * clampf((dur - t) / 2.5, 0.0, 1.0)
 		var r: float = float(c["r"]) * (0.7 + 0.3 * minf(1.0, t * 3.0))
-		(c["luz"] as OmniLight3D).light_energy = 2.6 * k * (0.85 + 0.3 * randf())
+		(c["luz"] as OmniLight3D).light_energy = 2.6 * k * (0.85 + 0.3 * randf()) * Desenho.forca_perto()
 		(c["part"] as CPUParticles3D).emitting = t < dur
 		if k < 0.3:
 			continue

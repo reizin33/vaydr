@@ -17,6 +17,9 @@ const ARQ := "user://desenho.cfg"
 const MARCA := "user://abrindo.txt"
 const MODOS := ["Completo", "Leve"]
 const DESC := "Completo: sombra nos cantos, luz que rebate e neblina com volume (precisa de placa de vídeo com Vulkan ou DirectX 12). Leve: o desenho mais simples, para PC fraco ou placa antiga. A troca vale quando o jogo abre de novo."
+## as luzes de perto (lanterna, fogueira, faróis, clarão do tiro) no completo: lá a luz soma em luz linear e a mesma luz
+## ficava mais apagada que no leve (o ponto mais claro do facho da lanterna saía 73 contra 86)
+const PERTO_COMPLETO := 1.4
 ## segundos desenhando o mundo até a abertura contar como boa
 const ABRIU_SEG := 6.0
 
@@ -27,6 +30,11 @@ static var _no_inicio := ""
 ## o modo desenhando agora: "completo" (Forward+) ou "leve" (Compatibility)
 static func atual() -> String:
 	return "leve" if RenderingServer.get_current_rendering_method() == "gl_compatibility" else "completo"
+
+
+## quanto as luzes de perto ficam mais fortes no modo de agora
+static func forca_perto() -> float:
+	return PERTO_COMPLETO if atual() == "completo" else 1.0
 
 
 ## o modo escolhido: o que vale quando o jogo abrir de novo

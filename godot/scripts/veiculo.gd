@@ -163,7 +163,7 @@ func _ready() -> void:
 		sl.position = Vector3(float(f[0]), float(f[1]), float(f[2]) + 0.05)
 		sl.rotation = Vector3(-0.1, PI, 0)
 		sl.light_color = Color(1.0, 0.95, 0.84)
-		sl.light_energy = 4.0 if (T["farol"] as Array).size() > 1 else 6.0
+		sl.light_energy = (4.0 if (T["farol"] as Array).size() > 1 else 6.0) * Desenho.forca_perto()
 		sl.spot_range = 36.0
 		sl.spot_angle = 30.0
 		sl.spot_attenuation = 0.8
