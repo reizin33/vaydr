@@ -212,7 +212,7 @@ jobs:
       group: godot-desenho-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 80
     permissions:
       contents: read
     steps:
@@ -224,7 +224,7 @@ jobs:
         run: |
           set -e
           sudo apt-get update -q
-          sudo apt-get install -y -q xvfb mesa-vulkan-drivers libvulkan1 vulkan-tools libxcursor1 libxinerama1 libxrandr2 libxi6 libfontconfig1 > /dev/null
+          sudo apt-get install -y -q xvfb mesa-vulkan-drivers libvulkan1 vulkan-tools libgl1-mesa-dri libglx-mesa0 libxcursor1 libxinerama1 libxrandr2 libxi6 libfontconfig1 > /dev/null
           base="https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable"
           curl -sSfL -o godot.zip "$base/Godot_v${GODOT_VER}-stable_linux.x86_64.zip"
           unzip -q godot.zip
@@ -246,6 +246,16 @@ jobs:
           ls -la godot/fotos || true
           grep -q "FOTOS-DESENHO OK" desenho.log && ! grep -q -E "SHADER ERROR|SCRIPT ERROR|Parse Error" desenho.log
 
+      # as mesmas fotos no modo leve (OpenGL por software), com "leve_" na frente: os pares para comparar os dois modos
+      - name: As mesmas fotos no modo leve
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          export LIBGL_ALWAYS_SOFTWARE=1
+          timeout 2400 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos-desenho 2>&1 | tee desenho_leve.log | awk '!visto[$0]++ && n++ < 150'
+          grep -q "FOTOS-DESENHO OK" desenho_leve.log
+
       - name: Fotos no registro
         if: always()
         run: |
@@ -264,6 +274,7 @@ jobs:
             godot/fotos/
             importar.log
             desenho.log
+            desenho_leve.log
           retention-days: 14
 
   publicar:

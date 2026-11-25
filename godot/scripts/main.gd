@@ -367,11 +367,11 @@ func _ciclo() -> void:
 	sol.rotation = Vector3(-a, deg_to_rad(-35), 0)
 	var dia_k := clampf(alt * 3.0, 0.0, 1.0)
 	# o sol do jogo antigo (~2 de luz ao meio-dia); no pôr do sol fica laranja e fraco
-	sol.light_energy = 2.0 * dia_k * sol_k
+	sol.light_energy = 2.0 * dia_k * luz_k * sol_teste
 	sol.visible = dia_k > 0.01
 	var por := clampf(1.0 - absf(alt) * 4.0, 0.0, 1.0) * (1.0 if alt > -0.1 else 0.0)
 	sol.light_color = Color(1.0, 0.96, 0.89).lerp(Color(1.0, 0.62, 0.38), por)
-	lua.light_energy = 0.3 * (1.0 - dia_k)
+	lua.light_energy = 0.3 * (1.0 - dia_k) * luz_k
 	var noite_k := 1.0 - clampf((alt + 0.15) * 4.0, 0.0, 1.0)
 	ceu.sky_top_color = Color(0.2, 0.38, 0.68).lerp(Color(0.02, 0.03, 0.07), noite_k)
 	ceu.sky_horizon_color = Color(0.6, 0.7, 0.8).lerp(Color(0.95, 0.6, 0.4), por * 0.7).lerp(Color(0.05, 0.06, 0.1), noite_k)
@@ -500,8 +500,11 @@ const QUALIDADE := [
 ## a neblina com volume (gráfico alto, modo completo): bem rala (a de sempre continua cobrindo o longe); o tempo engrossa
 var neblina_vol := 0.0
 const NEBLINA_VOL := 0.0025
-## a força do sol (as fotos do modo completo comparam outras forças com esta)
-var sol_k := 1.0
+## a força do sol e da lua: no modo leve cada luz é somada já em sRGB (o sol forte e a sombra escura do desenho de
+## antes); no completo a soma é em luz linear e o mesmo sol fica bem mais fraco: o dobro deixa o dia parecido
+const LUZ_COMPLETO := 2.0
+var luz_k := 1.0
+var sol_teste := 1.0     # as fotos do modo completo comparam outras forças do sol com esta
 
 
 func aplicar_qualidade(q: int) -> void:
@@ -531,6 +534,9 @@ func aplicar_qualidade(q: int) -> void:
 	amb.volumetric_fog_enabled = completo and bool(cfg["vol"])
 	neblina_vol = NEBLINA_VOL if amb.volumetric_fog_enabled else 0.0
 	amb.volumetric_fog_density = neblina_vol
+	luz_k = LUZ_COMPLETO if completo else 1.0
+	# o sol mais forte do completo não engrossa a neblina com volume (ela foi acertada com o sol de antes)
+	sol.light_volumetric_fog_energy = 0.7 / luz_k
 	if completo:
 		# a sombra dos cantos: no médio a de qualidade baixa (metade do custo), no alto a média
 		RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_LOW if q < 2 else RenderingServer.ENV_SSAO_QUALITY_MEDIUM, true, 0.5, 2, 50.0, 300.0)
@@ -4933,6 +4939,8 @@ func _teste_desenho() -> void:
 	_confere(amb.ssao_enabled and amb.ssil_enabled and amb.volumetric_fog_enabled and amb.volumetric_fog_density > 0.0
 		and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_SMAA and vp.msaa_3d == Viewport.MSAA_2X,
 		"gráfico alto no completo: sombra nos cantos, luz que rebate, neblina com volume, SMAA e MSAA 2x")
+	_confere(is_equal_approx(luz_k, LUZ_COMPLETO) and is_equal_approx(sol.light_volumetric_fog_energy, 0.7 / LUZ_COMPLETO),
+		"no completo o sol e a lua ficam %.1f vezes mais fortes (lá a luz soma em luz linear) sem engrossar a neblina" % LUZ_COMPLETO)
 	aplicar_qualidade(1)
 	_confere(amb.ssao_enabled and not amb.ssil_enabled and not amb.volumetric_fog_enabled and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_SMAA
 		and vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_BILINEAR, "gráfico médio no completo: só a sombra nos cantos e o SMAA")
@@ -4965,7 +4973,11 @@ func _teste_desenho() -> void:
 	_confere(tem_linha, "as configurações de gráficos têm o modo de desenho")
 
 
+var _foto_prefixo := ""
+
+
 func _foto(nome: String) -> void:
+	nome = _foto_prefixo + nome
 	# a janela das fotos é 1280 x 720 (às vezes ela encolhia no meio e a foto saía com dois quadros misturados)
 	if DisplayServer.window_get_size() != Vector2i(1280, 720):
 		print("foto %s: janela estava %s" % [nome, DisplayServer.window_get_size()])
@@ -5843,6 +5855,9 @@ func _fotos_desenho() -> void:
 	await _quadros(30)
 	print("desenho: %s · %s · placa: %s (%s)" % [RenderingServer.get_current_rendering_method(), RenderingServer.get_current_rendering_driver_name(),
 		RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor()])
+	# no modo leve (a mesma rotina com o OpenGL) as fotos saem com "leve_" na frente: os pares para comparar
+	var completo := Desenho.atual() == "completo"
+	_foto_prefixo = "" if completo else "leve_"
 	jogador.aparencia({})
 	clima.atual = "limpo"
 	clima.antes = "limpo"
@@ -5851,13 +5866,13 @@ func _fotos_desenho() -> void:
 	hora = 9.6
 	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
 	await _foto("01_comeco_na_mata")
-	for v in [["C01_sol130", 1.3, 1.0], ["C01_sol160", 1.6, 1.0]]:
-		sol_k = float(v[1])
-		amb.tonemap_exposure = float(v[2])
-		await _quadros(4)
-		await _foto(str(v[0]))
-	sol_k = 1.0
-	amb.tonemap_exposure = 1.0
+	if completo:
+		# acerto do sol do completo: 15% mais fraco e 15% mais forte que o escolhido
+		for v in [["C01_sol085", 0.85], ["C01_sol115", 1.15]]:
+			sol_teste = float(v[1])
+			await _quadros(4)
+			await _foto(str(v[0]))
+		sol_teste = 1.0
 	hora = 9.7
 	await _cam(Vector3(14, 0, 16), Vector3(-6, 2.0, -8))
 	await _foto("03_clareira")
@@ -5880,14 +5895,17 @@ func _fotos_desenho() -> void:
 	jogador.alternar_camera(true)
 	await _quadros(70)
 	await _foto("13b_terceira_pessoa")
-	# acerto da luz do modo completo: o mesmo lugar com o sol 30% e 60% mais forte e com 20% mais de exposição
-	for v in [["C13b_sol130", 1.3, 1.0], ["C13b_sol160", 1.6, 1.0], ["C13b_exposicao120", 1.0, 1.2]]:
-		sol_k = float(v[1])
-		amb.tonemap_exposure = float(v[2])
-		await _quadros(4)
-		await _foto(str(v[0]))
-	sol_k = 1.0
-	amb.tonemap_exposure = 1.0
+	if completo:
+		for v in [["C13b_sol085", 0.85], ["C13b_sol115", 1.15]]:
+			sol_teste = float(v[1])
+			await _quadros(4)
+			await _foto(str(v[0]))
+		sol_teste = 1.0
+	# de noite no mesmo lugar, só com a lua (a lua também é mais forte no completo)
+	hora = 22.5
+	await _quadros(12)
+	await _foto("13f_noite_de_lua")
+	hora = 9.8
 	jogador.alternar_camera(false)
 	await _quadros(10)
 	# o machado na mão, de frente para uma árvore (a mão e o item da primeira pessoa com a sombra dos cantos)

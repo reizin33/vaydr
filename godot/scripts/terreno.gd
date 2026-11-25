@@ -2,8 +2,9 @@ class_name Terreno
 extends Node3D
 ## O chão do mapa do VAYDR: o mesmo mapa do jogo antigo, tirado de lá pelos tools/exportar (relevo de 1 m em 961 x 721 m,
 ## com a Serra Velha a noroeste, a cor do chão de cada lugar, os pisos de asfalto, terra e concreto perto da clareira, o
-## quanto cada ponto é mata, o rio, o lago e o mar). As cores dos shaders ficam em sRGB, como o renderizador de
-## compatibilidade espera (ele converte o ALBEDO para luz linear no fim). A malha vai em pedaços de 64 m com quatro níveis de detalhe (1, 2, 4 e 8 m), cada um com uma "saia" na
+## quanto cada ponto é mata, o rio, o lago e o mar). As contas de cor dos shaders são em sRGB, como o modo leve
+## (Compatibility) espera (ele converte o ALBEDO para luz linear no fim); no modo completo (Forward+) a textura chega em luz
+## linear: ela volta para sRGB antes das contas e o resultado vai para luz linear (em_srgb e de_srgb). A malha vai em pedaços de 64 m com quatro níveis de detalhe (1, 2, 4 e 8 m), cada um com uma "saia" na
 ## borda para não abrir fresta entre pedaços de nível diferente. A colisão é um campo de alturas só.
 
 const PASTA := "res://dados/mapa/"
