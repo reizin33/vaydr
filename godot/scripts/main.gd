@@ -2473,7 +2473,12 @@ func _teste_curtume(livre: Vector3) -> void:
 	var clareira := _clareira_teste(c, 30.0)
 	_jogador_em(c, c + Vector3(0, 1, -6))
 	await _quadros(3)
+	# o material da estação de couro (6 tábuas, 4 pregos, 2 cordas)
+	jogador.inv.por("tabuas", 6)
+	jogador.inv.por("pregos", 4)
+	jogador.inv.por("corda", 2)
 	var ie := await _obra_em("estacaoCouro", c + Vector3(0, 0.3, 0), c + Vector3(0, 0, -3.0))
+	_confere(ie >= 0, "curtume: a estação de couro construída")
 	var rec := {}
 	for r in Dados.RECEITAS:
 		if str(r["faz"]) == "couroCurtido" and r.has("varal"):
@@ -2590,24 +2595,43 @@ func _teste_nado() -> void:
 	_confere(nadou and cab > 0.05 and andou > 1.5 and e_anda < 100.0 and e_anda > 98.0 and e_corre < e_anda - 4.0 and chip_n,
 		"natação: na água funda você nada com a cabeça fora d'água (%.2f m acima); nadou %.1f m; a energia cai (%.1f nadando, %.1f correndo); o HUD mostra" % [
 			cab, andou, e_anda, e_corre])
-	# sem energia: afoga
+	# sem energia: afoga (de volta ao ponto fundo: nadando ele foi para a beira)
+	_jogador_em(fundo, fundo + Vector3(6, 0.5, 0))
+	await _quadros(30)
 	jogador.energia = 0.0
 	jogador.vida = 100.0
 	await _quadros(60)
-	var afogou := jogador.vida < 97.0
+	var vida_afogando := jogador.vida
+	var afogou := jogador.nadando and jogador.vida < 97.0
 	ui.hud._chips()
 	var chip_a := str(ui.hud.chips.get_meta("chave", "")).contains("Afogando")
 	jogador.energia = 100.0
 	jogador.vida = 100.0
-	# o zumbi no fundo fundo não alcança quem nada por cima
+	# o zumbi no fundo do lago (o ponto mais fundo em volta, a 1,3 a 2,2 m) não alcança quem nada por cima
 	var pj := jogador.global_position
-	var z := _z_teste(Vector3(pj.x + 1.2, 0, pj.z), "walker", pj, false)
-	z.estado = "caca"
-	z.visto_em = pj
-	await _quadros(150)
-	var nao_alcancou := jogador.vida >= 99.9 and is_instance_valid(z) and z.global_position.distance_to(pj) < 4.0
+	var pz := Vector3.INF
+	var fz := 0.0
+	for r in [1.3, 1.7, 2.2]:
+		for k in 16:
+			var a := k / 16.0 * TAU
+			var q := pj + Vector3(cos(a), 0, sin(a)) * float(r)
+			var nq: float = terreno.nivel_agua(q.x, q.z)
+			var dq: float = nq - terreno.h(q.x, q.z)
+			if nq > -900.0 and dq > fz:
+				fz = dq
+				pz = q
+	var nao_alcancou := false
+	var vida_z := 100.0
+	if pz != Vector3.INF and fz > 1.8:
+		var z := _z_teste(pz, "walker", pj, false)
+		z.estado = "caca"
+		z.visto_em = pj
+		await _quadros(150)
+		vida_z = jogador.vida
+		nao_alcancou = jogador.vida >= 99.9 and is_instance_valid(z) and z.global_position.distance_to(pj) < 4.0
 	_limpar_zumbis()
-	_confere(afogou and chip_a and nao_alcancou, "natação: sem energia você se afoga (vida %.0f); o zumbi no fundo do lago não te alcança" % jogador.vida)
+	_confere(afogou and chip_a and nao_alcancou, "natação: sem energia você se afoga (vida %.1f, chip %s); o zumbi no fundo do lago (%.1f m de água) não te alcança (vida %.0f)" % [
+		vida_afogando, str(chip_a), fz, vida_z])
 	# a água rasa: anda devagar; a margem: volta a andar
 	_jogador_em(raso, raso + Vector3(0, 1, -5))
 	await _quadros(10)
@@ -3307,7 +3331,10 @@ func _obra_em(id: String, de: Vector3, alvo: Vector3) -> int:
 		return -1
 	var n0 := construcao.pecas.size()
 	construcao.colocar(id, a2["xf"], a2["chave"])
-	return n0 if construcao.pecas.size() > n0 else -1
+	if construcao.pecas.size() <= n0:
+		print("      (não deu para pôr %s: falta material %s)" % [id, str(Dados.custo(Dados.obra(id)))])
+		return -1
+	return n0
 
 
 ## a receita (a primeira com esse resultado)
