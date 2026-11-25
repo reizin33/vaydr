@@ -158,8 +158,8 @@ jobs:
           if [ "$ABRIU" != "sim" ]; then echo "o jogo nem abriu no teste (erro de script?): sem fotos"; exit 0; fi
           export LIBGL_ALWAYS_SOFTWARE=1
           # o amigo das fotos da partida em rede (outro jogo, sem tela): entra na partida que o jogo das fotos abre no fim
-          timeout 2700 ./godot-bin --headless --path godot -- --fotos-rede convidado > rede_fotos.log 2>&1 &
-          timeout 2700 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
+          timeout 3900 ./godot-bin --headless --path godot -- --fotos-rede convidado > rede_fotos.log 2>&1 &
+          timeout 3900 xvfb-run -a -s "-screen 0 1280x720x24" ./godot-bin --path godot --rendering-driver opengl3 --resolution 1280x720 -- --fotos 2>&1 | tee fotos.log | awk '!visto[$0]++ && n++ < 400'
           sleep 2
           kill %1 2>/dev/null
           echo "===== amigo das fotos ====="

@@ -156,7 +156,7 @@ func _ready() -> void:
 		_teste.call_deferred()
 	elif "--fotos" in args:
 		_entrar_teste()
-		_vigia(2400.0, "FOTOS")
+		_vigia(3600.0, "FOTOS")
 		_fotos.call_deferred()
 	elif "--teste-rede" in args or "--fotos-rede" in args:
 		# a partida em rede de verdade: dois jogos neste computador (quem abriu e quem entrou), cada um no seu mundo de teste
@@ -4536,6 +4536,10 @@ func _foto(nome: String) -> void:
 			faltam = f
 			img = im
 		if f == 0:
+			break
+		# nenhuma marca na foto (nem fora do lugar): as marcas não estão saindo nesta tela, e tentar de novo só gasta tempo
+		# (cada tentativa custa uns segundos no llvmpipe; com 12 por foto as fotos novas não chegavam a sair)
+		if f >= MARCAS and k >= 1:
 			break
 		print("foto %s: quadro %d com defeito (%d marcas fora do lugar)" % [nome, k, f])
 		await _quadros(2 + k)
