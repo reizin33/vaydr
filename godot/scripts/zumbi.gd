@@ -343,7 +343,8 @@ func ferir(dano: float, de: Vector3, quem := 0, info := {}) -> void:
 		derr = 1.0
 	if derr > 0.0 and randf() < derr and derrubar(dir * 3.0):
 		return
-	if k in ["fogo", "armadilha", "gas"] or dano < 4.0:
+	# a mordida do Caramelo machuca, mas não faz cambalear (senão o zumbi nunca acertava o cachorro)
+	if k in ["fogo", "armadilha", "gas", "mordida"] or dano < 4.0:
 		if estado in ["vaga", "alerta"]:
 			estado = "caca"
 		return

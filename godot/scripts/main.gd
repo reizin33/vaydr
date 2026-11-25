@@ -2417,7 +2417,7 @@ func _teste_cao(livre: Vector3) -> void:
 		if cao.st == "ataca":
 			brigou = true
 	var vida_z: float = z.vida if is_instance_valid(z) else 0.0
-	_confere(brigou and cao.mordidas > 0 and (cao.hp < Cao.HP_MAX or not is_instance_valid(z) or z.estado == "morto"),
+	_confere(brigou and cao.mordidas > 0 and cao.hp < Cao.HP_MAX,
 		"Caramelo: partiu para cima do zumbi e mordeu (%d mordidas, o zumbi com %.0f de vida); o zumbi bateu nele (vida dele %.0f de %.0f)" % [
 			cao.mordidas, vida_z, cao.hp, Cao.HP_MAX])
 	_limpar_zumbis()

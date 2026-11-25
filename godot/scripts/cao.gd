@@ -407,7 +407,7 @@ func _physics_process(dt: float) -> void:
 						if mord_t <= 0.0:
 							mord_t = 0.85
 							mordidas += 1
-							z.ferir(9.0 if z.tipo == "brute" else 12.0, global_position, 0, {"k": "golpe"})
+							z.ferir(9.0 if z.tipo == "brute" else 12.0, global_position, 0, {"k": "mordida"})
 							main.sons.tocar("mordida", global_position, -2.0)
 			if st == "fica":
 				var df := Vector2(fica.x - global_position.x, fica.z - global_position.z).length()
