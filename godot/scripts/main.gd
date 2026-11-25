@@ -4936,7 +4936,7 @@ func _teste_desenho() -> void:
 		and vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_BILINEAR, "gráfico médio no completo: só a sombra nos cantos e o SMAA")
 	aplicar_qualidade(0)
 	_confere(not amb.ssao_enabled and not amb.ssil_enabled and not amb.volumetric_fog_enabled and vp.screen_space_aa == Viewport.SCREEN_SPACE_AA_FXAA
-		and vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_FSR, "gráfico baixo: nada disso, FXAA e a resolução de 75%% ampliada com o FSR")
+		and vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_FSR, "gráfico baixo: nada disso, FXAA e a resolução de 75% ampliada com o FSR")
 	Ajustes.aplicar(self)
 	# a neblina com volume engrossa com o tempo (no alto)
 	aplicar_qualidade(2)
@@ -5873,6 +5873,30 @@ func _fotos_desenho() -> void:
 	await _foto("13b_terceira_pessoa")
 	jogador.alternar_camera(false)
 	await _quadros(10)
+	# o machado na mão, de frente para uma árvore (a mão e o item da primeira pessoa com a sombra dos cantos)
+	var livre := _lugar_livre(Vector2(0, 0), 14.0)
+	jogador.inv.por("machado", 1)
+	for i in Inventario.BARRA:
+		if jogador.inv.slots[i] != null and jogador.inv.slots[i]["id"] == "machado":
+			jogador.selecionar(i)
+	var arv: Dictionary = {}
+	var dmin := 1e9
+	for r in mundo.recursos:
+		if r["tipo"] == "arvore":
+			var dd: float = Vector2(r["pos"].x, r["pos"].z).distance_to(Vector2(livre.x, livre.z))
+			if dd < dmin:
+				dmin = dd
+				arv = r
+	if not arv.is_empty():
+		var pa: Vector3 = arv["pos"]
+		var lado_a := Vector3(livre.x - pa.x, 0, livre.z - pa.z).normalized()
+		var junto := pa + lado_a * 2.2
+		_por_em(Vector3(junto.x, terreno.h(junto.x, junto.z) + 0.3, junto.z))
+		await _quadros(6)
+		_olhar(pa + Vector3(0, 1.5, 0))
+		await _foto("13_machado_na_mao")
+	jogador.inv.tirar("machado", 1)
+	_mao_vazia()
 	# o gráfico alto: a luz que rebate (SSIL) e a neblina com volume
 	Ajustes.v["qualidade"] = 2
 	Ajustes.aplicar(self)
