@@ -35,7 +35,11 @@ const TIPOS := {
 		"assento": [0.0, 1.42, -1.4], "farol": [[0.0, 1.0, 2.1]], "camD": 7.0, "camH": 1.8},
 	"jangada": {"nome": "Jangada", "art": "a", "maxV": 2.6, "ace": 1.6, "cons": 0.0, "galao": 0.0, "cap": 3, "ruido": 4.0,
 		"hw": 1.2, "hd": 1.6, "alt": 0.75, "bateria": false, "agua": true, "exposto": true, "remo": true, "sem_motor": true, "rodas": [],
-		"assento": [0.0, 1.25, -0.3], "farol": [], "camD": 6.0, "camH": 1.7}}
+		"assento": [0.0, 1.25, -0.3], "farol": [], "camD": 6.0, "camH": 1.7},
+	# no ar (etapa 6m): Espaço sobe, C desce, W e S para a frente e para trás, A e D giram; precisa das 2 peças de rotor
+	"heli": {"nome": "Helicóptero", "art": "o", "maxV": 22.0, "ace": 3.5, "cons": 3.2, "galao": 25.0, "cap": 4, "ruido": 75.0,
+		"hw": 1.4, "hd": 3.8, "alt": 2.9, "bateria": true, "voa": true, "rotor": true, "rodas": [],
+		"assento": [0.4, 2.05, 1.15], "farol": [[0.0, 0.9, 2.6]], "camD": 11.0, "camH": 3.2}}
 
 var main
 var tipo := ""
@@ -79,6 +83,12 @@ var _lan_yaw := 0.0
 var _lan_pr := Vector2.ZERO
 var _antes_rede := {}
 var _remo_t := 0.0
+var rotor := 0.0             # o helicóptero: o rotor ganhando força (0 parado, 1 sustenta)
+var vy := 0.0
+var alt := 0.0               # a altura do helicóptero sobre o chão (ou o telhado, ou a água)
+var _helice_t := 0.0
+var rotor_mi: MeshInstance3D
+var cauda_mi: MeshInstance3D
 
 static var _mat_c: StandardMaterial3D
 static var _mat_v: StandardMaterial3D
@@ -94,7 +104,7 @@ func _init(m, t: String, id_: String) -> void:
 	var pn: Array = []
 	for w in T["rodas"]:
 		pn.append(100.0)
-	pecas = {"motor": 100.0, "pneus": pn, "oleo": 80.0, "bateria": true}
+	pecas = {"motor": 100.0, "pneus": pn, "oleo": 80.0, "bateria": true, "rotor": 2}
 	set_meta("veiculo", self)
 	# na água ninguém tropeça nele (só a mira pega, para o E); na terra é sólido
 	collision_layer = 2 if bool(T.get("agua", false)) else 1
@@ -133,6 +143,17 @@ func _ready() -> void:
 		mi.material_override = _mat_corpo()
 		corpo.add_child(mi)
 		rodas_mi.append(mi)
+	if M.has("rotor"):
+		rotor_mi = MeshInstance3D.new()
+		rotor_mi.mesh = M["rotor"]
+		rotor_mi.material_override = _mat_corpo()
+		rotor_mi.position = Vector3(0, 2.75, 0.45)
+		corpo.add_child(rotor_mi)
+		cauda_mi = MeshInstance3D.new()
+		cauda_mi.mesh = M["rotor_cauda"]
+		cauda_mi.material_override = _mat_corpo()
+		cauda_mi.position = Vector3(0.14, 2.25, -4.75)
+		corpo.add_child(cauda_mi)
 	# os faróis de verdade (acendem de noite, com alguém dirigindo)
 	for f in T["farol"]:
 		var sl := SpotLight3D.new()
@@ -254,9 +275,15 @@ func pode() -> String:
 		return "O motor está quebrado"
 	if bool(T.get("bateria", false)) and not bool(pecas["bateria"]):
 		return "Sem bateria: não pega"
+	if voa() and int(pecas.get("rotor", 2)) < 2:
+		return "Faltam peças de rotor (%d de 2)" % int(pecas.get("rotor", 0))
 	if comb <= 0.0:
 		return "Sem combustível"
 	return ""
+
+
+func voa() -> bool:
+	return bool(T.get("voa", false))
 
 
 func sem_motor() -> bool:
@@ -277,6 +304,8 @@ func texto() -> String:
 		return "E  Subir na %s  segure E: a carga" % nome().to_lower()
 	if na_agua():
 		return "E  Subir no %s  %d%% de combustível · segure E: oficina e carga" % [nome().to_lower(), roundi(comb)]
+	if voa():
+		return "E  Pilotar o helicóptero  %d%% de combustível · segure E: oficina e carga" % roundi(comb)
 	return "E  Dirigir %s %s  %d%% de combustível · segure E: oficina e porta-malas" % [o_a(), nome().to_lower(), roundi(comb)]
 
 
@@ -309,6 +338,14 @@ func _physics_process(dt: float) -> void:
 		return
 	var j = main.jogador
 	var dirige: bool = ativo and j != null and j.veiculo == self
+	# no ar: o helicóptero (com o rotor girando ou no ar, a física dele; parado no chão, nada)
+	if voa():
+		if dirige or alt > 0.05 or rotor > 0.01 or absf(vy) > 0.01:
+			_mover_voo(dt, dirige, j)
+		_som(dirige)
+		_luzes(dirige)
+		_fumaca_passo(dirige)
+		return
 	# na água: sempre boiando (e a correnteza leva)
 	if na_agua():
 		_mover_agua(dt, dirige, j)
@@ -529,6 +566,110 @@ func _mover_agua(dt: float, dirige: bool, j) -> void:
 		buz -= dt
 
 
+## o helicóptero (updateHeli do jogo antigo): o rotor ganha força em uns 3 s; Espaço sobe, C (ou Ctrl) desce, soltando os dois
+## ele fica parado no ar; W vai para a frente, S freia (parado, dá ré devagar), A e D giram; soltando tudo ele para no ar;
+## perto do chão desce devagar para pousar; pouso forte ou batida rápida no chão amassa (e machuca quem está dentro); não
+## atravessa prédio (pousa no telhado)
+func _mover_voo(dt: float, dirige: bool, j) -> void:
+	var on: bool = ativo and hp > 0.0 and float(pecas["motor"]) > 0.0 and comb > 0.0 and int(pecas.get("rotor", 2)) >= 2
+	rotor = move_toward(rotor, 1.0 if on else 0.0, dt * (0.35 if on else 0.25))
+	var sus := rotor > 0.8
+	var p := global_position
+	var g := _chao_voo(p)
+	var up := 0.0
+	var acc := 0.0
+	var gira := 0.0
+	if dirige and not bool(j.preso):
+		if Input.is_action_pressed("pular"):
+			up += 1.0
+		if Input.is_action_pressed("agachar"):
+			up -= 1.0
+		var mv := Input.get_vector("esquerda", "direita", "frente", "tras")
+		acc = -mv.y
+		gira = mv.x
+	acel = maxf(0.0, up) * 0.6 + absf(acc) * 0.4
+	var v_desce: float = lerpf(1.5, 5.0, clampf((alt - 0.4) / 3.6, 0.0, 1.0)) if alt < 4.0 else 5.0
+	var alvo_vy := (5.0 if up > 0.0 else (-v_desce if up < 0.0 else 0.0)) if sus else (-9.0 if alt > 0.05 else 0.0)
+	vy = move_toward(vy, alvo_vy, dt * (3.0 if sus else 6.0))
+	if sus:
+		var alvo := acc * float(T["maxV"])
+		var taxa: float = T["ace"]
+		if absf(acc) < 0.05:
+			alvo = 0.0
+			taxa = float(T["ace"]) * (3.0 if alt < 1.2 else 1.5)
+		elif acc * v < -0.01:
+			alvo = 0.0
+			taxa = float(T["ace"]) * 2.4
+		elif acc < 0.0:
+			alvo = acc * float(T["maxV"]) * 0.35
+		v = move_toward(v, alvo, dt * taxa)
+		rotation.y -= gira * 1.2 * dt
+	else:
+		v *= exp(-dt * 1.5)
+	var fr := frente()
+	if alt > 0.3 or sus:
+		var mov := fr * v * dt
+		if mov.length() > 0.0001:
+			var col := move_and_collide(mov)
+			if col != null:
+				v *= -0.3
+				if absf(v) > 3.0:
+					hp = maxf(0.0, hp - absf(v) * 2.0)
+					main.sons.tocar("quebrar", global_position, 0.0)
+		var q := global_position
+		if not main.terreno.dentro(q.x, q.z):
+			global_position = Vector3(p.x, q.y, p.z)
+			v *= 0.3
+	global_position.y += vy * dt
+	var gy := _chao_voo(global_position)
+	if global_position.y < gy:
+		var imp := -vy
+		global_position.y = gy
+		if imp > 6.0 or (absf(v) > 6.0 and alt < 1.0):
+			hp = maxf(0.0, hp - (imp - 4.0) * 6.0 - absf(v))
+			main.sons.tocar("quebrar", global_position, 2.0)
+			if dirige:
+				j.tremor = 1.0
+				if imp > 6.0:
+					j.ferir((imp - 6.0) * 5.0, true, global_position)
+		vy = 0.0
+		v *= 0.4
+	alt = global_position.y - gy
+	# para a frente o nariz abaixa; na curva ele deita para o lado da curva
+	pitch = lerpf(pitch, clampf(v / float(T["maxV"]) * 0.35, -0.35, 0.35), minf(1.0, dt * 2.0))
+	roll = lerpf(roll, gira * 0.2, minf(1.0, dt * 2.0))
+	corpo.rotation = Vector3(pitch, 0, roll)
+	# o rotor girando, o barulho e o combustível
+	if rotor > 0.05:
+		giro += dt * rotor * 28.0
+		if dirige:
+			_ruido_t -= dt
+			if _ruido_t <= 0.0:
+				_ruido_t = 0.5
+				main.barulho(global_position, float(T["ruido"]) * rotor)
+		_helice_t -= dt
+		if _helice_t <= 0.0:
+			_helice_t = 0.35
+			main.sons.tocar("helice", global_position, -4.0 + rotor * 4.0)
+	if rotor_mi != null:
+		rotor_mi.rotation = Vector3(0, giro, 0)
+		cauda_mi.rotation = Vector3(giro * 1.7, 0, 0)
+	if on:
+		comb = maxf(0.0, comb - (0.06 + absf(v) * 0.01) * float(T["cons"]) * dt)
+	if hp <= 0.0 and dirige:
+		main.ui.aviso("O helicóptero caiu!", 5.0)
+		j.ferir(40.0, true, global_position)
+		if main.get("veiculos") != null and j.vivo:
+			main.veiculos.expulsar(j)
+
+
+## o chão embaixo do helicóptero: a terra, o telhado (um prédio embaixo) ou a água
+func _chao_voo(p: Vector3) -> float:
+	var g := _chao(p.x, p.z, p.y)
+	var n: float = main.terreno.nivel_agua(p.x, p.z)
+	return maxf(g, n) if n > -900.0 else g
+
+
 ## bateu de frente forte: amassa (acima de 7 m/s machuca a lataria e o motor; acima de 9 pode furar um pneu)
 func _bateu(hit: float, dirige: bool, j) -> void:
 	if hit > 7.0:
@@ -704,6 +845,11 @@ func buzinar() -> void:
 
 ## põe no chão (ao nascer, carregar ou descer): altura e inclinação na hora
 func assentar() -> void:
+	if voa():
+		alt = 0.0
+		vy = 0.0
+		global_position.y = _chao_voo(global_position + Vector3(0, 1.0, 0))
+		return
 	if na_agua():
 		var p := global_position
 		var nv: float = main.terreno.nivel_agua(p.x, p.z)
@@ -820,6 +966,8 @@ func estado() -> Array:
 		L.append(["Óleo", pct(float(pecas["oleo"])), float(pecas["oleo"]) < 15.0])
 	if bool(T.get("bateria", false)):
 		L.append(["Bateria", "ok" if bool(pecas["bateria"]) else "faltando", not bool(pecas["bateria"])])
+	if voa():
+		L.append(["Rotor", "%d de 2 peças" % int(pecas.get("rotor", 0)), int(pecas.get("rotor", 0)) < 2])
 	L.append(["Carga", "%d de %d" % [int(T["cap"]) - porta.livres(), int(T["cap"])], false])
 	return L
 
@@ -848,9 +996,11 @@ func acoes(j) -> Array:
 		A.append({"id": "oleo", "t": "Pôr óleo", "s": "1 óleo de motor: +45%", "ok": inv.conta("oleoMotor") > 0})
 	if bool(T.get("bateria", false)) and not bool(pecas["bateria"]):
 		A.append({"id": "bateria", "t": "Instalar bateria", "s": "1 bateria automotiva" + tk, "ok": kit and inv.conta("bateriaVeic") > 0})
+	if voa() and int(pecas.get("rotor", 0)) < 2:
+		A.append({"id": "rotor", "t": "Montar o rotor", "s": "peças de rotor (%d de 2)%s" % [int(pecas.get("rotor", 0)), tk], "ok": kit and inv.conta("pecasRotor") > 0})
 	A.append({"id": "carga", "t": "Carga" if na_agua() else "Porta-malas", "s": "%d de %d espaços" % [int(T["cap"]) - porta.livres(), int(T["cap"])], "ok": true})
 	var nao := pode()
-	A.append({"id": "dirigir", "t": "Subir" if na_agua() else "Dirigir", "s": nao if nao != "" else "pronto", "ok": nao == ""})
+	A.append({"id": "dirigir", "t": "Pilotar" if voa() else ("Subir" if na_agua() else "Dirigir"), "s": nao if nao != "" else "pronto", "ok": nao == ""})
 	return A
 
 
@@ -907,6 +1057,15 @@ func fazer(id: String, j) -> String:
 			_dica_oleo = false
 			main.sons.tocar("pegar", global_position, 0.0)
 			return "Óleo em " + pct(float(pecas["oleo"]))
+		"rotor":
+			if not kit or inv.conta("pecasRotor") <= 0:
+				return "Precisa das peças de rotor e do kit de ferramentas"
+			var k := mini(2 - int(pecas.get("rotor", 0)), inv.conta("pecasRotor"))
+			inv.tirar("pecasRotor", k)
+			pecas["rotor"] = int(pecas.get("rotor", 0)) + k
+			_gastar_kit(j, 3.0)
+			main.sons.tocar("construir", global_position, 0.0)
+			return "Rotor montado!" if int(pecas["rotor"]) >= 2 else "Falta mais 1 peça de rotor"
 		"bateria":
 			if not kit or inv.conta("bateriaVeic") <= 0:
 				return "Precisa de 1 bateria automotiva e do kit de ferramentas"
@@ -951,6 +1110,9 @@ func rede(L: PackedFloat32Array, i: int) -> void:
 
 func _boneco(dt: float) -> void:
 	var k := 1.0 - exp(-dt * 12.0)
+	if rotor_mi != null:
+		rotor_mi.rotation = Vector3(0, giro, 0)
+		cauda_mi.rotation = Vector3(giro * 1.7, 0, 0)
 	global_position = global_position.lerp(_lan_p, k)
 	rotation.y = lerp_angle(rotation.y, _lan_yaw, k)
 	pitch = lerpf(pitch, _lan_pr.x, k)
@@ -987,6 +1149,7 @@ func receber_estado(d: Dictionary, lugar: bool) -> void:
 		pecas["motor"] = clampf(float(pd.get("motor", pecas["motor"])), 0.0, 100.0)
 		pecas["oleo"] = clampf(float(pd.get("oleo", pecas["oleo"])), 0.0, 100.0)
 		pecas["bateria"] = bool(pd.get("bateria", pecas["bateria"]))
+		pecas["rotor"] = clampi(int(pd.get("rotor", pecas.get("rotor", 2))), 0, 2)
 		var pn = pd.get("pneus", [])
 		if pn is Array and (pn as Array).size() == (pecas["pneus"] as Array).size():
 			var L: Array = []
@@ -1063,6 +1226,7 @@ func carregar(d: Dictionary) -> void:
 		pecas["motor"] = clampf(float(pd.get("motor", pecas["motor"])), 0.0, 100.0)
 		pecas["oleo"] = clampf(float(pd.get("oleo", pecas["oleo"])), 0.0, 100.0)
 		pecas["bateria"] = bool(pd.get("bateria", pecas["bateria"]))
+		pecas["rotor"] = clampi(int(pd.get("rotor", pecas.get("rotor", 2))), 0, 2)
 		var pn = pd.get("pneus", [])
 		var R: Array = T["rodas"]
 		if pn is Array and (pn as Array).size() == R.size():

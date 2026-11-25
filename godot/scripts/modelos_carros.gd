@@ -29,9 +29,20 @@ static func malhas(tipo: String) -> Dictionary:
 			_barco(P)
 		"jangada":
 			_jangada(P, R)
+		"heli":
+			_heli(P)
 	var b := _montar(P["base"])
 	var c := _montar(P["cabine"]) if not (P["cabine"] as Array).is_empty() else {}
 	var r := {"base": b.get("malha"), "sup_base": b.get("sups", []), "cabine": c.get("malha"), "sup_cabine": c.get("sups", []), "roda": _roda()}
+	if tipo == "heli":
+		var L1: Array = []
+		for i in 2:
+			_A(L1, _caixa(9.2, 0.04, 0.32), _m(0, 0, 0, 0, i * PI / 2.0), 0x1c1f22, "corpo", 0.02)
+		_A(L1, _cil(0.15, 0.15, 0.12, 10), _m(0, -0.06, 0), 0x5c6166)
+		r["rotor"] = _montar(L1).get("malha")
+		var L2: Array = []
+		_A(L2, _caixa(0.03, 1.4, 0.18), Transform3D.IDENTITY, 0x1c1f22, "corpo", 0.02)
+		r["rotor_cauda"] = _montar(L2).get("malha")
 	_cache[tipo] = r
 	return r
 
@@ -262,6 +273,46 @@ static func _jangada(P: Dictionary, R: RandomNumberGenerator) -> void:
 			_A(B, _cil(0.2, 0.2, 0.08, 8), _m(x - 0.04, 0.3, z, 0, 0, PI / 2.0), co, "corpo", 0.05)
 	_A(B, _cil(0.025, 0.025, 1.9, 5), _m(0.9, 0.42, -0.7, 1.2, 0, 0.4), tr)
 	_A(B, _caixa(0.18, 0.03, 0.42), _m(1.25, 0.6, 0.85, 0.3, 0, 0.4), tr)
+
+
+# ---------------------------------------------------------------- o helicóptero (v_heli, etapa 6m)
+static func _heli(P: Dictionary) -> void:
+	var B: Array = P["base"]
+	var C: Array = P["cabine"]
+	var p := 0x4a5236
+	var p2 := 0x3a4129
+	var faixa := 0xb9b49a
+	var preto := 0x16181a
+	var dark := 0x1c1f22
+	var glass := 0x1a252d
+	var trim := 0x5c6166
+	# a fuselagem e a cabine chanfradas, o nariz de vidro e as janelas das portas (a cabine some na primeira pessoa)
+	_A(B, _chanfro(1.7, 1.0, 3.0, 0.28), _m(0, 1.0, 0.35), p)
+	_A(C, _chanfro(1.6, 0.85, 2.3, 0.3, 0.88, 0.82), _m(0, 1.9, 0.15), p)
+	_A(B, ModelosBichos._elipse(0.84, 0.52, 0.85, 14, 8), _m(0, 1.02, 1.85), p2)
+	_A(C, ModelosBichos._elipse(0.8, 0.72, 0.9, 14, 8), _m(0, 1.62, 1.9), glass, "vidro", 0.0)
+	for s in [-1.0, 1.0]:
+		for z in [0.85, -0.05]:
+			_A(C, _caixa(0.04, 0.62, 0.78), _m(s * 0.805, 1.9, z), glass, "vidro", 0.0)
+		_A(B, _caixa(0.03, 0.05, 2.2), _m(s * 0.86, 1.48, 0.4), preto, "corpo", 0.0)
+	# o capô do motor com o escape, a base do rotor e o mastro
+	_A(B, _chanfro(0.95, 0.45, 1.5, 0.16), _m(0, 2.5, -0.55), p2)
+	_A(B, _cil(0.09, 0.12, 0.45, 8), _m(0, 2.45, -1.3, -PI / 2.0), preto)
+	_A(B, _chanfro(0.5, 0.2, 0.6, 0.06), _m(0, 2.42, 0.45), dark)
+	_A(B, _cil(0.08, 0.08, 0.32, 8), _m(0, 2.45, 0.45), trim)
+	# a cauda afinando com a faixa clara, o estabilizador e as derivas
+	_A(B, _cil(0.11, 0.26, 3.9, 10), _m(0, 1.85, -0.95, -PI / 2.0), p)
+	_A(B, _cil(0.199, 0.214, 0.4, 10), _m(0, 1.85, -2.3, -PI / 2.0), faixa, "corpo", 0.02)
+	_A(B, _caixa(1.4, 0.05, 0.36), _m(0, 1.86, -3.7), p2)
+	_A(B, _caixa(0.06, 1.05, 0.62, 0.55), _m(0, 2.3, -4.72, -0.32), p2)
+	_A(B, _caixa(0.05, 0.45, 0.4, 0.6), _m(0, 1.55, -4.7, 0.35), p2)
+	# os esquis de tubo com a ponta levantada e as travessas
+	for s in [-1.0, 1.0]:
+		_A(B, _cil(0.045, 0.045, 3.1, 6), _m(s * 0.95, 0.08, -1.15, PI / 2.0), trim)
+		_A(B, _cil(0.045, 0.045, 0.42, 6), _m(s * 0.95, 0.08, 1.95, PI / 2.0 - 0.75), trim)
+		for z in [1.25, -0.45]:
+			_A(B, _cil(0.04, 0.04, 0.75, 6), _m(s * 0.95, 0.08, z, 0, 0, s * 0.7), trim)
+	_A(B, _caixa(0.16, 0.08, 0.05), _m(0, 0.9, 2.62), 0xfff1c8, "farol", 0.0)
 
 
 ## tronco de cone com a fase (a proa de 4 lados do barco)

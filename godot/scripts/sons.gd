@@ -109,6 +109,8 @@ func _ready() -> void:
 	# os veículos (etapa 6j): a buzina (dois tons juntos, rachados), a partida do motor (o arranque e o ronco subindo)
 	bancos["buzina"] = [_buzina()]
 	bancos["partida"] = [_mistura(_ruido(0.7, 520.0, 0.5, 3.6), _tom(0.65, 34.0, 58.0, 0.75, 2.2))]
+	# a hélice do helicóptero (o "tuc-tuc" das pás: ruído grave e uma nota baixa, curtos)
+	bancos["helice"] = [_mistura(_ruido(0.34, 380.0, 0.8, 7.0), _tom(0.3, 38.0, 34.0, 0.35, 8.0))]
 	_gravacoes()
 
 

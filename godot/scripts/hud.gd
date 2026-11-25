@@ -516,10 +516,18 @@ func _veiculo_ver(j) -> void:
 		return
 	var vel := float(vc.v)
 	veic_nome.text = "%s · %d KM/H%s" % [str(vc.nome()).to_upper(), roundi(absf(vel) * 3.6), " · RÉ" if vel < -0.3 else ""]
-	var b: Array = ["Gasolina " + Veiculo.pct(float(vc.comb)), "Lataria " + Veiculo.pct(float(vc.hp)), "Motor " + Veiculo.pct(float(vc.pecas["motor"]))]
-	var f: int = vc.furados()
-	b.append(("%d pneu%s furado%s" % [f, "s" if f > 1 else "", "s" if f > 1 else ""]) if f > 0 else "Pneus ok")
-	b.append("Óleo " + Veiculo.pct(float(vc.pecas["oleo"])))
+	var b: Array = []
+	if bool(vc.voa()):
+		b.append("Altura %d m" % roundi(float(vc.alt)))
+	if not bool(vc.sem_motor()):
+		b.append("Gasolina " + Veiculo.pct(float(vc.comb)))
+		b.append("Motor " + Veiculo.pct(float(vc.pecas["motor"])))
+	b.append(("Casco " if bool(vc.na_agua()) else "Lataria ") + Veiculo.pct(float(vc.hp)))
+	if not (vc.T["rodas"] as Array).is_empty():
+		var f: int = vc.furados()
+		b.append(("%d pneu%s furado%s" % [f, "s" if f > 1 else "", "s" if f > 1 else ""]) if f > 0 else "Pneus ok")
+	if not bool(vc.na_agua()) and not bool(vc.voa()):
+		b.append("Óleo " + Veiculo.pct(float(vc.pecas["oleo"])))
 	b.append("Carga %d/%d" % [int(vc.T["cap"]) - int(vc.porta.livres()), int(vc.T["cap"])])
 	if not bool(vc.luz):
 		b.append("faróis apagados")

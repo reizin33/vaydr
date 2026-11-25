@@ -5,7 +5,8 @@ extends Node3D
 ## triciclo da fazenda (com um pouco de gasolina e um pneu furado); na água (etapa 6k), o barco a motor no cais do lago (sem
 ## gasolina e com o motor quebrado) e a jangada que você faz (Fabricar) e põe na água de frente para o rio ou o lago. Toque E
 ## entra (se der); segure E abre a oficina do veículo (o estado das peças, os consertos, abastecer e o porta-malas). O
-## helicóptero vem depois.
+## helicóptero da Base Militar (sem gasolina, sem bateria, com o motor quebrado e sem as 2 peças de rotor: raras, no avião
+## caído, nos depósitos militares e nos laboratórios) entra na etapa 6m.
 ## As estradas: fora delas (e fora da cidade) os veículos andam mais devagar, menos o triciclo.
 ## Na partida em rede os veículos são de quem abriu: o convidado vê eles andando e pode pedir para dirigir um (quem abriu
 ## deixa se ninguém estiver nele e se ele andar); dirigindo, o jogo do convidado diz onde o veículo está e quem abriu mostra para
@@ -17,7 +18,8 @@ const PADRAO := [
 	["sedan", "sedanVila", 57.5, -48.0, 0.35, {"comb": 0.0, "bateria": false, "pneus": [100.0, 0.0, 100.0, 100.0], "motor": 70.0, "oleo": 35.0, "hp": 75.0}],
 	["moto", "motoCidade", 186.0, 15.5, 1.2, {"comb": 0.0, "motor": 0.0, "oleo": 50.0, "hp": 80.0}],
 	["triciclo", "triFazenda", -79.0, 63.0, -2.4, {"comb": 15.0, "pneus": [100.0, 0.0, 100.0], "oleo": 20.0, "hp": 85.0}],
-	["barco", "barcoCais", 74.6, 91.3, 0.05, {"comb": 0.0, "motor": 0.0, "hp": 90.0}]]
+	["barco", "barcoCais", 74.6, 91.3, 0.05, {"comb": 0.0, "motor": 0.0, "hp": 90.0}],
+	["heli", "heliBase", -112.0, -30.0, 1.57, {"comb": 0.0, "motor": 0.0, "bateria": false, "rotor": 0, "hp": 60.0}]]
 const CEL := 16.0
 
 var main
@@ -56,6 +58,7 @@ func novo() -> void:
 		v.pecas["motor"] = float(o.get("motor", 100.0))
 		v.pecas["oleo"] = float(o.get("oleo", 80.0))
 		v.pecas["bateria"] = bool(o.get("bateria", true))
+		v.pecas["rotor"] = int(o.get("rotor", 2))
 		if o.has("pneus"):
 			v.pecas["pneus"] = (o["pneus"] as Array).duplicate()
 		v.assentar()
@@ -194,6 +197,9 @@ func entrar(v: Veiculo, j) -> bool:
 func sair(j) -> bool:
 	var v = j.veiculo
 	if v == null or not is_instance_valid(v):
+		return false
+	if v.voa() and float(v.alt) > 0.6:
+		main.ui.aviso("Pouse antes de sair (C desce)", 2.5)
 		return false
 	if absf(float(v.v)) > 4.0 and not v.na_agua():
 		main.ui.aviso("Diminua a velocidade para descer", 2.5)
