@@ -177,6 +177,10 @@ func _percebe(dt: float) -> void:
 	var ve := float(S["ve"])
 	if _alvo != null and bool(_alvo.vivo) and _dp < ve * 2.0:
 		var alc := ve * (1.0 if bool(S.get("noturno", false)) else lerpf(1.0, 0.62, noite))
+		if main.clima != null:
+			alc *= main.clima.visao()
+			if S.has("presas"):
+				alc *= float(main.clima.estacao()["pred"])
 		if _alvo.get("agachado") == true:
 			alc *= 0.45
 		if _alvo.get("lanterna_acesa") == true and noite > 0.3:

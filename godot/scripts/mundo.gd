@@ -105,16 +105,19 @@ render_mode cull_disabled, diffuse_burley, specular_disabled;
 uniform sampler2D tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec4 cor : source_color = vec4(1.0);
 uniform float corte = 0.45;
+uniform vec3 estacao = vec3(1.0);
+uniform float vento = 1.0;
 
 void vertex() {
 	vec3 w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float ponta = clamp(VERTEX.y * 0.25, 0.0, 1.0);
-	VERTEX.x += sin(TIME * 1.3 + w.x * 0.21 + w.z * 0.13) * 0.035 * ponta;
-	VERTEX.z += cos(TIME * 1.1 + w.z * 0.17 + w.x * 0.07) * 0.03 * ponta;
+	VERTEX.x += sin(TIME * (1.3 + 0.5 * vento) + w.x * 0.21 + w.z * 0.13) * 0.035 * ponta * vento;
+	VERTEX.z += cos(TIME * (1.1 + 0.4 * vento) + w.z * 0.17 + w.x * 0.07) * 0.03 * ponta * vento;
 }
 
 void fragment() {
 	vec4 c = texture(tex, UV) * cor;
+	c.rgb *= estacao;
 	ALBEDO = c.rgb;
 	ALPHA = c.a;
 	ALPHA_SCISSOR_THRESHOLD = corte;
@@ -125,10 +128,27 @@ void fragment() {
 """
 	var m := ShaderMaterial.new()
 	m.shader = sh
+	mats_folha.append(m)
 	m.set_shader_parameter("tex", base.albedo_texture)
 	m.set_shader_parameter("cor", base.albedo_color * tinta)
 	m.set_shader_parameter("corte", base.alpha_scissor_threshold if base.alpha_scissor_threshold > 0.05 else 0.45)
 	return m
+
+
+## o tempo nas copas (etapa 6b): a cor da estação (outono amarelo e laranja, inverno seco) e a força do vento
+var mats_folha: Array = []
+var _copa_cor := Color(1, 1, 1)
+var _copa_vento := 1.0
+
+
+func tempo_copas(cor: Color, vento: float) -> void:
+	if cor.is_equal_approx(_copa_cor) and absf(vento - _copa_vento) < 0.02:
+		return
+	_copa_cor = cor
+	_copa_vento = vento
+	for m in mats_folha:
+		(m as ShaderMaterial).set_shader_parameter("estacao", Vector3(cor.r, cor.g, cor.b))
+		(m as ShaderMaterial).set_shader_parameter("vento", vento)
 
 
 func _chave(p: Vector3, pedaco: float) -> Vector2i:

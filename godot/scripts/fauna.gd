@@ -481,7 +481,7 @@ func _pop_tick() -> void:
 			if int(e["n"]) >= cap:
 				e["rec"] = 0.0
 				continue
-			var taxa := float(FAUNA[sp_id]["pop"])
+			var taxa := float(FAUNA[sp_id]["pop"]) * (float(main.clima.estacao()["fauna"]) if main.clima != null else 1.0)
 			if int(e["n"]) >= 2:
 				taxa *= float(POP["casal"])
 			elif int(e["n"]) == 0:

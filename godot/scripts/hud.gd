@@ -35,6 +35,9 @@ var dia_hora: Label
 var dia_falta: Label
 var dia_chip: PanelContainer
 var dia_chip_lbl: Label
+var dia_clima_ico: TextureRect   # o tempo agora (etapa 6b): o ícone e o nome (só quando não é céu limpo)
+var dia_clima: Label
+var dia_estacao: Label
 var teclas: PanelContainer
 var util: HBoxContainer
 var bt_lanterna: Button
@@ -332,6 +335,18 @@ func _topo() -> void:
 	h.add_child(dia_hora)
 	dia_falta = Estilo.rotulo("", 13, Estilo.OSSO, "ui", 800)
 	h.add_child(dia_falta)
+	dia_clima_ico = TextureRect.new()
+	dia_clima_ico.custom_minimum_size = Vector2(15, 15)
+	dia_clima_ico.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	dia_clima_ico.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	dia_clima_ico.modulate = Color(0.74, 0.84, 0.95)
+	dia_clima_ico.visible = false
+	h.add_child(dia_clima_ico)
+	dia_clima = Estilo.rotulo("", 13, Color(0.74, 0.84, 0.95), "ui", 700)
+	dia_clima.visible = false
+	h.add_child(dia_clima)
+	dia_estacao = Estilo.rotulo("", 11, Estilo.CINZA, "ui", 700, 1)
+	h.add_child(dia_estacao)
 	dia_chip = PanelContainer.new()
 	h.add_child(dia_chip)
 	dia_chip_lbl = Estilo.rotulo("", 10, Estilo.MUSGO, "ui", 800, 2)
@@ -344,6 +359,20 @@ func _relogio() -> void:
 	dia_ico.texture = Estilo.icone("lua" if noite else "sol", 18)
 	dia_nome.text = "DIA %d" % int(main.dia)
 	dia_hora.text = "%s ·" % main.hora_txt()
+	var cl = main.get("clima")
+	if cl != null:
+		var tc: float = cl.temperatura()
+		dia_hora.text = "%s · %d °C ·" % [main.hora_txt(), roundi(tc)]
+		var tp: String = cl.atual
+		var ver: bool = tp != "limpo"
+		if dia_clima.visible != ver:
+			dia_clima.visible = ver
+			dia_clima_ico.visible = ver
+		if ver:
+			dia_clima.text = "· " + str(Clima.DEF[tp]["nome"])
+			dia_clima_ico.texture = Estilo.icone(str(Clima.DEF[tp]["icone"]), 16)
+		var E0: Dictionary = cl.estacao()
+		dia_estacao.text = "%s %d/7 · %s" % [str(E0["nome"]).to_upper(), int(cl.estacao_dia()), str(cl.lua_nome()).to_upper()]
 	var falta: float
 	if noite:
 		falta = (5.5 - h) if h < 5.5 else (24.0 - h + 5.5)
@@ -634,6 +663,12 @@ func _chips() -> void:
 		quer.append(["escudo", "%d%%" % roundi(pr * 100.0), Color(0.84, 0.67, 0.4)])
 	if j.enjoo > 0.0:
 		quer.append(["alerta", "Dor de barriga", Color(0.61, 0.76, 0.29)])
+	var cl = main.get("clima")
+	if cl != null:
+		if float(cl.molhado) > 0.35:
+			quer.append(["gota", "Molhado", Color(0.55, 0.75, 0.95)])
+		if bool(cl.com_frio_rapido()):
+			quer.append(["frio", "Com frio", Color(0.7, 0.85, 1.0)])
 	var chave := str(quer)
 	if chave == str(chips.get_meta("chave", "")):
 		return

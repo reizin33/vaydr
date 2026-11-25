@@ -596,6 +596,19 @@ func _fauna(L: PackedFloat32Array) -> void:
 	main.fauna.rede(L)
 
 
+## de quem abriu: o tempo (etapa 6b)
+func mandar_clima(tipo: int, k: float, dia_c: int) -> void:
+	if papel == "anfitriao" and on and _peer != null:
+		_clima.rpc(tipo, k, dia_c)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _clima(tipo: int, k: float, dia_c: int) -> void:
+	if papel != "convidado" or not on or main == null or not is_instance_valid(main) or main.get("clima") == null:
+		return
+	main.clima.rede(tipo, clampf(k, 0.0, 1.0), dia_c)
+
+
 ## convidado: o golpe, o tiro ou a flecha no boneco de um bicho vai para quem abriu
 func hit_b(uid: int, d: float, de: Vector3, tipo: String) -> void:
 	if papel != "convidado" or not on or d <= 0.0:

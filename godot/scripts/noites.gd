@@ -148,7 +148,8 @@ func onda() -> int:
 	var feitos := 0
 	for q in main.jogadores_vivos():
 		var p: Vector3 = q["p"]
-		var n := mini(qtd_onda(noite_n, lua_sangue), MAX_ZUMBIS - _vivos())
+		var cheia: bool = main.clima != null and not lua_sangue and main.clima.lua_fase() == 4
+		var n := mini(roundi(qtd_onda(noite_n, lua_sangue) * (1.15 if cheia else 1.0)), MAX_ZUMBIS - _vivos())
 		var i := 0
 		for t in n * 4:
 			if i >= n:

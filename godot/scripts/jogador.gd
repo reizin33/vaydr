@@ -61,6 +61,7 @@ var _cam_livre := 0.0
 var _cam_dentro := 0.0
 var _bob := Vector3.ZERO
 var _corre := false
+var _dica_frio := false
 var golpe_t := -1.0      # o golpe no corpo (terceira pessoa): tempo desde o clique
 var golpe_dur := 0.4
 var golpe_parado := false   # para a foto: o golpe fica parado onde está
@@ -549,7 +550,7 @@ func _physics_process(dt: float) -> void:
 	cd = maxf(0.0, cd - dt)
 	# fome e sede
 	fome = maxf(0.0, fome - dt / 22.0)
-	sede = maxf(0.0, sede - dt / 15.0)
+	sede = maxf(0.0, sede - dt / 15.0 * (main.clima.sede() if main.clima != null else 1.0))
 	if fome <= 0.0 or sede <= 0.0:
 		ferir(dt * 0.8, false)
 	elif fome > 60.0 and sede > 60.0 and vida < 100.0 and enjoo <= 0.0:
@@ -588,6 +589,14 @@ func _physics_process(dt: float) -> void:
 		_folego_t += dt
 		if _folego_t > 0.8:
 			energia = minf(100.0, energia + dt * (14.0 if dir.length() < 0.1 else 9.0))
+	# com frio (de noite sem roupa quente, molhado, na frente fria, no inverno) a energia não enche (etapa 6b)
+	if main.clima != null and main.clima.com_frio_rapido():
+		var lim: float = 100.0 - 50.0 * (1.0 - main.clima.calor_roupa())
+		if energia > lim:
+			energia = maxf(lim, energia - 24.0 * dt)
+		if not _dica_frio:
+			_dica_frio = true
+			main.ui.aviso("Está frio: sem roupa quente a sua energia não enche. Fique perto do fogo ou faça um casaco e um gorro de pele.", 7.0)
 	_corre = corre and dir.length() > 0.1
 	var vel := AGACHA if agachado else (CORRE if corre else ANDA)
 	var alvo := dir * vel

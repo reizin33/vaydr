@@ -18,6 +18,8 @@ var efeitos: Efeitos
 var projeteis: Projeteis
 var noites: Noites          # as noites: as ondas da horda, a lua de sangue e o Colosso (etapa 5c)
 var fauna: Fauna            # os bichos do mato: as regiões, a caça e as carcaças (etapa 6a)
+var clima: Clima            # o tempo, as estações e a lua (etapa 6b)
+var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
 var palco: Palco          # o palco da criação do personagem (a clareira no começo da noite)
@@ -109,6 +111,8 @@ func _ready() -> void:
 	add_child(noites)
 	fauna = Fauna.new(self)
 	add_child(fauna)
+	clima = Clima.new(self)
+	add_child(clima)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -322,6 +326,10 @@ func _ciclo() -> void:
 		amb.ambient_light_color = amb.ambient_light_color.lerp(Color(0.75, 0.2, 0.15), 0.4 * noite_k)
 
 
+	if clima != null:
+		clima.ambiente(sol, lua, ceu, amb, neblina_base)
+
+
 ## a lua de sangue agora (no convidado vem de quem abriu, junto com a hora)
 func lua_de_sangue() -> bool:
 	if Rede.convidado():
@@ -353,6 +361,7 @@ func _process(dt: float) -> void:
 			ui.aviso("O sol está indo embora: de noite os zumbis correm. Faça uma fogueira ou se tranque na base.", 7.0)
 		if antes < 6.0 and hora >= 6.0:
 			ui.aviso("Amanheceu: dia %d" % dia, 5.0)
+		clima.passo(dt)
 	_ciclo()
 	terreno.mare(hora)
 	# zumbis: os de cada lugar (vila, posto, fazenda, sítios...) aparecem quando alguém chega perto; fora isso, alguns
@@ -416,6 +425,7 @@ func aplicar_qualidade(q: int) -> void:
 	sol.directional_shadow_max_distance = cfg["dist"]
 	amb.glow_enabled = cfg["brilho"]
 	amb.fog_density = cfg["neblina"]
+	neblina_base = cfg["neblina"]
 	jogador.cam.far = cfg["longe"]
 	mundo.alcance(cfg["mata"])
 	malhas_mapa.alcance(cfg["predios"])
@@ -526,6 +536,8 @@ func barulho(p: Vector3, r: float, alvo := Vector3.INF) -> void:
 	if Rede.convidado():
 		Rede.ruido(p, r)
 		return
+	if clima != null:
+		r *= clima.ruido()
 	if fauna != null:
 		fauna.ouvir(p, r)
 	var para := p if alvo == Vector3.INF else alvo
@@ -935,7 +947,7 @@ func salvar_jogo() -> bool:
 		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
-		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar()}
+		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -988,6 +1000,9 @@ func carregar_jogo() -> bool:
 	var fd = d.get("fauna", {})
 	if fd is Dictionary:
 		fauna.carregar(fd)
+	var cd = d.get("clima", {})
+	if cd is Dictionary:
+		clima.carregar(cd)
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -1599,14 +1614,14 @@ func _teste_fauna(livre: Vector3) -> void:
 	_limpar_bichos()
 	await _quadros(2)
 	# agachado, pelas costas, ele não te vê; o tiro faz ele fugir
-	jogador.agachado = true
+	Input.action_press("agachar")
 	var cv2 := _b_teste("cervo", c + X * 10.0, c + X * 30.0)
 	await _quadros(150)
 	var quieto := cv2.st
 	barulho(jogador.global_position, 55.0)
 	var ec2: String = await _b_ate(cv2, ["foge"], 120)
 	_confere(quieto == "come" and ec2 == "foge", "cervo: agachado e pelas costas ele não te vê (%s); o barulho do tiro faz ele fugir (%s)" % [quieto, ec2])
-	jogador.agachado = false
+	Input.action_release("agachar")
 	_limpar_bichos()
 	await _quadros(2)
 	# o rifle derruba o cervo: vira carcaça (a população da região baixa um)
@@ -1849,6 +1864,136 @@ func _teste_fauna(livre: Vector3) -> void:
 	hora = hora_antes
 	jogador.vida = 100.0
 	spawn_t = spawn_antes
+
+
+## o tempo, as estações e a lua (etapa 6b): as estações de 7 dias, as fases da lua e o eclipse, o sorteio do tempo (o 1º dia
+## limpo), a hora do tempo que vira às 6h, a neblina que fecha a vista, a chuva que molha, a tempestade que abafa o barulho e
+## o raio que põe fogo na árvore, a temperatura (frio no inverno à noite, calor no verão à tarde), o frio que segura a energia,
+## a cor das copas no outono, o tempo para quem entrou na partida, o relógio e o jogo salvo
+func _teste_clima(livre: Vector3) -> void:
+	var hora_antes := hora
+	var dia_antes := dia
+	var salvo := clima.salvar()
+	_confere(clima.estacao_idx(1) == 0 and clima.estacao_idx(7) == 0 and clima.estacao_idx(8) == 1 and clima.estacao_idx(15) == 2
+		and clima.estacao_idx(22) == 3 and clima.estacao_idx(29) == 0,
+		"estações: primavera (dias 1 a 7), verão, outono, inverno e a primavera de novo no dia 29")
+	_confere(clima.lua_fase(3) == 4 and absf(clima.lua_ilum(3) - 1.0) < 0.01 and clima.lua_ilum(7) < 0.01 and clima.eclipse_dia(7)
+		and clima.eclipse_dia(20) and not clima.eclipse_dia(8),
+		"lua: cheia no dia 3 (clareia a noite), nova no dia 7; eclipse do sol nos dias 7 e 20")
+	var s1 := clima.sortear(1)
+	var tipos := {}
+	for i in 80:
+		clima.periodo = {}
+		for sg in clima.sortear(2 + i % 27):
+			tipos[str(sg[2])] = true
+	clima.periodo = {}
+	_confere(s1.size() == 1 and str(s1[0][2]) == "nublado" and tipos.size() >= 7,
+		"tempo: o 1º dia é limpo; nos outros sai de tudo (%s)" % ", ".join(PackedStringArray(tipos.keys())))
+	dia = 5
+	clima.segs = [[6.0, 9.6, "neblina"], [20.0, 30.0, "frio"]]
+	clima.dia_c = 5
+	hora = 7.0
+	var a1 := clima.tipo_agora()
+	hora = 3.0
+	dia = 6
+	var dt6 := clima.dia_tempo()
+	var a2 := clima.tipo_agora()
+	hora = 12.0
+	dia = 5
+	var a3 := clima.tipo_agora()
+	_confere(a1 == "neblina" and a2 == "frio" and dt6 == 5 and a3 == "limpo",
+		"tempo: a neblina de manhã, a frente fria de madrugada (ainda do dia de ontem), limpo à tarde")
+	# a neblina fecha a vista (você, os zumbis e os bichos)
+	clima.atual = "neblina"
+	clima.antes = "neblina"
+	clima.k = 1.0
+	_ciclo()
+	var dens_neb := amb.fog_density
+	var vis_neb := clima.visao()
+	clima.atual = "limpo"
+	clima.antes = "limpo"
+	_ciclo()
+	var dens_limpo := amb.fog_density
+	_confere(dens_neb > dens_limpo * 2.5 and vis_neb < 0.6,
+		"neblina: a vista fecha (neblina %.4f contra %.4f) e eles enxergam a metade (%.0f%%)" % [dens_neb, dens_limpo, vis_neb * 100.0])
+	# a chuva molha quem está no aberto
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clareira := _clareira_teste(c, 14.0)
+	_jogador_em(c, c + Vector3(0, 1.5, -10))
+	await _quadros(3)
+	clima.atual = "chuva"
+	clima.antes = "chuva"
+	clima.k = 1.0
+	clima.chuva_k = 0.72
+	clima.molhado = 0.0
+	for i in 60:
+		clima._passo_molhado(0.5)
+	clima._passo_chuva()
+	var molh := clima.molhado
+	var gotas := clima._chuva.emitting
+	_confere(molh > 0.2 and gotas and not clima.abrigado(), "chuva: no aberto você fica molhado (%.0f%%) e as gotas caem em volta" % (molh * 100.0))
+	# a tempestade abafa o barulho; o raio cai numa árvore alta perto e ela pega fogo
+	clima.atual = "tempestade"
+	clima.antes = "tempestade"
+	var ruido_t := clima.ruido()
+	var fogos := projeteis.chamas.size()
+	var pr := clima.raio()
+	var dr := Vector2(pr.x - c.x, pr.z - c.z).length() if pr != Vector3.INF else -1.0
+	_confere(absf(ruido_t - 0.7) < 0.01 and pr != Vector3.INF and projeteis.chamas.size() == fogos + 1 and dr >= 17.0 and dr <= 86.0,
+		"tempestade: o barulho fica abafado (%.0f%%) e o raio caiu numa árvore a %.0f m (pegou fogo)" % [ruido_t * 100.0, dr])
+	projeteis.limpar()
+	clima.chuva_k = 0.0
+	clima.molhado = 0.0
+	clima._passo_chuva()
+	# a temperatura: inverno de madrugada faz frio de verdade; verão à tarde faz calor e a sede aperta
+	clima.atual = "limpo"
+	clima.antes = "limpo"
+	dia = 22
+	hora = 2.0
+	var t_inv := clima.temperatura()
+	var frio_inv := clima.com_frio()
+	jogador.energia = 100.0
+	clima._frio_t = 0.0
+	await _quadros(150)
+	var en_frio := jogador.energia
+	dia = 8
+	hora = 14.0
+	var t_ver := clima.temperatura()
+	var sede_ver := clima.sede()
+	clima._frio_t = 0.0
+	_confere(t_inv < 6.0 and frio_inv and en_frio < 85.0 and t_ver > 30.0 and sede_ver > 1.15,
+		"temperatura: inverno de madrugada %d °C (com frio, a energia não enche: %.0f); verão à tarde %d °C (a sede aperta %.0f%% mais)" % [
+			roundi(t_inv), en_frio, roundi(t_ver), (sede_ver - 1.0) * 100.0])
+	jogador.energia = 100.0
+	# as copas: no outono amarelo e laranja
+	dia = 15
+	hora = 12.0
+	_ciclo()
+	var copa_out: Color = mundo._copa_cor
+	dia = 2
+	_ciclo()
+	_confere(copa_out.r > 1.3 and copa_out.b < 0.7 and mundo.mats_folha.size() > 0, "outono: as copas ficam amarelas e laranja (%d materiais de folha)" % mundo.mats_folha.size())
+	# quem entrou recebe o tempo de quem abriu; o relógio mostra a temperatura e o tempo
+	clima.rede(Clima.TIPOS.find("chuva"), 1.0, 9)
+	var rede_ok := clima.atual == "chuva"
+	ui.hud._relogio()
+	var rel: String = ui.hud.dia_hora.text
+	_confere(rede_ok and rel.contains("°C") and ui.hud.dia_clima.visible and ui.hud.dia_clima.text.contains("Chuva"),
+		"relógio: a temperatura e o tempo (%s %s); o tempo de quem abriu chega para quem entrou" % [rel, ui.hud.dia_clima.text])
+	# o jogo salvo guarda o tempo do dia
+	var sv := clima.salvar()
+	clima.carregar({})
+	var zerou := clima.atual == "limpo"
+	clima.carregar(sv)
+	_confere(zerou and clima.atual == "chuva" and clima.segs.size() == sv["segs"].size(), "jogo salvo: o tempo do dia volta como estava (%s)" % clima.atual)
+	clima.carregar(salvo)
+	clima.chuva_k = 0.0
+	clima._passo_chuva()
+	_devolver_clareira(clareira)
+	dia = dia_antes
+	hora = hora_antes
+	_ciclo()
+	jogador.energia = 100.0
 
 
 ## o HUD com a arma de fogo na mão: as balas no pente / na mochila
@@ -3126,6 +3271,7 @@ func _teste() -> void:
 	await _teste_armas(livre)
 	await _teste_noites(livre)
 	await _teste_fauna(livre)
+	await _teste_clima(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -3758,6 +3904,36 @@ func _fotos() -> void:
 	if nfa > 0:
 		jogador.inv.tirar("faca", nfa)
 	_limpar_bichos()
+	# o tempo (etapa 6b): a chuva no meio da tarde, a neblina de manhã cedo e as copas do outono
+	var clima_antes := clima.salvar()
+	var dia_f := dia
+	dia = 10
+	hora = 15.0
+	clima.atual = "chuva"
+	clima.antes = "chuva"
+	clima.k = 1.0
+	clima.chuva_k = 0.9
+	_jogador_em(lw, lw + X3 * 25.0 + Vector3(0, 1.4, 0))
+	await _quadros(3)
+	clima._passo_chuva()
+	await _quadros(70)
+	await _foto("17d_chuva")
+	clima.chuva_k = 0.0
+	clima._passo_chuva()
+	clima.atual = "neblina"
+	clima.antes = "neblina"
+	hora = 7.1
+	await _quadros(12)
+	await _foto("17e_neblina")
+	dia = 17
+	hora = 16.4
+	clima.atual = "limpo"
+	clima.antes = "limpo"
+	_jogador_em(lw, lw - X3 * 40.0 + Vector3(0, 4.0, 0))
+	await _quadros(12)
+	await _foto("17f_outono")
+	clima.carregar(clima_antes)
+	dia = dia_f
 	hora = hora_f
 	_ciclo()
 	_devolver_clareira(clar)

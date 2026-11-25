@@ -1041,7 +1041,7 @@ func _perceber(j, para: Vector3, dist: float, noite_k: float, dt: float) -> void
 	if not j.vivo:
 		return
 	var ag: bool = j.agachado
-	var vis := lerpf(24.0, 11.0, noite_k)
+	var vis: float = lerpf(24.0, 11.0, noite_k) * (main.clima.visao() if main.get("clima") != null else 1.0)
 	if bool(j.lanterna_acesa) and noite_k > 0.3:
 		vis += 14.0
 	if ag:
