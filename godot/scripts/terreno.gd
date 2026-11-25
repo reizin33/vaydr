@@ -282,6 +282,10 @@ varying vec3 wn;
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wn = NORMAL;
+	// a malha do chão não traz tangente: sem ela o relevo das texturas (NORMAL_MAP) não aparecia. A textura vai pelo X e
+	// pelo Z do mundo (como num PlaneMesh): a tangente é o X na encosta e a binormal sai dela e da normal
+	TANGENT = normalize(vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x);
+	BINORMAL = normalize(cross(NORMAL, TANGENT));
 }
 
 // as contas de cor deste chão foram acertadas no modo leve, onde a textura chega em sRGB e o ALBEDO é lido em sRGB; no modo
@@ -463,6 +467,10 @@ vec3 de_srgb(vec3 c) {
 }
 void vertex() {
 	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	// o rio e o lago são quadrados soltos sem normal nem tangente: a água é deitada
+	NORMAL = vec3(0.0, 1.0, 0.0);
+	TANGENT = vec3(1.0, 0.0, 0.0);
+	BINORMAL = vec3(0.0, 0.0, -1.0);
 	VERTEX.y += sin(wp.x * 0.11 + wp.z * 0.03 - TIME * 1.1) * 0.06 + sin(wp.x * 0.05 - wp.z * 0.07 - TIME * 0.7) * 0.05;
 }
 void fragment() {
