@@ -1742,6 +1742,32 @@ func usar_item(i: int) -> void:
 			main.ui.aviso("Aprendeu a construir com a %s" % Dados.nome(id), 4.0)
 		"sacoDormir":
 			main.construcao.por_saco(self)
+		"jangada":
+			# a jangada desmontada (etapa 6k): de frente para o rio ou o lago, põe na água
+			var fr := -global_transform.basis.z
+			fr.y = 0.0
+			fr = fr.normalized()
+			var pt := Vector3.INF
+			for dd in [2.5, 3.5, 4.5]:
+				var q := global_position + fr * float(dd)
+				var nq: float = main.terreno.nivel_agua(q.x, q.z)
+				if nq > -900.0 and nq - main.terreno.h(q.x, q.z) > 0.6:
+					pt = Vector3(q.x, nq, q.z)
+					break
+			if pt == Vector3.INF or main.get("veiculos") == null:
+				main.ui.aviso("Fique de frente para a água, na beira do rio ou do lago")
+				return
+			inv.usar_um(i)
+			main.veiculos.nova_jangada(pt, atan2(fr.x, fr.z))
+			main.sons.tocar("nado", pt, 0.0)
+			main.ui.aviso("Jangada na água. Toque E perto dela para subir (W rema, A e D viram, E desce).", 6.0)
+		"pecaVeiculo":
+			# a peça de motor: abre a oficina do veículo mais perto (etapa 6j)
+			var vp = main.veiculos.perto(global_position, 6.0) if main.get("veiculos") != null else null
+			if vp == null:
+				main.ui.aviso("Use perto de um veículo (a peça conserta o motor, com o kit de ferramentas)")
+				return
+			main.ui.abrir_veiculo(vp)
 		_:
 			main.ui.aviso("%s: chega numa próxima etapa" % str(d.get("acao", d.get("nome", id))))
 

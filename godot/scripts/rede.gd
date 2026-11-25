@@ -648,7 +648,7 @@ func _mandar_veic(j) -> void:
 	var vc = j.get("veiculo")
 	if vc == null or not is_instance_valid(vc) or not bool(vc.dono_rede):
 		return
-	var k: int = main.veiculos.lista.find(vc)
+	var k: int = main.veiculos.indice(vc)
 	if k >= 0:
 		_veic_conv.rpc_id(1, k, vc.para_motorista())
 

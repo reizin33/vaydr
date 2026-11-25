@@ -25,6 +25,10 @@ static func malhas(tipo: String) -> Dictionary:
 			_moto(P)
 		"triciclo":
 			_triciclo(P)
+		"barco":
+			_barco(P)
+		"jangada":
+			_jangada(P, R)
 	var b := _montar(P["base"])
 	var c := _montar(P["cabine"]) if not (P["cabine"] as Array).is_empty() else {}
 	var r := {"base": b.get("malha"), "sup_base": b.get("sups", []), "cabine": c.get("malha"), "sup_cabine": c.get("sups", []), "roda": _roda()}
@@ -218,6 +222,60 @@ static func _triciclo(P: Dictionary) -> void:
 	_A(B, _caixa(1.1, 0.35, 0.5), _m(0, 1.05, -0.75), 0x3f3f3a)
 	for s in [1.0, -1.0]:
 		_A(B, _caixa(0.1, 0.06, 0.04), _m(s * 0.5, 0.8, -1.0), 0x9a1a14, "lanterna", 0.0)
+
+
+# ---------------------------------------------------------------- o barco a motor (v_barco, etapa 6k)
+static func _barco(P: Dictionary) -> void:
+	var B: Array = P["base"]
+	var casco := 0xd8d4c8
+	var faixa := 0x2d5a7a
+	var mad := 0x6b5038
+	var dark := 0x1c1f22
+	var trim := 0x5c6166
+	# o casco (mais estreito embaixo), a faixa azul na linha d'água e a proa pontuda
+	_A(B, _chanfro(1.8, 0.65, 4.2, 0.2, 1.0, 1.0, 0.7, 0.9), _m(0, 0.35, 0), casco)
+	_A(B, _chanfro(1.8, 0.18, 4.25, 0.02, 1.0, 1.0, 0.72, 1.0), _m(0, 0.05, 0), faixa, "corpo", 0.02)
+	var proa := _cil_fase(0.05, 0.9, 0.95, 4, PI / 4.0)
+	var mp := _m(0, 0.5, 2.35, PI / 2.0) * Transform3D(Basis.from_scale(Vector3(1.0, 1.0, 0.6)), Vector3.ZERO)
+	_A(B, proa, mp, casco)
+	# os bancos, o motor de popa, o eixo e a hélice
+	for z in [-0.8, 0.6]:
+		_A(B, _caixa(1.6, 0.08, 0.4), _m(0, 0.7, z), mad, "corpo", 0.06)
+	_A(B, _caixa(0.45, 0.55, 0.4), _m(0, 0.85, -2.2), dark)
+	_A(B, _cil(0.04, 0.04, 0.7, 6), _m(0, 0.15, -2.3), trim)
+	_A(B, _caixa(0.12, 0.3, 0.2), _m(0, -0.15, -2.32), dark)
+	_A(B, _caixa(0.16, 0.08, 0.04), _m(0, 1.0, 2.12), 0xfff1c8, "farol", 0.0)
+
+
+# ---------------------------------------------------------------- a jangada (v_jangada, etapa 6k)
+static func _jangada(P: Dictionary, R: RandomNumberGenerator) -> void:
+	var B: Array = P["base"]
+	var tr := 0x7a5a3a
+	var tr2 := 0x664a30
+	var co := 0xb9a77a
+	# sete toras deitadas ao longo da jangada, as travessas e as amarrações de corda; o remo apoiado de lado
+	for i in 7:
+		_A(B, _cil(0.17, 0.17, 3.0, 8), _m(-1.0 + i * 0.34, 0.15, 1.5, -PI / 2.0), tr if i % 2 == 1 else tr2, "corpo", 0.07 + R.randf() * 0.03)
+	for z in [-1.1, 0.0, 1.1]:
+		_A(B, _caixa(2.4, 0.08, 0.12), _m(0, 0.34, z), tr2, "corpo", 0.06)
+		for x in [-0.85, 0.85]:
+			_A(B, _cil(0.2, 0.2, 0.08, 8), _m(x - 0.04, 0.3, z, 0, 0, PI / 2.0), co, "corpo", 0.05)
+	_A(B, _cil(0.025, 0.025, 1.9, 5), _m(0.9, 0.42, -0.7, 1.2, 0, 0.4), tr)
+	_A(B, _caixa(0.18, 0.03, 0.42), _m(1.25, 0.6, 0.85, 0.3, 0, 0.4), tr)
+
+
+## tronco de cone com a fase (a proa de 4 lados do barco)
+static func _cil_fase(rt: float, rb: float, h: float, seg: int, fase: float) -> PackedVector3Array:
+	var t := PackedVector3Array()
+	for i in seg:
+		var a0 := fase + i / float(seg) * TAU
+		var a1 := fase + (i + 1) / float(seg) * TAU
+		var b0 := Vector3(rb * cos(a0), 0, rb * sin(a0))
+		var b1 := Vector3(rb * cos(a1), 0, rb * sin(a1))
+		var t0 := Vector3(rt * cos(a0), h, rt * sin(a0))
+		var t1 := Vector3(rt * cos(a1), h, rt * sin(a1))
+		t.append_array(PackedVector3Array([b0, t0, t1, b0, t1, b1, Vector3(0, h, 0), t1, t0, Vector3.ZERO, b1, b0]))
+	return t
 
 
 # ---------------------------------------------------------------- a roda (pneu, aro e os raios)

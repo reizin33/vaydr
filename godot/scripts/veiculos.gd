@@ -2,8 +2,10 @@ class_name Veiculos
 extends Node3D
 ## Os veículos do mundo (etapa 6j), como no jogo antigo (47_carro.js, veicPadrao): a caminhonete perto da fazenda (sem
 ## gasolina), o carro da vila (sem bateria, com um pneu furado e o motor cansado), a moto da cidade (com o motor quebrado) e o
-## triciclo da fazenda (com um pouco de gasolina e um pneu furado). Toque E entra (se der); segure E abre a oficina do veículo
-## (o estado das peças, os consertos, abastecer e o porta-malas). O barco, a jangada e o helicóptero vêm depois.
+## triciclo da fazenda (com um pouco de gasolina e um pneu furado); na água (etapa 6k), o barco a motor no cais do lago (sem
+## gasolina e com o motor quebrado) e a jangada que você faz (Fabricar) e põe na água de frente para o rio ou o lago. Toque E
+## entra (se der); segure E abre a oficina do veículo (o estado das peças, os consertos, abastecer e o porta-malas). O
+## helicóptero vem depois.
 ## As estradas: fora delas (e fora da cidade) os veículos andam mais devagar, menos o triciclo.
 ## Na partida em rede os veículos são de quem abriu: o convidado vê eles andando e pode pedir para dirigir um (quem abriu
 ## deixa se ninguém estiver nele e se ele andar); dirigindo, o jogo do convidado diz onde o veículo está e quem abriu mostra para
@@ -14,11 +16,14 @@ const PADRAO := [
 	["caminhonete", "caminhonete", -57.0, 49.0, 2.28, {"comb": 0.0, "motor": 100.0, "oleo": 70.0}],
 	["sedan", "sedanVila", 57.5, -48.0, 0.35, {"comb": 0.0, "bateria": false, "pneus": [100.0, 0.0, 100.0, 100.0], "motor": 70.0, "oleo": 35.0, "hp": 75.0}],
 	["moto", "motoCidade", 186.0, 15.5, 1.2, {"comb": 0.0, "motor": 0.0, "oleo": 50.0, "hp": 80.0}],
-	["triciclo", "triFazenda", -79.0, 63.0, -2.4, {"comb": 15.0, "pneus": [100.0, 0.0, 100.0], "oleo": 20.0, "hp": 85.0}]]
+	["triciclo", "triFazenda", -79.0, 63.0, -2.4, {"comb": 15.0, "pneus": [100.0, 0.0, 100.0], "oleo": 20.0, "hp": 85.0}],
+	["barco", "barcoCais", 74.6, 91.3, 0.05, {"comb": 0.0, "motor": 0.0, "hp": 90.0}]]
 const CEL := 16.0
 
 var main
 var lista: Array = []
+var _extra := {}             # convidado: os veículos de quem abriu que não existem aqui (a jangada dele), índice de lá -> boneco
+var _escondidos: Array = []  # convidado: os veículos só do seu mundo (a sua jangada), escondidos durante a partida
 var _grade := {}             # célula de 16 m -> [[a, b, meia largura + 1 m]] dos pedaços de estrada
 var _dicas := {}
 
@@ -60,6 +65,9 @@ func novo() -> void:
 ## um lugar livre para o veículo perto do ponto do jogo antigo (o mapa daqui pode ter uma árvore ou um muro bem ali)
 func _lugar(tipo: String, p: Vector3, yaw: float) -> Vector3:
 	var T: Dictionary = Veiculo.TIPOS[tipo]
+	if bool(T.get("agua", false)):
+		var nv: float = main.terreno.nivel_agua(p.x, p.z)
+		return Vector3(p.x, (nv if nv > -900.0 else main.terreno.h(p.x, p.z)) - 0.22, p.z)
 	var bx := BoxShape3D.new()
 	bx.size = Vector3(float(T["hw"]) * 2.0 + 0.2, float(T["alt"]) - 0.5, float(T["hd"]) * 2.0 + 0.2)
 	var q := PhysicsShapeQueryParameters3D.new()
@@ -187,7 +195,7 @@ func sair(j) -> bool:
 	var v = j.veiculo
 	if v == null or not is_instance_valid(v):
 		return false
-	if absf(float(v.v)) > 4.0:
+	if absf(float(v.v)) > 4.0 and not v.na_agua():
 		main.ui.aviso("Diminua a velocidade para descer", 2.5)
 		return false
 	var p: Vector3 = v.saida()
@@ -224,7 +232,7 @@ func _devolver(v) -> void:
 	if not bool(v.dono_rede):
 		return
 	v.dono_rede = false
-	var k := lista.find(v)
+	var k := indice(v)
 	if k >= 0:
 		Rede.sair_veic(k, v.estado_rede())
 	v.lan = true
@@ -232,10 +240,22 @@ func _devolver(v) -> void:
 
 func _desligar(v) -> void:
 	v.ativo = false
-	v.v = 0.0
+	# na água ele continua deslizando um pouco
+	v.v = float(v.v) * 0.3 if v.na_agua() else 0.0
 	v.acel = 0.0
 	v.freando = false
 	v.mostrar_cabine(true)
+
+
+## a jangada desmontada posta na água (etapa 6k): fica no mundo como os outros veículos (e no jogo salvo)
+func nova_jangada(p: Vector3, yaw: float) -> Veiculo:
+	var v := Veiculo.new(main, "jangada", "jangada%d" % Time.get_ticks_msec())
+	add_child(v)
+	v.global_position = p
+	v.rotation.y = yaw
+	v.assentar()
+	lista.append(v)
+	return v
 
 
 ## o veículo mais perto (até r metros)
@@ -253,35 +273,93 @@ func perto(p: Vector3, r: float) -> Veiculo:
 
 
 # ================================================================ a partida em rede
-## de quem abriu: todos os veículos (são poucos), [índice, ...12 números de Veiculo.para_rede]
+## de quem abriu: todos os veículos (são poucos), [índice, tipo, ...12 números de Veiculo.para_rede]
 func para_rede() -> PackedFloat32Array:
 	var L := PackedFloat32Array()
+	var tipos: Array = Veiculo.TIPOS.keys()
 	for i in lista.size():
 		var v = lista[i]
 		if not is_instance_valid(v):
 			continue
 		L.append(float(i))
+		L.append(float(tipos.find((v as Veiculo).tipo)))
 		L.append_array((v as Veiculo).para_rede())
 	return L
 
 
-## no convidado: os veículos daqui viram os bonecos dos de quem abriu
+## no convidado: os veículos daqui viram os bonecos dos de quem abriu (os do jogo antigo são os mesmos nos dois; os que quem
+## abriu fez, como a jangada, nascem aqui como bonecos; os que só você tem ficam escondidos até a partida acabar)
 func rede(L: PackedFloat32Array) -> void:
-	var n := 13
+	var n := 14
 	var i := 0
 	var j = main.jogador
+	var tipos: Array = Veiculo.TIPOS.keys()
+	if _escondidos.is_empty():
+		for q in range(PADRAO.size(), lista.size()):
+			var vq = lista[q]
+			if is_instance_valid(vq) and not _escondidos.has(vq):
+				if j != null and j.veiculo == vq:
+					expulsar(j)
+				_esconder(vq, true)
+				_escondidos.append(vq)
 	while i + n <= L.size():
 		var k := int(L[i])
-		if k >= 0 and k < lista.size() and is_instance_valid(lista[k]):
-			var v: Veiculo = lista[k]
-			# o que você está dirigindo: quem manda onde ele está é você
-			if v.dono_rede and j != null and j.veiculo == v:
-				i += n
-				continue
-			if j != null and j.veiculo == v:
-				expulsar(j)
-			v.rede(L, i + 1)
+		var ti := int(L[i + 1])
+		if k >= 0 and ti >= 0 and ti < tipos.size():
+			var v := _boneco_de(k, str(tipos[ti]))
+			if v != null:
+				# o que você está dirigindo: quem manda onde ele está é você
+				if v.dono_rede and j != null and j.veiculo == v:
+					i += n
+					continue
+				if j != null and j.veiculo == v:
+					expulsar(j)
+				v.rede(L, i + 2)
 		i += n
+
+
+## o veículo daqui que mostra o veículo k de quem abriu (os do jogo antigo pelo lugar na lista; os outros nascem aqui)
+func _boneco_de(k: int, tipo: String) -> Veiculo:
+	if k < PADRAO.size():
+		if k < lista.size() and is_instance_valid(lista[k]) and (lista[k] as Veiculo).tipo == tipo:
+			return lista[k]
+		return null
+	var v = _extra.get(k)
+	if v != null and is_instance_valid(v) and (v as Veiculo).tipo == tipo:
+		return v
+	if v != null and is_instance_valid(v):
+		(v as Node).queue_free()
+	var nv := Veiculo.new(main, tipo, "rede%d" % k)
+	add_child(nv)
+	nv.lan = true
+	_extra[k] = nv
+	return nv
+
+
+## o índice que quem abriu conhece (para pedir para dirigir e para devolver)
+func indice(v) -> int:
+	var k := lista.find(v)
+	if k >= 0 and k < PADRAO.size():
+		return k
+	for e in _extra:
+		if _extra[e] == v:
+			return int(e)
+	return k if not Rede.convidado() else -1
+
+
+func _por_indice(k: int) -> Veiculo:
+	if Rede.convidado() and k >= PADRAO.size():
+		var v = _extra.get(k)
+		return v if v != null and is_instance_valid(v) else null
+	if k >= 0 and k < lista.size() and is_instance_valid(lista[k]):
+		return lista[k]
+	return null
+
+
+func _esconder(v, on: bool) -> void:
+	(v as Node3D).visible = not on
+	(v as Node3D).process_mode = Node.PROCESS_MODE_DISABLED if on else Node.PROCESS_MODE_INHERIT
+	(v as CollisionObject3D).collision_layer = 0 if on else (2 if (v as Veiculo).na_agua() else 1)
 
 
 func soltar_rede() -> void:
@@ -293,11 +371,22 @@ func soltar_rede() -> void:
 			(v as Veiculo).dono_rede = false
 			(v as Veiculo).motorista = 0
 			(v as Veiculo).soltar_rede()
+	for k in _extra:
+		var v = _extra[k]
+		if is_instance_valid(v):
+			if j != null and j.veiculo == v:
+				expulsar(j)
+			(v as Node).queue_free()
+	_extra = {}
+	for v in _escondidos:
+		if is_instance_valid(v):
+			_esconder(v, false)
+	_escondidos = []
 
 
 ## convidado: pede para dirigir o veículo de quem abriu (quem abriu responde)
 func pedir(v: Veiculo) -> void:
-	var k := lista.find(v)
+	var k := indice(v)
 	if k < 0:
 		return
 	Rede.pedir_veic(k)
@@ -306,9 +395,9 @@ func pedir(v: Veiculo) -> void:
 
 ## convidado: quem abriu deixou dirigir (com o estado das peças de lá) ou disse por que não
 func resposta(k: int, ok: bool, motivo: String, estado: Dictionary) -> void:
-	if k < 0 or k >= lista.size() or not is_instance_valid(lista[k]):
+	var v := _por_indice(k)
+	if v == null:
 		return
-	var v: Veiculo = lista[k]
 	if not ok:
 		main.ui.aviso(motivo, 3.5)
 		main.sons.tocar("vazio", v.global_position, 0.0)

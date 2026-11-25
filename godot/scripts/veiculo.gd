@@ -1,7 +1,7 @@
 class_name Veiculo
 extends CharacterBody3D
-## Um veículo do jogo antigo (47_carro.js), etapa 6j: a caminhonete, o carro, a moto e o triciclo. Cada um tem as peças com
-## estado, como lá:
+## Um veículo do jogo antigo (47_carro.js), etapa 6j: a caminhonete, o carro, a moto e o triciclo; na água (etapa 6k) o barco a
+## motor do cais do lago e a jangada (você faz e põe na água). Cada um tem as peças com estado, como lá:
 ## · motor: perde com batidas, com a água funda e sem óleo; em 0 não pega. Conserta com peça de motor + kit de ferramentas.
 ## · pneus: furam em batidas e atropelando; furado deixa lento e puxa para o lado. Troca com pneu + kit.
 ## · óleo: gasta rodando; pouco óleo estraga o motor. Repõe com óleo de motor.
@@ -28,7 +28,14 @@ const TIPOS := {
 	"triciclo": {"nome": "Triciclo", "art": "o", "maxV": 11.0, "ace": 3.2, "cons": 0.6, "galao": 80.0, "cap": 4, "ruido": 22.0,
 		"hw": 0.75, "hd": 1.3, "alt": 1.22, "bateria": false, "fora": 1.0, "exposto": true,
 		"rodas": [[0.0, 0.36, 0.98, 1, 0.86], [0.66, 0.38, -0.62, 0, 0.9], [-0.66, 0.38, -0.62, 0, 0.9]],
-		"assento": [0.0, 1.7, -0.2], "farol": [[0.0, 0.92, 1.15]], "camD": 5.6, "camH": 1.6}}
+		"assento": [0.0, 1.7, -0.2], "farol": [[0.0, 0.92, 1.15]], "camD": 5.6, "camH": 1.6},
+	# na água (etapa 6k): só anda onde tem água (encalha na margem), a correnteza do rio leva; a jangada é no remo
+	"barco": {"nome": "Barco a motor", "art": "o", "maxV": 9.0, "ace": 2.4, "cons": 0.9, "galao": 50.0, "cap": 6, "ruido": 22.0,
+		"hw": 0.95, "hd": 2.3, "alt": 1.1, "bateria": false, "agua": true, "exposto": true, "rodas": [],
+		"assento": [0.0, 1.42, -1.4], "farol": [[0.0, 1.0, 2.1]], "camD": 7.0, "camH": 1.8},
+	"jangada": {"nome": "Jangada", "art": "a", "maxV": 2.6, "ace": 1.6, "cons": 0.0, "galao": 0.0, "cap": 3, "ruido": 4.0,
+		"hw": 1.2, "hd": 1.6, "alt": 0.75, "bateria": false, "agua": true, "exposto": true, "remo": true, "sem_motor": true, "rodas": [],
+		"assento": [0.0, 1.25, -0.3], "farol": [], "camD": 6.0, "camH": 1.7}}
 
 var main
 var tipo := ""
@@ -71,6 +78,7 @@ var _lan_p := Vector3.ZERO
 var _lan_yaw := 0.0
 var _lan_pr := Vector2.ZERO
 var _antes_rede := {}
+var _remo_t := 0.0
 
 static var _mat_c: StandardMaterial3D
 static var _mat_v: StandardMaterial3D
@@ -88,7 +96,8 @@ func _init(m, t: String, id_: String) -> void:
 		pn.append(100.0)
 	pecas = {"motor": 100.0, "pneus": pn, "oleo": 80.0, "bateria": true}
 	set_meta("veiculo", self)
-	collision_layer = 1
+	# na água ninguém tropeça nele (só a mira pega, para o E); na terra é sólido
+	collision_layer = 2 if bool(T.get("agua", false)) else 1
 	collision_mask = 1
 
 
@@ -239,6 +248,8 @@ func furados() -> int:
 func pode() -> String:
 	if hp <= 0.0:
 		return "%s destruíd%s" % [nome(), str(T["art"])]
+	if sem_motor():
+		return ""
 	if float(pecas["motor"]) <= 0.0:
 		return "O motor está quebrado"
 	if bool(T.get("bateria", false)) and not bool(pecas["bateria"]):
@@ -248,12 +259,25 @@ func pode() -> String:
 	return ""
 
 
+func sem_motor() -> bool:
+	return bool(T.get("sem_motor", false))
+
+
+func na_agua() -> bool:
+	return bool(T.get("agua", false))
+
+
 ## o texto da mira, parado na frente dele
 func texto() -> String:
 	var nao := pode()
+	# o texto principal e, depois de dois espaços, a dica menor (como o HUD mostra)
 	if nao != "":
-		return "%s: %s · toque E: o que falta · segure E: oficina" % [nome(), nao.to_lower()]
-	return "E  Dirigir %s %s · %d%% de combustível · segure E: oficina e porta-malas" % [o_a(), nome().to_lower(), roundi(comb)]
+		return "%s: %s  toque E: o que falta · segure E: oficina" % [nome(), nao.to_lower()]
+	if sem_motor():
+		return "E  Subir na %s  segure E: a carga" % nome().to_lower()
+	if na_agua():
+		return "E  Subir no %s  %d%% de combustível · segure E: oficina e carga" % [nome().to_lower(), roundi(comb)]
+	return "E  Dirigir %s %s  %d%% de combustível · segure E: oficina e porta-malas" % [o_a(), nome().to_lower(), roundi(comb)]
 
 
 ## onde fica o olho de quem dirige (o assento, inclinando com o veículo)
@@ -285,6 +309,13 @@ func _physics_process(dt: float) -> void:
 		return
 	var j = main.jogador
 	var dirige: bool = ativo and j != null and j.veiculo == self
+	# na água: sempre boiando (e a correnteza leva)
+	if na_agua():
+		_mover_agua(dt, dirige, j)
+		_som(dirige)
+		_luzes(dirige)
+		_fumaca_passo(dirige)
+		return
 	if not dirige and absf(v) < 0.02:
 		v = 0.0
 		acel = 0.0
@@ -414,6 +445,86 @@ func _mover(dt: float, dirige: bool, j) -> void:
 		if comb <= 0.0 and not _dica_comb:
 			_dica_comb = true
 			main.ui.aviso("A gasolina acabou. Ache outro galão no posto, nos carros ou no depósito de combustível e abasteça.", 7.0)
+	if buz > 0.0:
+		buz -= dt
+
+
+## o barco e a jangada (updateBarco do jogo antigo): só na água; encalha na margem (batendo rápido machuca o casco); a correnteza
+## do rio leva; a jangada no remo (W rema, A e D viram); bóia mexendo com a água
+func _mover_agua(dt: float, dirige: bool, j) -> void:
+	var acc := 0.0
+	var strv := 0.0
+	freando = false
+	if dirige and not bool(j.preso):
+		var mv := Input.get_vector("esquerda", "direita", "frente", "tras")
+		acc = -mv.y
+		strv = mv.x
+	var sem := sem_motor()
+	var motor_ok: bool = sem or (hp > 0.0 and float(pecas["motor"]) > 0.0 and comb > 0.0)
+	if not motor_ok:
+		acc = minf(0.0, acc) * 0.3
+	acel = maxf(0.0, acc)
+	var maxv: float = float(T["maxV"]) * (1.0 if sem else 0.6 + 0.4 * float(pecas["motor"]) / 100.0)
+	if acc > 0.05:
+		v += float(T["ace"]) * acc * dt * _taper(v, maxv)
+	elif acc < -0.05:
+		v -= float(T["ace"]) * 0.8 * (-acc) * dt
+	else:
+		v *= exp(-dt * (0.9 if sem else 0.45))
+	v = clampf(v, -maxv * 0.4, maxv)
+	if absf(v) < 0.02 and absf(acc) < 0.05:
+		v = 0.0
+	steer = move_toward(steer, strv, dt * 2.5)
+	rotation.y -= steer * clampf(absf(v) / 2.0 + 0.25, 0.0, 1.0) * (0.8 if sem else 1.1) * dt * (1.0 if v >= 0.0 else -1.0)
+	var fr := frente()
+	var antes := global_position
+	var mov := fr * v * dt
+	# a correnteza do rio leva rio abaixo (mais forte em cima, mais fraca perto do lago)
+	if main.pesca != null and main.fauna != null and main.pesca.local(antes.x, antes.z) == "rio":
+		var q: Vector2 = main.fauna.rio_perto(antes.x, antes.z)
+		var rp: Array = main.fauna.rio_ponto(q.y)
+		var dr: Vector2 = rp[1]
+		mov += Vector3(dr.x, 0.0, dr.y) * lerpf(0.6, 0.3, q.y) * dt
+	if mov.length() > 0.0001:
+		var col := move_and_collide(mov)
+		if col != null:
+			v *= 0.5
+	# a proa na margem (ou na água rasa): encalha
+	var hd: float = T["hd"]
+	var gp := global_position
+	var proa := gp + fr * hd * 0.85 * (1.0 if v >= 0.0 else -1.0)
+	var n_p: float = main.terreno.nivel_agua(proa.x, proa.z)
+	if n_p < -900.0 or n_p - main.terreno.h(proa.x, proa.z) < 0.45:
+		global_position = Vector3(antes.x, gp.y, antes.z)
+		if absf(v) > 3.0:
+			hp = maxf(0.0, hp - (absf(v) - 3.0))
+			main.sons.tocar("madeira", global_position, 0.0)
+		v *= -0.15
+	# boiando
+	var p := global_position
+	var nv: float = main.terreno.nivel_agua(p.x, p.z)
+	var t := Time.get_ticks_msec() / 1000.0
+	global_position.y = (nv if nv > -900.0 else main.terreno.h(p.x, p.z)) - 0.22 + sin(t * 1.6 + p.x) * 0.04
+	pitch = sin(t * 1.3) * 0.03 - v * 0.006
+	roll = sin(t * 1.1 + 1.0) * 0.035 + steer * 0.04 * absf(v) / 4.0
+	corpo.rotation = Vector3(pitch, 0, roll)
+	giro += v * dt
+	# o motor gasta e faz barulho; o remo faz barulho de água
+	if dirige and not sem and motor_ok:
+		comb = maxf(0.0, comb - (0.02 + absf(v) * 0.015) * float(T["cons"]) * dt)
+		_ruido_t -= dt
+		if _ruido_t <= 0.0:
+			_ruido_t = 0.5
+			main.barulho(global_position, float(T["ruido"]) * (1.0 if absf(v) > 1.0 else 0.5))
+		if comb <= 0.0 and not _dica_comb:
+			_dica_comb = true
+			main.ui.aviso("A gasolina do barco acabou. Ache outro galão e abasteça (segure E perto dele).", 6.0)
+	if dirige and sem and absf(acc) > 0.1:
+		_remo_t -= dt
+		if _remo_t <= 0.0:
+			_remo_t = 0.9
+			main.sons.tocar("nado", global_position, -6.0)
+			main.barulho(global_position, float(T["ruido"]))
 	if buz > 0.0:
 		buz -= dt
 
@@ -584,7 +695,7 @@ func _fumaca_passo(dirige: bool) -> void:
 
 ## buzina (clique dirigindo): os zumbis ouvem de longe
 func buzinar() -> void:
-	if buz > 0.0:
+	if buz > 0.0 or sem_motor():
 		return
 	buz = 0.6
 	main.sons.tocar("buzina", global_position, 2.0)
@@ -593,6 +704,11 @@ func buzinar() -> void:
 
 ## põe no chão (ao nascer, carregar ou descer): altura e inclinação na hora
 func assentar() -> void:
+	if na_agua():
+		var p := global_position
+		var nv: float = main.terreno.nivel_agua(p.x, p.z)
+		global_position.y = (nv if nv > -900.0 else main.terreno.h(p.x, p.z)) - 0.22
+		return
 	_chao_e_inclinacao(1.0)
 	_chao_e_inclinacao(1.0)
 	_rodas(0.0)
@@ -604,6 +720,17 @@ func saida() -> Vector3:
 	var hw: float = T["hw"]
 	var hd: float = T["hd"]
 	var op: Array = []
+	if na_agua():
+		# do barco e da jangada: na margem, se der; senão pula na água do lado e nada
+		var xa := global_transform
+		for o in [[2.0, 0.0], [-2.0, 0.0], [0.0, 3.0], [0.0, -3.0], [2.6, 1.5], [-2.6, 1.5], [2.6, -1.5], [-2.6, -1.5]]:
+			var q := xa * Vector3(float(o[0]), 0, float(o[1]))
+			var c := _ponto_chao(q)
+			if c != Vector3.INF and _livre(c):
+				return c
+		var w := xa * Vector3(1.8, 0, 0)
+		var nw: float = main.terreno.nivel_agua(w.x, w.z)
+		return Vector3(w.x, (nw if nw > -900.0 else global_position.y) - 1.0, w.z)
 	if bool(T.get("moto", false)):
 		op = [[0.9, 0.0], [-0.9, 0.0], [0.0, -1.6], [1.4, 0.0], [-1.4, 0.0], [0.0, 1.6], [0.0, -2.3]]
 	else:
@@ -680,14 +807,17 @@ static func pct(x: float) -> String:
 ## o estado de cada peça (para a oficina e o HUD): [nome, valor, ruim]
 func estado() -> Array:
 	var L: Array = []
-	L.append(["Combustível", pct(comb), comb < 15.0])
-	L.append(["Motor", pct(float(pecas["motor"])), float(pecas["motor"]) < 35.0])
-	L.append(["Lataria", pct(hp), hp < 35.0])
-	var pn: Array = []
-	for q in pecas["pneus"]:
-		pn.append("furado" if float(q) <= 0.0 else pct(float(q)))
-	L.append(["Pneus", " · ".join(PackedStringArray(pn)), furados() > 0])
-	L.append(["Óleo", pct(float(pecas["oleo"])), float(pecas["oleo"]) < 15.0])
+	if not sem_motor():
+		L.append(["Combustível", pct(comb), comb < 15.0])
+		L.append(["Motor", pct(float(pecas["motor"])), float(pecas["motor"]) < 35.0])
+	L.append(["Casco" if na_agua() else "Lataria", pct(hp), hp < 35.0])
+	if not (T["rodas"] as Array).is_empty():
+		var pn: Array = []
+		for q in pecas["pneus"]:
+			pn.append("furado" if float(q) <= 0.0 else pct(float(q)))
+		L.append(["Pneus", " · ".join(PackedStringArray(pn)), furados() > 0])
+	if not na_agua():
+		L.append(["Óleo", pct(float(pecas["oleo"])), float(pecas["oleo"]) < 15.0])
 	if bool(T.get("bateria", false)):
 		L.append(["Bateria", "ok" if bool(pecas["bateria"]) else "faltando", not bool(pecas["bateria"])])
 	L.append(["Carga", "%d de %d" % [int(T["cap"]) - porta.livres(), int(T["cap"])], false])
@@ -700,11 +830,13 @@ func acoes(j) -> Array:
 	var tk := "" if kit else " (precisa do kit de ferramentas)"
 	var A: Array = []
 	var inv: Inventario = j.inv
-	A.append({"id": "abastecer", "t": "Abastecer", "s": ("1 galão: +%d%%" % int(T["galao"])) if inv.conta("gasolina") > 0 else "sem galão de gasolina",
-		"ok": inv.conta("gasolina") > 0 and comb < 97.0})
+	if not sem_motor():
+		A.append({"id": "abastecer", "t": "Abastecer", "s": ("1 galão: +%d%%" % int(T["galao"])) if inv.conta("gasolina") > 0 else "sem galão de gasolina",
+			"ok": inv.conta("gasolina") > 0 and comb < 97.0})
 	if hp < 100.0:
-		A.append({"id": "lataria", "t": "Consertar a lataria", "s": "3 sucata e 2 pregos: +35%", "ok": inv.conta("sucata") >= 3 and inv.conta("pregos") >= 2})
-	if float(pecas["motor"]) < 100.0:
+		A.append({"id": "lataria", "t": "Remendar o casco" if na_agua() else "Consertar a lataria", "s": "3 sucata e 2 pregos: +35%",
+			"ok": inv.conta("sucata") >= 3 and inv.conta("pregos") >= 2})
+	if not sem_motor() and float(pecas["motor"]) < 100.0:
 		A.append({"id": "motor", "t": "Consertar o motor", "s": "1 peça de motor" + tk, "ok": kit and inv.conta("pecaVeiculo") > 0})
 	var fraco := false
 	for q in pecas["pneus"]:
@@ -712,13 +844,13 @@ func acoes(j) -> Array:
 			fraco = true
 	if fraco:
 		A.append({"id": "pneu", "t": "Trocar pneu", "s": "1 pneu" + tk, "ok": kit and inv.conta("pneu") > 0})
-	if float(pecas["oleo"]) < 90.0:
+	if not na_agua() and float(pecas["oleo"]) < 90.0:
 		A.append({"id": "oleo", "t": "Pôr óleo", "s": "1 óleo de motor: +45%", "ok": inv.conta("oleoMotor") > 0})
 	if bool(T.get("bateria", false)) and not bool(pecas["bateria"]):
 		A.append({"id": "bateria", "t": "Instalar bateria", "s": "1 bateria automotiva" + tk, "ok": kit and inv.conta("bateriaVeic") > 0})
-	A.append({"id": "carga", "t": "Porta-malas", "s": "%d de %d espaços" % [int(T["cap"]) - porta.livres(), int(T["cap"])], "ok": true})
+	A.append({"id": "carga", "t": "Carga" if na_agua() else "Porta-malas", "s": "%d de %d espaços" % [int(T["cap"]) - porta.livres(), int(T["cap"])], "ok": true})
 	var nao := pode()
-	A.append({"id": "dirigir", "t": "Dirigir", "s": nao if nao != "" else "pronto", "ok": nao == ""})
+	A.append({"id": "dirigir", "t": "Subir" if na_agua() else "Dirigir", "s": nao if nao != "" else "pronto", "ok": nao == ""})
 	return A
 
 

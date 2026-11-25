@@ -2684,7 +2684,7 @@ func _teste_veiculos(livre: Vector3) -> void:
 	_limpar_zumbis()
 	veiculos.novo()
 	await _quadros(3)
-	var ok_lugar := veiculos.lista.size() == 4
+	var ok_lugar := veiculos.lista.size() == Veiculos.PADRAO.size()
 	var dists: Array = []
 	for i in veiculos.lista.size():
 		var vi: Veiculo = veiculos.lista[i]
@@ -2699,7 +2699,7 @@ func _teste_veiculos(livre: Vector3) -> void:
 	var tc := veiculos.por_id("triFazenda")
 	_confere(ok_lugar and cv != null and sd != null and mt != null and tc != null and cv.pode() == "Sem combustível"
 		and sd.pode().begins_with("Sem bateria") and mt.pode() == "O motor está quebrado" and tc.pode() == "" and sd.furados() == 1,
-		"veículos: a caminhonete (sem gasolina), o carro (sem bateria, um pneu furado), a moto (motor quebrado) e o triciclo (pronto) perto dos lugares do jogo antigo (%s)" % ", ".join(PackedStringArray(dists)))
+		"veículos: a caminhonete (sem gasolina), o carro (sem bateria, um pneu furado), a moto (motor quebrado), o triciclo (pronto) e o barco perto dos lugares do jogo antigo (%s)" % ", ".join(PackedStringArray(dists)))
 	if cv == null or sd == null or mt == null or tc == null:
 		spawn_t = spawn_antes
 		hora = hora_antes
@@ -2944,6 +2944,117 @@ func _teste_veiculos(livre: Vector3) -> void:
 	cao.iniciar()
 	veiculos.novo()
 	_devolver_clareira(clar)
+	spawn_t = spawn_antes
+	hora = hora_antes
+
+
+## o barco e a jangada (etapa 6k): o barco no lago (motor quebrado e sem gasolina), conserta, abastece, sobe, anda na água, vira,
+## desce no meio do lago (nadando); a jangada no remo (sem gasolina); pôr a jangada na água de frente para o lago; o jogo salvo
+func _teste_barcos() -> void:
+	var hora_antes := hora
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	hora = 12.0
+	_limpar_zumbis()
+	veiculos.novo()
+	await _quadros(3)
+	var bc := veiculos.por_id("barcoCais")
+	if bc == null:
+		_confere(false, "barcos: o barco do cais existe")
+		spawn_t = spawn_antes
+		hora = hora_antes
+		return
+	var nb: float = terreno.nivel_agua(bc.global_position.x, bc.global_position.z)
+	var boia := nb > -900.0 and absf(bc.global_position.y - (nb - 0.22)) < 0.12
+	var tm0 := bc.texto()
+	for it in [["kitFerramentas", 1], ["pecaVeiculo", 1], ["gasolina", 1]]:
+		jogador.inv.por(str(it[0]), int(it[1]))
+	var m1 := bc.fazer("motor", jogador)
+	var m2 := bc.fazer("abastecer", jogador)
+	_confere(boia and tm0.contains("motor está quebrado") and bc.pode() == "" and absf(bc.comb - 50.0) < 0.01,
+		"barcos: o barco do cais bóia no lago (%.2f m abaixo da água) com o motor quebrado; consertou (%s) e abasteceu (%s)" % [nb - bc.global_position.y, m1, m2])
+	# sobe e anda
+	bc.rotation.y = 0.05
+	var entrou := veiculos.entrar(bc, jogador)
+	await _quadros(4)
+	var p0 := bc.global_position
+	var c0 := bc.comb
+	Input.action_press("frente")
+	await _quadros(120)
+	var v1 := bc.v
+	Input.action_press("esquerda")
+	var y0 := bc.rotation.y
+	await _quadros(40)
+	Input.action_release("esquerda")
+	Input.action_release("frente")
+	var dy := angle_difference(y0, bc.rotation.y)
+	var andou := Vector2(bc.global_position.x - p0.x, bc.global_position.z - p0.z).length()
+	var n1: float = terreno.nivel_agua(bc.global_position.x, bc.global_position.z)
+	_confere(entrou and jogador.veiculo == bc and v1 > 2.0 and andou > 2.5 and n1 > -900.0 and bc.comb < c0 and dy > 0.1,
+		"barcos: subiu no barco e ele anda na água (%.1f m/s, andou %.1f m, gasta gasolina); A vira para a esquerda (%.2f rad)" % [v1, andou, dy])
+	# desce no meio do lago: cai na água e nada
+	await _quadros(30)
+	var desceu := veiculos.sair(jogador)
+	await _quadros(40)
+	_confere(desceu and jogador.veiculo == null and jogador.nadando, "barcos: desceu no meio do lago e caiu na água (nadando)")
+	# a jangada: no remo, sem gasolina
+	var jg := veiculos.nova_jangada(Vector3(66.0, 0, 104.0), 0.0)
+	await _quadros(3)
+	var nj: float = terreno.nivel_agua(66.0, 104.0)
+	var ok_j := jg.pode() == "" and absf(jg.global_position.y - (nj - 0.22)) < 0.12 and jg.texto().contains("Subir na jangada")
+	veiculos.entrar(jg, jogador)
+	var pj := jg.global_position
+	Input.action_press("frente")
+	await _quadros(150)
+	var vj := jg.v
+	Input.action_release("frente")
+	var andou_j := Vector2(jg.global_position.x - pj.x, jg.global_position.z - pj.z).length()
+	_confere(ok_j and jogador.veiculo == jg and vj > 1.0 and vj <= 2.61 and andou_j > 1.5 and jg.comb == 0.0,
+		"barcos: a jangada bóia e anda no remo sem gasolina (%.1f m/s, andou %.1f m)" % [vj, andou_j])
+	veiculos.sair(jogador)
+	await _quadros(5)
+	# pôr a jangada na água: na margem, de frente para o lago
+	var margem := Vector3.INF
+	var lago := Vector3(66.0, 0, 104.0)
+	for k in 24:
+		var a := k / 24.0 * TAU
+		var dr := Vector3(cos(a), 0, sin(a))
+		for r in range(4, 60):
+			var q := lago + dr * float(r)
+			var nq: float = terreno.nivel_agua(q.x, q.z)
+			if nq < -900.0 or nq - terreno.h(q.x, q.z) < 0.05:
+				var w := q - dr * 3.5
+				var nw: float = terreno.nivel_agua(w.x, w.z)
+				if nw > -900.0 and nw - terreno.h(w.x, w.z) > 0.7:
+					margem = q + dr * 0.8
+				break
+		if margem != Vector3.INF:
+			break
+	var antes_n := veiculos.lista.size()
+	var pos_ok := false
+	if margem != Vector3.INF:
+		_jogador_em(margem, Vector3(lago.x, terreno.h(margem.x, margem.z) + 1.4, lago.z))
+		await _quadros(3)
+		jogador.inv.por("jangada", 1)
+		jogador.usar_item(_slot_de("jangada"))
+		await _quadros(3)
+		pos_ok = veiculos.lista.size() == antes_n + 1 and jogador.inv.conta("jangada") == 0
+	_confere(margem != Vector3.INF and pos_ok, "barcos: de frente para o lago, a jangada desmontada vai para a água (%s)" % str(margem))
+	# o jogo salvo guarda a jangada
+	var sv := veiculos.salvar()
+	veiculos.carregar(sv)
+	var jangadas := 0
+	for v in veiculos.lista:
+		if is_instance_valid(v) and (v as Veiculo).tipo == "jangada":
+			jangadas += 1
+	_confere(jangadas == 2 and veiculos.por_id("barcoCais") != null and absf(veiculos.por_id("barcoCais").comb - bc.comb) < 0.5,
+		"barcos: o jogo salvo guarda o barco e as jangadas (%d)" % jangadas)
+	for it in ["gasolina", "kitFerramentas", "pecaVeiculo", "jangada"]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	veiculos.novo()
+	_jogador_em(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(SPAWN.x, 1.0, SPAWN.z - 5.0))
 	spawn_t = spawn_antes
 	hora = hora_antes
 
@@ -4393,6 +4504,7 @@ func _teste() -> void:
 	await _teste_curtume(livre)
 	await _teste_nado()
 	await _teste_veiculos(livre)
+	await _teste_barcos()
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -5158,6 +5270,20 @@ func _fotos() -> void:
 		jogador._olhar_t = -30.0
 		await _quadros(40)
 		await _foto("17o_triciclo")
+		veiculos.expulsar(jogador)
+		jogador.alternar_camera(false)
+	var bcf := veiculos.por_id("barcoCais")
+	if bcf != null:
+		hora = 17.2
+		bcf.pecas["motor"] = 100.0
+		bcf.comb = 60.0
+		bcf.rotation.y = 0.6
+		jogador.alternar_camera(true)
+		veiculos.entrar(bcf, jogador)
+		jogador.rotation.y = bcf.rotation.y + PI + 0.7
+		jogador._olhar_t = -30.0
+		await _quadros(40)
+		await _foto("17p_barco_no_lago")
 		veiculos.expulsar(jogador)
 		jogador.alternar_camera(false)
 	veiculos.novo()
