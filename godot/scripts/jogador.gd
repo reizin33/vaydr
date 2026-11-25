@@ -554,7 +554,7 @@ func _physics_process(dt: float) -> void:
 	sede = maxf(0.0, sede - dt / 15.0 * (main.clima.sede() if main.clima != null else 1.0))
 	if fome <= 0.0 or sede <= 0.0:
 		ferir(dt * 0.8, false)
-	elif fome > 60.0 and sede > 60.0 and vida < vida_max() and enjoo <= 0.0:
+	elif fome > 60.0 and sede > 60.0 and vida < vida_max() and enjoo <= 0.0 and (main.lesoes == null or int(main.lesoes.sangra) == 0):
 		vida = minf(vida_max(), vida + dt * 0.25)
 	# dor de barriga: perde um pouco de vida e de água até passar (remédio corta)
 	if enjoo > 0.0:

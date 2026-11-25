@@ -2352,7 +2352,7 @@ func _teste_lesoes(livre: Vector3) -> void:
 	for z in zumbis:
 		if is_instance_valid(z) and z.global_position.distance_to(pm) < 3.0:
 			levantou = true
-	_confere(morreu_v and levantou, "vírus: em 100%% você morre e o corpo levanta como zumbi perto de onde caiu")
+	_confere(morreu_v and levantou, "vírus: em 100% você morre e o corpo levanta como zumbi perto de onde caiu")
 	renascer(false)
 	await _quadros(5)
 	_limpar_zumbis()
