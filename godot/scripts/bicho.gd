@@ -799,7 +799,7 @@ func _livre(dx: float, dz: float) -> bool:
 	# o que tapa na frente (árvore, pedra, parede)
 	var o := centro()
 	var sp := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(o, o + Vector3(dx, 0, dz) * 2.2 * k, 1, [get_rid()])
+	var q := PhysicsRayQueryParameters3D.create(o, o + Vector3(dx, 0, dz) * 2.2 * k, 1, [get_rid(), main.terreno.corpo_chao.get_rid()])
 	var h := sp.intersect_ray(q)
 	if not h.is_empty():
 		var c: Object = h["collider"]

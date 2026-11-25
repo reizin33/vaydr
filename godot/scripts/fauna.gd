@@ -175,6 +175,8 @@ func ponto_ok(x: float, z: float, sp_id: String, rigor: bool) -> bool:
 	q.shape = s
 	q.transform = Transform3D(Basis(), Vector3(x, main.terreno.h(x, z) + s.radius + 0.35, z))
 	q.collision_mask = 1
+	var fora: Array[RID] = [main.terreno.corpo_chao.get_rid()]
+	q.exclude = fora
 	if not sp.intersect_shape(q, 1).is_empty():
 		return false
 	# longe da base de alguém e dos lugares com nome (menos a fazenda)
