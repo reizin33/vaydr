@@ -16,7 +16,9 @@ import numpy as np
 
 TAM_MIN = 0.12     # pedaço chato maior que isto sai (nas unidades do modelo)
 CHATO = 0.02       # espessura / tamanho abaixo disto é um plano
-DOBRA_MAX = 25.0   # dobra média entre triângulos vizinhos abaixo disto (graus) é uma fita
+DOBRA_MAX = 25.0   # dobra média entre triângulos vizinhos abaixo disto (graus) é uma fita...
+DOBRA_TUBO = 40.0  # ...desde que nenhuma dobra passe disto (um galho fino de 8 lados dobra 45 graus em volta)
+SOLTO_MIN = 0.03   # um quadrado solto (até dois triângulos) maior que isto sai: nunca é galho
 
 
 def ler_glb(caminho):
@@ -96,19 +98,26 @@ def fitas(V, I):
     comp = np.array([raiz(i) for i in range(len(T))])
     soma = {}
     cont = {}
+    maior = {}
     for ts in arestas.values():
         if len(ts) == 2:
             c = comp[ts[0]]
             ang = float(np.degrees(np.arccos(np.clip(abs(float(np.dot(nrm[ts[0]], nrm[ts[1]]))), 0.0, 1.0))))
             soma[c] = soma.get(c, 0.0) + ang
             cont[c] = cont.get(c, 0) + 1
+            maior[c] = max(maior.get(c, 0.0), ang)
     tirar = np.zeros(len(T), bool)
     for c in np.unique(comp):
         sel = comp == c
         vs = pos[np.unique(T[sel].reshape(-1))]
-        # sem aresta dividida com outro triângulo (um triângulo solto, ou dois encostados só pela ponta) também é chato; e
-        # um quadrado só (dois triângulos, mesmo dobrado) não é galho: é o losango
-        if float(np.ptp(vs, axis=0).max()) > TAM_MIN and (cont.get(c, 0) == 0 or int(sel.sum()) <= 2 or soma[c] / cont[c] < DOBRA_MAX):
+        tam = float(np.ptp(vs, axis=0).max())
+        # um quadrado solto (um ou dois triângulos, mesmo dobrado) não é galho: é o losango
+        if int(sel.sum()) <= 2:
+            if tam > SOLTO_MIN:
+                tirar |= sel
+            continue
+        # a fita: maior que TAM_MIN, sem aresta dividida ou com os vizinhos quase no mesmo plano (e nenhuma dobra de tubo)
+        if tam > TAM_MIN and (cont.get(c, 0) == 0 or (soma[c] / cont[c] < DOBRA_MAX and maior[c] < DOBRA_TUBO)):
             tirar |= sel
     return tirar
 
