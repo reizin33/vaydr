@@ -1255,6 +1255,13 @@ class Mira extends Control:
 			acerto = false
 		draw_circle(c, r + 1.5, escuro, true, -1.0, true)
 		draw_circle(c, r, Estilo.SANGUE if acerto else cor_m, true, -1.0, true)
+		# segurando E (esfolar, plantar, colher): o anel enche
+		var ac: Dictionary = j.acao
+		if not ac.is_empty() and str(ac.get("tipo", "")) in ["esfolar", "plantio"] and float(ac.get("dur", 0.0)) > 0.0 and bool(ac.get("fazer", true)):
+			var k := clampf(float(ac["t"]) / float(ac["dur"]), 0.0, 1.0)
+			if k > 0.02:
+				draw_arc(c, 14.0, -PI * 0.5, -PI * 0.5 + TAU * k, 48, escuro, 5.0, true)
+				draw_arc(c, 14.0, -PI * 0.5, -PI * 0.5 + TAU * k, 48, cor_m, 2.6, true)
 
 
 ## a luneta do rifle: tudo escuro fora do círculo, o retículo fino no meio e a borda do vidro

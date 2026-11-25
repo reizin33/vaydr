@@ -27,6 +27,8 @@ var aguas := []           # poços e barris: {pos, nome}
 var portas := []
 var zspawn := {}          # lugar -> [[x, z]...] (onde os zumbis de cada lugar nascem)
 var lugares := []         # {id, nome, x, z, r}
+var plantio_def := []     # os canteiros da fazenda e dos sítios (o plantio, etapa 6g)
+var fruteiras := []       # as árvores de fruta das casas e dos sítios
 var ruas := []            # estradas do jogo antigo (minimapa e mapa): {cor: asfalto/terra/trilha, w, pts: PackedVector2Array}
 var predios := []         # prédios da cidade (minimapa e mapa): {ret: Rect2 em x/z, tipo, nome}
 var lugares_nome := []    # lugares com nome (galpão, bunker, base militar...): {nome, x, z}
@@ -235,6 +237,8 @@ func montar(col: ColisaoMapa = null) -> void:
 	loot = ant.get("LOOT", {})
 	loot_cid = ant.get("CID_LOOT", {})
 	zspawn = o.get("zspawn", {})
+	plantio_def = v.get("plantio", [])
+	fruteiras = v.get("fruteiras", [])
 	for p in v.get("places", []):
 		lugares.append({"id": str(p["id"]), "nome": str(p.get("nome", p["id"])), "x": float(p["x"]), "z": float(p["z"]), "r": float(p.get("r", 14.0))})
 	for r in v.get("roads", []):

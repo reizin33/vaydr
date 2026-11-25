@@ -1041,6 +1041,23 @@ func _passo_acao(dt: float) -> void:
 						main.ui.aviso(r, 5.0)
 					main.ui.atualizar()
 				return
+		"plantio":
+			var ap: Dictionary = acao["a"]
+			var longe: bool = global_position.distance_to(ap["p"]) > 3.2
+			if longe or not Input.is_action_pressed("usar"):
+				var curto: bool = t < 0.3 and not longe
+				acao = {}
+				if curto:
+					main.plantio.toque(ap, self)
+				return
+			if t >= float(acao["dur"]):
+				var fazer: bool = acao["fazer"]
+				acao = {}
+				if fazer:
+					main.plantio.concluir(ap, self)
+				else:
+					main.plantio.toque(ap, self)
+				return
 		"recarga":
 			if sel != int(acao.get("slot", sel)):
 				acao = {}
@@ -1238,6 +1255,13 @@ func usar() -> void:
 		var tc: String = main.cao.texto(self)
 		if tc.begins_with("E  ") or main.cao.st == "espera" or main.cao.lan:
 			main.cao.interagir(self)
+			return
+	# o canteiro e a árvore de fruta (etapa 6g): toque E troca a cultura, segure E planta ou colhe
+	if main.plantio != null and acao.is_empty():
+		var ap: Dictionary = main.plantio.alvo(self)
+		if not ap.is_empty():
+			var dur: float = main.plantio.duracao(ap, self)
+			acao = {"tipo": "plantio", "t": 0.0, "dur": maxf(dur, 0.35), "a": ap, "fazer": dur > 0.0}
 			return
 	var h := mira(ALCANCE + 0.4)
 	if not h.is_empty():

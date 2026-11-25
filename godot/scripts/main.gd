@@ -23,6 +23,7 @@ var sono: Sono              # o sono e o dormir (etapa 6c)
 var pesca: Pesca            # a pesca (etapa 6d)
 var cao: Cao                # o Caramelo, o cachorro (etapa 6e)
 var lesoes: Lesoes          # os ferimentos: sangramento, perna quebrada, vírus e ferida grave (etapa 6f)
+var plantio: Plantio        # os canteiros e as árvores de fruta (etapa 6g)
 var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
@@ -127,6 +128,8 @@ func _ready() -> void:
 	cao.iniciar()
 	lesoes = Lesoes.new(self)
 	add_child(lesoes)
+	plantio = Plantio.new(self)
+	add_child(plantio)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -383,6 +386,7 @@ func _process(dt: float) -> void:
 		clima.passo(dt)
 	sono.passo(dt)
 	lesoes.passo(dt)
+	plantio.passo(dt)
 	_ciclo()
 	terreno.mare(hora)
 	# zumbis: os de cada lugar (vila, posto, fazenda, sítios...) aparecem quando alguém chega perto; fora isso, alguns
@@ -886,6 +890,11 @@ func texto_mira() -> String:
 		var tc := cao.texto(jogador)
 		if tc != "":
 			return tc
+	# o canteiro ou a árvore de fruta perto (etapa 6g)
+	if plantio != null:
+		var tp := plantio.texto(jogador)
+		if tp != "":
+			return tp
 	var h := jogador.mira(Jogador.ALCANCE + 0.4)
 	if h.is_empty():
 		return ""
@@ -991,7 +1000,7 @@ func salvar_jogo() -> bool:
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
 		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar(), "pesca": pesca.salvar(),
-		"cao": cao.salvar(), "lesoes": lesoes.salvar()}
+		"cao": cao.salvar(), "lesoes": lesoes.salvar(), "plantio": plantio.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -1057,6 +1066,8 @@ func carregar_jogo() -> bool:
 	cao.carregar(kd if kd is Dictionary else {})
 	var ld = d.get("lesoes", {})
 	lesoes.carregar(ld if ld is Dictionary else {})
+	var pld = d.get("plantio", {})
+	plantio.carregar(pld if pld is Dictionary else {})
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -2332,6 +2343,108 @@ func _teste_lesoes(livre: Vector3) -> void:
 	hora = hora_antes
 	jogador.vida = 100.0
 	spawn_t = spawn_antes
+
+
+## o plantio e o pomar (etapa 6g): os canteiros da fazenda e dos sítios, plantar com semente (o toque troca a cultura),
+## crescer com o tempo (a chuva ajuda, o inverno atrasa), colher (volta semente), as árvores de fruta e o jogo salvo
+func _teste_plantio() -> void:
+	var hora_antes := hora
+	var dia_antes := dia
+	hora = 12.0
+	dia = 2
+	plantio.novo()
+	var n_faz := 0
+	var n_sit_pronto := 0
+	for d in plantio.DEF:
+		if d["tipo"] == "fazenda" and float(plantio.S[d["id"]]) < 0.0:
+			n_faz += 1
+		if d["tipo"] == "sitio" and float(plantio.S[d["id"]]) >= 1.0:
+			n_sit_pronto += 1
+	_confere(plantio.DEF.size() >= 30 and plantio.FR.size() >= 20 and n_faz >= 10 and n_sit_pronto >= 5,
+		"plantio: %d canteiros (%d da fazenda vazios, %d dos sítios prontos para colher) e %d árvores de fruta" % [plantio.DEF.size(), n_faz, n_sit_pronto, plantio.FR.size()])
+	# um canteiro vazio da fazenda: sem semente não planta; o toque troca a cultura; segurar planta
+	var dc: Dictionary = {}
+	for d in plantio.DEF:
+		if d["tipo"] == "fazenda":
+			dc = d
+			break
+	var a2: Vector2 = dc["a"]
+	var b2: Vector2 = dc["b"]
+	var meio := (a2 + b2) * 0.5
+	var perp := Vector2(-(b2 - a2).y, (b2 - a2).x).normalized()
+	var pj := Vector3(meio.x + perp.x * 1.1, 0, meio.y + perp.y * 1.1)
+	var ns := jogador.inv.conta("sementes")
+	if ns > 0:
+		jogador.inv.tirar("sementes", ns)
+	_jogador_em(pj, Vector3(meio.x, float(dc["y"]) + 0.2, meio.y))
+	await _quadros(3)
+	var ap := plantio.alvo(jogador)
+	var t_sem := plantio.texto(jogador)
+	jogador.inv.por("sementes", 3)
+	var t_com := plantio.texto(jogador)
+	plantio.sel = 0
+	plantio.toque(ap, jogador)
+	var trocou := plantio.sel == 1
+	plantio.concluir(ap, jogador)
+	var id := str(dc["id"])
+	var plantou := float(plantio.S[id]) == 0.0 and int(plantio.C[id]) == 1 and jogador.inv.conta("sementes") == 2
+	_confere(str(ap.get("id", "")) == id and t_sem.begins_with("Canteiro vazio") and t_com.begins_with("E  Plantar milho") and trocou and plantou,
+		"canteiro: sem semente não planta (%s); com sementes (%s) o toque trocou para batata e segurar plantou" % [t_sem, t_com])
+	# cresce: a chuva acelera, o inverno atrasa; o pé aparece; pronto, colhe (e volta semente)
+	clima.chuva_k = 0.0
+	var r_sol := plantio.ritmo()
+	clima.chuva_k = 0.9
+	var r_chuva := plantio.ritmo()
+	clima.chuva_k = 0.0
+	dia = 23
+	var r_inv := plantio.ritmo()
+	dia = 2
+	plantio.S[id] = 0.6
+	plantio._atualizar_tudo()
+	var no: MeshInstance3D = plantio._nos.get(id)
+	var pe_ok: bool = no != null and no.visible and no.mesh == plantio._malhas["batata"]
+	var t_cresce := plantio.texto(jogador)
+	plantio.S[id] = 0.9999
+	await _quadros(60)
+	var pronto := float(plantio.S[id]) >= 1.0
+	var t_colhe := plantio.texto(jogador)
+	var antes_b := jogador.inv.conta("batata")
+	plantio.concluir(plantio.alvo(jogador), jogador)
+	var colheu := jogador.inv.conta("batata") > antes_b and float(plantio.S[id]) < 0.0
+	_confere(absf(r_chuva / r_sol - 1.8) < 0.01 and r_inv < r_sol * 0.5 and pe_ok and t_cresce.begins_with("Batata crescendo · 60%") and pronto
+		and t_colhe.begins_with("E  Colher batata") and colheu,
+		"canteiro: a chuva acelera (x%.1f), o inverno atrasa (x%.2f); o pé de batata aparece (%s); pronto, colheu %d batata(s)" % [
+			r_chuva / r_sol, r_inv / r_sol, t_cresce, jogador.inv.conta("batata") - antes_b])
+	# a árvore de fruta: colhe, as frutas somem e voltam com o tempo
+	var fr: Dictionary = plantio.FR[0]
+	var fp: Vector3 = fr["p"]
+	_jogador_em(fp + Vector3(1.4, 0, 0), fp + Vector3(0, 1.2, 0))
+	await _quadros(3)
+	var t_fr := plantio.texto(jogador)
+	var fruta := str(fr["fruta"])
+	var antes_f := jogador.inv.conta(fruta)
+	plantio.concluir(plantio.alvo(jogador), jogador)
+	var ganhou_f := jogador.inv.conta(fruta) - antes_f
+	var sumiu: bool = not (plantio._frutas[fr["id"]] as Node3D).visible
+	var t_sem_f := plantio.texto(jogador)
+	_confere(t_fr.begins_with("E  Colher") and ganhou_f >= 2 and sumiu and t_sem_f.contains("sem fruta"),
+		"pomar: colheu %d %s (%s); as frutas sumiram da árvore e voltam (%s)" % [ganhou_f, Dados.nome(fruta).to_lower(), t_fr, t_sem_f])
+	# o jogo salvo
+	plantio.S[id] = 0.5
+	plantio.C[id] = 4
+	var sv := plantio.salvar()
+	plantio.novo()
+	var zerou := float(plantio.S[id]) < 0.0
+	plantio.carregar(sv)
+	_confere(zerou and absf(float(plantio.S[id]) - 0.5) < 0.01 and int(plantio.C[id]) == 4 and float(plantio.W[fr["id"]]) < 0.5,
+		"jogo salvo: a roça e as frutas voltam como estavam")
+	for it in ["sementes", "batata", fruta]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	plantio.novo()
+	hora = hora_antes
+	dia = dia_antes
 
 
 ## o espaço da mochila com o item (para os testes)
@@ -3767,6 +3880,7 @@ func _teste() -> void:
 	_teste_sons()
 	await _teste_cao(livre)
 	await _teste_lesoes(livre)
+	await _teste_plantio()
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -4466,6 +4580,25 @@ func _fotos() -> void:
 	var nfr := jogador.inv.conta("frutas")
 	if nfr > 0:
 		jogador.inv.tirar("frutas", nfr)
+	# a roça da fazenda (etapa 6g): milho, batata, abóbora, tomate, cenoura e feijão crescendo nos canteiros; e um pé de
+	# manga da vila com fruta
+	var nfaz := 0
+	for d in plantio.DEF:
+		if d["tipo"] == "fazenda":
+			plantio.S[d["id"]] = 1.0 if nfaz % 7 != 3 else 0.3
+			plantio.C[d["id"]] = nfaz % 6
+			nfaz += 1
+	plantio._atualizar_tudo()
+	await _cam_alto(Vector3(-38.0, terreno.h(-38.0, 86.0) + 4.2, 86.0), Vector3(-53.0, 0.3, 72.0))
+	await _quadros(20)
+	await _foto("17i_roca_da_fazenda")
+	jogador.set_physics_process(true)
+	var fr0: Dictionary = plantio.FR[0]
+	var pf: Vector3 = fr0["p"]
+	await _cam(pf + Vector3(-3.2, 0, 3.4), Vector3(pf.x, 2.3, pf.z))
+	await _quadros(15)
+	await _foto("17j_pe_de_manga")
+	plantio.novo()
 	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()
