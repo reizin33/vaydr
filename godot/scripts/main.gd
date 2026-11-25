@@ -3327,7 +3327,9 @@ func _lugar_plano(centro: Vector2, lado: float, evita: Vector2, rente := false) 
 			caixa.size = Vector3(lado, y1 - y0, lado)
 			q.transform = Transform3D(Basis(), Vector3(p.x, (y0 + y1) * 0.5, p.y))
 		var ok := true
-		for hh in sp.intersect_shape(q, 64):
+		# rente (a pista dos veículos): até 1024 resultados; com as árvores e pedras em volta (mais de 100), 64 acabavam antes de
+		# chegar no poste ou na mureta. Os outros testes seguem com 64 (o lugar deles não muda)
+		for hh in sp.intersect_shape(q, 1024 if rente else 64):
 			if not (hh["collider"] as Object).has_meta("recurso"):
 				ok = false
 				break

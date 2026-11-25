@@ -50,6 +50,41 @@ static func ler_malha(f: FileAccess, r: Dictionary) -> ArrayMesh:
 	return m
 
 
+## tira da malha os blocos de folhas do jogo antigo (icosaedros verdes: faces verdes grandes e "gordas"): ficam a madeira,
+## o musgo e os cipós das rotas de subida (verdes também, mas finos ou miúdos)
+static func sem_copa_velha(m: ArrayMesh) -> ArrayMesh:
+	if m == null or m.get_surface_count() == 0:
+		return m
+	var arr := m.surface_get_arrays(0)
+	var cs: PackedColorArray = arr[Mesh.ARRAY_COLOR]
+	var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var ids: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+	if cs.is_empty() or ids.is_empty():
+		return m
+	var novo := PackedInt32Array()
+	for t in range(0, ids.size() - 2, 3):
+		var verdes := 0
+		for k in 3:
+			var c: Color = cs[ids[t + k]]
+			if c.g > c.r * 1.15 and c.g > c.b:
+				verdes += 1
+		if verdes >= 2:
+			var a: Vector3 = vs[ids[t]]
+			var b: Vector3 = vs[ids[t + 1]]
+			var c2: Vector3 = vs[ids[t + 2]]
+			var e := maxf(a.distance_to(b), maxf(b.distance_to(c2), a.distance_to(c2)))
+			var area := (b - a).cross(c2 - a).length() * 0.5
+			if e >= 0.35 and area / maxf(e * e, 1e-9) >= 0.12:
+				continue
+		novo.append(ids[t])
+		novo.append(ids[t + 1])
+		novo.append(ids[t + 2])
+	arr[Mesh.ARRAY_INDEX] = novo
+	var m2 := ArrayMesh.new()
+	m2.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m2
+
+
 ## bytes crus (float32) viram PackedVector3Array/PackedVector2Array/PackedColorArray sem laço: monta o cabeçalho do
 ## formato do Godot (tipo + quantidade) e decodifica
 static func _como(tipo: int, dados: PackedByteArray, tam: int) -> Variant:
@@ -82,6 +117,10 @@ func _grupo(nome: String) -> void:
 	for r in indice:
 		var mi := MeshInstance3D.new()
 		mi.mesh = ler_malha(f, r)
+		# as árvores gigantes: a copa velha em blocos verdes de poucos lados sai (no lugar dela fica a copa de jacarandá que o
+		# Mundo põe); ficam o tronco, as raízes, os galhos andáveis e os cipós
+		if str(r.get("nome", "")).begins_with("gigante"):
+			mi.mesh = sem_copa_velha(mi.mesh as ArrayMesh)
 		var tex := str(r.get("tex", ""))
 		mi.material_override = mat if tex == "" else material(tex, false, false, Color(1, 1, 1), 0.0)
 		n_vertices += int(r["nu"])
