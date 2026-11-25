@@ -245,6 +245,9 @@ func _percebe(dt: float) -> void:
 		am_p = _predador.global_position
 		forca = 1.3
 		eh_j = false
+	# o cheiro de sangue: o predador fica atento a quem sangra
+	if S.has("presas") and _sangrando() and _dp < float(S["ve"]) * 1.4:
+		alerta = minf(1.5, alerta + dt * 0.6)
 	if forca > 0.0:
 		amea = {"p": am_p, "f": forca, "jog": eh_j}
 		amea_t = 6.0
@@ -319,6 +322,11 @@ func fugir(de: Vector3, dur := 6.0) -> void:
 
 func _jog_pos() -> Vector3:
 	return _alvo.global_position if _alvo != null else global_position
+
+
+## você sangrando: o predador sente o cheiro (etapa 6f)
+func _sangrando() -> bool:
+	return _alvo == main.jogador and main.get("lesoes") != null and int(main.lesoes.sangra) > 0
 
 
 func _jog_vida() -> float:
@@ -400,7 +408,7 @@ func _decide(dt: float) -> void:
 				if o.hp > o.hp_max * 0.55:
 					fortes += 1
 			var noite: bool = main.noite_k() > 0.5
-			var fraco := _jog_vida() < 45.0
+			var fraco := _jog_vida() < 45.0 or _sangrando()
 			var abrigo := _abrigo()
 			var L: Bicho = _lider_vivo()
 			if L == null:
@@ -489,7 +497,7 @@ func _decide(dt: float) -> void:
 				_caca(dt)
 				return
 			var noite2: bool = main.noite_k() > 0.55
-			var fraco2 := _jog_vida() < 50.0
+			var fraco2 := _jog_vida() < 50.0 or _sangrando()
 			var abrigo2 := _abrigo()
 			if not amea.is_empty() and bool(amea["jog"]) and alerta >= 0.5 and jv:
 				var quer := not abrigo2 and (noite2 or fraco2 or golpeado_t > 0.0) and hp > hp_max * 0.5
@@ -796,6 +804,8 @@ func _ferir_jogador(j) -> void:
 	var A: Dictionary = S["ataque"]
 	var d := float(A["dano"]) * esc
 	j.ferir(d, true, global_position)
+	if j == main.jogador and main.get("lesoes") != null:
+		main.lesoes.golpe_bicho(nome().to_lower(), A, d)
 	if bool(A.get("derruba", false)) and j == main.jogador:
 		var fr: Vector3 = j.global_position - global_position
 		fr.y = 0.0

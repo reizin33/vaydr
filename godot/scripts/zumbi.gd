@@ -566,6 +566,8 @@ func _chefe_passo(dt: float, j, para: Vector3, dist: float) -> bool:
 				if not a in pegou:
 					pegou.append(a)
 					a.ferir(36.0, true, global_position)
+					if a == main.jogador and main.get("lesoes") != null and randf() < 0.75:
+						main.lesoes.sangrar(true, "Colosso")
 					if a == main.jogador:
 						a.velocity += d * 11.0 + Vector3(0, 4.0, 0)
 						a.tremor = maxf(a.tremor, 0.9)
@@ -605,6 +607,8 @@ func _pisao_onda() -> void:
 		var pa: Vector3 = (a.pos_alvo() if a.has_method("pos_alvo") else a.global_position)
 		var d := Vector2(pa.x - global_position.x, pa.z - global_position.z).length()
 		a.ferir(40.0 * (1.0 - 0.5 * d / R), true, global_position)
+		if a == main.jogador and main.get("lesoes") != null and d < R * 0.5 and randf() < 0.3:
+			main.lesoes.quebrar_perna()
 		if a == main.jogador:
 			var fr: Vector3 = a.global_position - global_position
 			fr.y = 0.0
@@ -1045,6 +1049,8 @@ func _physics_process(dt: float) -> void:
 					cao.ferir(float(S["dano"]) * randf_range(0.85, 1.1), global_position)
 			elif dist < float(S["alcance"]) * maxf(1.0, escala * 0.9) + 0.35 and j.vivo and _bloqueio(j).is_empty():
 				j.ferir(float(S["dano"]) * randf_range(0.85, 1.1), true, global_position)
+				if j == main.jogador and main.get("lesoes") != null:
+					main.lesoes.mordida(tipo)
 		if golpe_t > 1.05:
 			golpe_t = -1.0
 			mira_cao = false

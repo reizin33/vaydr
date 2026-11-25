@@ -22,6 +22,7 @@ var clima: Clima            # o tempo, as estações e a lua (etapa 6b)
 var sono: Sono              # o sono e o dormir (etapa 6c)
 var pesca: Pesca            # a pesca (etapa 6d)
 var cao: Cao                # o Caramelo, o cachorro (etapa 6e)
+var lesoes: Lesoes          # os ferimentos: sangramento, perna quebrada, vírus e ferida grave (etapa 6f)
 var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
@@ -124,6 +125,8 @@ func _ready() -> void:
 	cao.name = "Caramelo"
 	add_child(cao)
 	cao.iniciar()
+	lesoes = Lesoes.new(self)
+	add_child(lesoes)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -379,6 +382,7 @@ func _process(dt: float) -> void:
 			ui.aviso("Amanheceu: dia %d" % dia, 5.0)
 		clima.passo(dt)
 	sono.passo(dt)
+	lesoes.passo(dt)
 	_ciclo()
 	terreno.mare(hora)
 	# zumbis: os de cada lugar (vila, posto, fazenda, sítios...) aparecem quando alguém chega perto; fora isso, alguns
@@ -834,6 +838,8 @@ func dano_rede(d: float, de: Vector3) -> void:
 			construcao.ferir_peca(np, 3.0, h["position"])
 			return
 	jogador.ferir(d, true, o)
+	# o golpe do zumbi de quem abriu pode passar o vírus (etapa 6f)
+	lesoes.mordida(str(z.tipo) if z != null else "walker")
 
 
 ## /ir: para o lado de alguém (no seu mundo, onde ele está no dele)
@@ -942,6 +948,9 @@ func texto_mira() -> String:
 
 
 func _morreu() -> void:
+	if lesoes.causa == "virus":
+		ui.aviso("O vírus te venceu.", 5.0)
+	lesoes.morreu(jogador.global_position)
 	ui.abrir(false)
 	# como no Rust: o que você tinha (e a roupa do corpo) fica numa mochila no chão, dá para voltar e pegar
 	var caida := Inventario.new(Inventario.MAXIMO, false)
@@ -982,7 +991,7 @@ func salvar_jogo() -> bool:
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
 		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar(), "pesca": pesca.salvar(),
-		"cao": cao.salvar()}
+		"cao": cao.salvar(), "lesoes": lesoes.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -1046,6 +1055,8 @@ func carregar_jogo() -> bool:
 		pesca.carregar(pd)
 	var kd = d.get("cao", {})
 	cao.carregar(kd if kd is Dictionary else {})
+	var ld = d.get("lesoes", {})
+	lesoes.carregar(ld if ld is Dictionary else {})
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -2217,6 +2228,119 @@ func _teste_pesca() -> void:
 			jogador.inv.tirar(id, n)
 	_mao_vazia()
 	hora = hora_antes
+
+
+## os ferimentos (etapa 6f): o sangramento (o leve para sozinho, o forte só com bandagem), a perna quebrada na queda alta
+## (devagar, sem correr nem pular; a tala; sara), o vírus no golpe do zumbi (sobe, tira vida máxima, a seringa cura e
+## protege), a ferida grave do golpe forte de bicho (a sutura fecha), o HUD, o jogo salvo e quem morre do vírus levanta
+func _teste_lesoes(livre: Vector3) -> void:
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	_limpar_zumbis()
+	_limpar_bichos()
+	var hora_antes := hora
+	hora = 12.0
+	lesoes.zerar()
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	_jogador_em(c, c + Vector3(10, 1, 0))
+	await _quadros(3)
+	# o sangramento leve: a vida cai e para sozinho; o forte não para, a bandagem para
+	jogador.vida = 100.0
+	lesoes.sangrar(false, "lobo")
+	await _quadros(60)
+	var caiu := jogador.vida < 99.6
+	lesoes.sangra_t = Lesoes.LEVE_DUR + 1.0
+	await _quadros(3)
+	var parou := lesoes.sangra == 0
+	lesoes.sangrar(true)
+	lesoes.sangra_t = 120.0
+	await _quadros(3)
+	var forte_continua := lesoes.sangra == 2
+	ui.hud._chips()
+	var chip_s := str(ui.hud.chips.get_meta("chave", ""))
+	jogador.inv.por("bandagem", 1)
+	jogador.consumir_slot(_slot_de("bandagem"))
+	_confere(caiu and parou and forte_continua and chip_s.contains("Sangrando") and lesoes.sangra == 0 and jogador.inv.conta("bandagem") == 0,
+		"sangramento: a vida cai, o leve para sozinho, o forte continua (o HUD mostra) e a bandagem para")
+	# a perna quebrada: a queda alta quebra; devagar, sem correr nem pular; a tala; sara
+	jogador.vida = 100.0
+	lesoes.queda(6.0)
+	var quebrou := lesoes.perna and not lesoes.pode_correr() and not lesoes.pode_pular() and absf(lesoes.vel() - Lesoes.PERNA_VEL) < 0.01
+	jogador.inv.por("tala", 2)
+	jogador.consumir_slot(_slot_de("tala"))
+	var com_tala := lesoes.tala and lesoes.pode_pular() and not lesoes.pode_correr() and absf(lesoes.vel() - Lesoes.TALA_VEL) < 0.01
+	var n_tala := jogador.inv.conta("tala")
+	jogador.consumir_slot(_slot_de("tala"))
+	var nao_gastou := jogador.inv.conta("tala") == n_tala
+	lesoes.perna_h = Lesoes.CURA_PERNA_H - 0.01
+	hora = 12.0
+	await _quadros(90)
+	_confere(quebrou and com_tala and nao_gastou and not lesoes.perna,
+		"perna quebrada: a queda alta quebrou (devagar, sem correr nem pular); a tala imobilizou (a segunda não foi gasta); sarou")
+	var nt := jogador.inv.conta("tala")
+	if nt > 0:
+		jogador.inv.tirar("tala", nt)
+	# o vírus: o golpe do zumbi passa; sobe e tira vida máxima; a seringa cura e protege
+	var pegou := false
+	for i in 200:
+		if lesoes.mordida("walker"):
+			pegou = true
+			break
+	lesoes.virus = 60.0
+	await _quadros(3)
+	var vm := jogador.vida_max()
+	ui.hud._chips()
+	var chip_v := str(ui.hud.chips.get_meta("chave", ""))
+	jogador.inv.por("seringa", 1)
+	jogador.consumir_slot(_slot_de("seringa"))
+	var curou := lesoes.virus == 0.0 and lesoes.imune_h > 1.9
+	var protegido := not lesoes.mordida("walker")
+	_confere(pegou and absf(vm - 75.0) < 0.5 and chip_v.contains("Vírus 60%") and curou and protegido,
+		"vírus: o golpe do zumbi passou; com 60%% a vida máxima caiu para %.0f (o HUD mostra); a seringa curou e protege" % vm)
+	lesoes.imune_h = 0.0
+	# a ferida grave: o golpe forte de bicho rasga; a sutura fecha
+	lesoes.golpe_bicho("urso", {"sangra": 0.0}, 30.0)
+	var rasgou := lesoes.ferida and absf(jogador.vida_max() - 80.0) < 0.5
+	jogador.inv.por("sutura", 1)
+	jogador.consumir_slot(_slot_de("sutura"))
+	_confere(rasgou and not lesoes.ferida and jogador.vida_max() == 100.0, "ferida grave: o golpe forte do bicho baixou a vida máxima (80) e a sutura fechou")
+	# o jogo salvo
+	lesoes.sangra = 1
+	lesoes.perna = true
+	lesoes.tala = true
+	lesoes.virus = 33.0
+	var sv := lesoes.salvar()
+	lesoes.zerar()
+	lesoes.carregar(sv)
+	_confere(lesoes.sangra == 1 and lesoes.perna and lesoes.tala and absf(lesoes.virus - 33.0) < 0.1, "jogo salvo: os ferimentos voltam como estavam")
+	# quem morre do vírus levanta como zumbi perto de onde caiu
+	lesoes.zerar()
+	lesoes.virus = 99.99
+	var pm := jogador.global_position
+	await _quadros(120)
+	var morreu_v := not jogador.vivo
+	await get_tree().create_timer(2.2).timeout
+	var levantou := false
+	for z in zumbis:
+		if is_instance_valid(z) and z.global_position.distance_to(pm) < 3.0:
+			levantou = true
+	_confere(morreu_v and levantou, "vírus: em 100%% você morre e o corpo levanta como zumbi perto de onde caiu")
+	renascer(false)
+	await _quadros(5)
+	_limpar_zumbis()
+	lesoes.zerar()
+	hora = hora_antes
+	jogador.vida = 100.0
+	spawn_t = spawn_antes
+
+
+## o espaço da mochila com o item (para os testes)
+func _slot_de(id: String) -> int:
+	for i in jogador.inv.slots.size():
+		var s = jogador.inv.slots[i]
+		if s != null and str(s["id"]) == id:
+			return i
+	return 0
 
 
 ## os sons gravados (CC0) do jogo antigo: carregaram e tocam no lugar dos sons por código; o limitador no som geral
@@ -3642,6 +3766,7 @@ func _teste() -> void:
 	await _teste_pesca()
 	_teste_sons()
 	await _teste_cao(livre)
+	await _teste_lesoes(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")

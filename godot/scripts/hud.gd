@@ -681,6 +681,18 @@ func _chips() -> void:
 		var nomes := {"segue": "Seguindo", "fica": "Vigiando", "ataca": "Brigando", "ferido": "Ferido", "descansa": "Descansando"}
 		var vida_c: int = roundi(float(cao.hp) / Cao.HP_MAX * 20.0) * 5
 		quer.append(["cao", "Caramelo · %s %d%%" % [str(nomes.get(cao.st, "")), vida_c], Color(0.88, 0.64, 0.36) if vida_c > 30 else Color(0.95, 0.45, 0.35)])
+	# os ferimentos (etapa 6f)
+	var le = main.get("lesoes")
+	if le != null:
+		if int(le.sangra) > 0:
+			quer.append(["sangue", "Sangrando muito" if int(le.sangra) >= 2 else "Sangrando", Color(0.95, 0.3, 0.28)])
+		if bool(le.perna):
+			quer.append(["perna", "Perna com tala" if bool(le.tala) else "Perna quebrada", Color(0.95, 0.62, 0.3)])
+		if float(le.virus) > 0.0:
+			var vv: int = maxi(1, floori(float(le.virus)))
+			quer.append(["virus", "Vírus %d%%" % vv, Color(0.62, 0.85, 0.35) if vv <= 50 else Color(0.95, 0.4, 0.3)])
+		if bool(le.ferida):
+			quer.append(["kit", "Ferida grave", Color(0.95, 0.35, 0.35)])
 	var chave := str(quer)
 	if chave == str(chips.get_meta("chave", "")):
 		return

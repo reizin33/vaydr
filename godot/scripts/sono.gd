@@ -123,6 +123,8 @@ func pode(lugar: Dictionary) -> String:
 	var j = main.jogador
 	if not j.vivo:
 		return "Agora não dá"
+	if main.get("lesoes") != null and int(main.lesoes.sangra) > 0:
+		return "Você está sangrando: faça um curativo (bandagem ou kit médico) antes de dormir"
 	if main.terreno.tipo_agua(j.global_position.x, j.global_position.z) != 0 and main.terreno.nivel_agua(j.global_position.x, j.global_position.z) > j.global_position.y + 0.3:
 		return "Não dá para dormir na água"
 	var noite := float(main.hora) >= 18.0 or float(main.hora) < 5.0
@@ -206,7 +208,7 @@ func acordar(motivo: String) -> void:
 	j.preso = false
 	var manual := motivo == "__manual"
 	if not manual and motivo == "":
-		j.vida = minf(100.0, float(j.vida) + 8.0)
+		j.vida = minf(float(j.vida_max()), float(j.vida) + 8.0)
 		main.ui.aviso("Bom dia. Você dormiu a noite e acordou descansado." if bool(d["noite"]) else "Você tirou um cochilo e acordou melhor.", 5.0)
 		if bool(d["lugar"].get("cama", false)) and not Rede.convidado():
 			main.salvar_jogo()

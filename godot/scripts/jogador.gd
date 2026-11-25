@@ -554,8 +554,8 @@ func _physics_process(dt: float) -> void:
 	sede = maxf(0.0, sede - dt / 15.0 * (main.clima.sede() if main.clima != null else 1.0))
 	if fome <= 0.0 or sede <= 0.0:
 		ferir(dt * 0.8, false)
-	elif fome > 60.0 and sede > 60.0 and vida < 100.0 and enjoo <= 0.0:
-		vida = minf(100.0, vida + dt * 0.25)
+	elif fome > 60.0 and sede > 60.0 and vida < vida_max() and enjoo <= 0.0:
+		vida = minf(vida_max(), vida + dt * 0.25)
 	# dor de barriga: perde um pouco de vida e de água até passar (remédio corta)
 	if enjoo > 0.0:
 		enjoo -= dt
@@ -581,7 +581,7 @@ func _physics_process(dt: float) -> void:
 		cansado = true
 	elif energia >= 25.0:
 		cansado = false
-	var corre := quer_correr and not cansado
+	var corre := quer_correr and not cansado and (main.lesoes == null or main.lesoes.pode_correr())
 	# energia: correndo gasta (uns 8 s de corrida), parado ou andando volta depois de um instante
 	if corre:
 		energia = maxf(0.0, energia - dt * 12.0)
@@ -599,7 +599,8 @@ func _physics_process(dt: float) -> void:
 			_dica_frio = true
 			main.ui.aviso("Está frio: sem roupa quente a sua energia não enche. Fique perto do fogo ou faça um casaco e um gorro de pele.", 7.0)
 	_corre = corre and dir.length() > 0.1
-	var vel: float = (AGACHA if agachado else (CORRE if corre else ANDA)) * (main.sono.vel() if main.sono != null else 1.0)
+	var vel: float = (AGACHA if agachado else (CORRE if corre else ANDA)) * (main.sono.vel() if main.sono != null else 1.0) \
+		* (main.lesoes.vel() if main.lesoes != null else 1.0)
 	var alvo := dir * vel
 	var k := 12.0 if is_on_floor() else 2.5
 	velocity.x = lerpf(velocity.x, alvo.x, 1.0 - exp(-k * dt))
@@ -608,8 +609,11 @@ func _physics_process(dt: float) -> void:
 		if queda_v < -11.0:
 			ferir((-queda_v - 11.0) * 6.0, false)
 			tremor = 0.35
+			# a queda alta quebra a perna (etapa 6f)
+			if main.lesoes != null and vivo:
+				main.lesoes.queda(-queda_v - 11.0)
 		queda_v = 0.0
-		if Input.is_action_just_pressed("pular") and not preso and energia >= 6.0:
+		if Input.is_action_just_pressed("pular") and not preso and energia >= 6.0 and (main.lesoes == null or main.lesoes.pode_pular()):
 			velocity.y = PULO
 			energia -= 6.0
 			_folego_t = 0.0
@@ -1367,9 +1371,13 @@ func consumir_slot(i: int) -> void:
 		return
 	var id: String = it["id"]
 	var d := Dados.item(id)
+	# a tala só com a perna quebrada, a sutura só com a ferida grave (etapa 6f)
+	if d.has("trata") and main.lesoes != null and not main.lesoes.precisa(str(d["trata"])):
+		main.ui.aviso("Você não precisa disso agora")
+		return
 	fome = clampf(fome + float(d.get("fome", 0.0)), 0.0, 100.0)
 	sede = clampf(sede + float(d.get("sede", 0.0)), 0.0, 100.0)
-	vida = clampf(vida + float(d.get("vida", 0.0)), 0.0, 100.0)
+	vida = clampf(vida + float(d.get("vida", 0.0)), 0.0, vida_max())
 	sono = clampf(sono + float(d.get("sono", 0.0)), 0.0, 100.0)
 	energia = clampf(energia + float(d.get("energia", 0.0)), 0.0, 100.0)
 	inv.usar_um(i)
@@ -1384,6 +1392,10 @@ func consumir_slot(i: int) -> void:
 	uso_n += 1
 	var verbo := "Bebeu" if str(d.get("tipo", "")) == "bebida" else ("Usou" if str(d.get("tipo", "")) == "cura" else "Comeu")
 	main.ui.aviso("%s: %s" % [verbo, d.get("nome", id)])
+	if main.lesoes != null:
+		var trat: String = main.lesoes.curar(id)
+		if trat != "":
+			main.ui.aviso(trat, 4.0)
 	main.sons.tocar("comer", global_position, -4.0)
 
 
@@ -1398,7 +1410,7 @@ func usar_item(i: int) -> void:
 		"remedios":
 			inv.usar_um(i)
 			enjoo = 0.0
-			vida = minf(100.0, vida + 6.0)
+			vida = minf(vida_max(), vida + 6.0)
 			main.ui.aviso("Tomou remédio: a dor de barriga passou")
 		"pilhas":
 			if bateria >= 99.0:
@@ -1466,6 +1478,11 @@ func _aprender_uma() -> String:
 	var esc_r: Dictionary = opcoes[randi() % opcoes.size()]
 	aprendidas[str(esc_r["faz"])] = true
 	return Dados.nome(str(esc_r["faz"]))
+
+
+## a vida máxima (o vírus avançado e a ferida grave baixam)
+func vida_max() -> float:
+	return main.lesoes.vida_max() if main.lesoes != null else 100.0
 
 
 ## de: de onde veio o golpe (a seta vermelha mostra o lado)
