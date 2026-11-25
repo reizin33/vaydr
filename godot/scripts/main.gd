@@ -3059,6 +3059,55 @@ func _teste_barcos() -> void:
 	hora = hora_antes
 
 
+## o rolamento (etapa 6l): parado o C só agacha; correndo, C mergulha e rola para a frente (uns 3 m, gasta 12 de energia); no
+## meio do giro o golpe não pega
+func _teste_rolamento(livre: Vector3) -> void:
+	var c := _lugar_plano(Vector2(-35, 45), 24.0, Vector2(livre.x, livre.z))
+	var clar := _clareira_teste(c, 22.0)
+	_jogador_em(c - Vector3(0, 0, 9), c + Vector3(0, 1.0, 4))
+	await _quadros(5)
+	Input.action_press("agachar")
+	await _quadros(3)
+	var parado_nao := jogador.rola.is_empty() and jogador.agachado
+	Input.action_release("agachar")
+	await _quadros(5)
+	jogador.energia = 100.0
+	jogador.vida = 100.0
+	var fr0 := -jogador.global_transform.basis.z
+	fr0.y = 0.0
+	fr0 = fr0.normalized()
+	Input.action_press("frente")
+	Input.action_press("correr")
+	await _quadros(30)
+	var p0 := jogador.global_position
+	var e0 := jogador.energia
+	Input.action_press("agachar")
+	await _quadros(2)
+	Input.action_release("agachar")
+	var rolou := not jogador.rola.is_empty()
+	var e1 := jogador.energia
+	await _quadros(18)
+	var inv := jogador.rolando_invulneravel()
+	var vida0 := jogador.vida
+	jogador.ferir(20.0, true, jogador.global_position + fr0 * 1.5)
+	var nao_pegou := absf(jogador.vida - vida0) < 0.01
+	Input.action_release("frente")
+	Input.action_release("correr")
+	for k in 150:
+		await get_tree().physics_frame
+		if jogador.rola.is_empty():
+			break
+	var d := jogador.global_position - p0
+	d.y = 0.0
+	var adiante := d.dot(fr0)
+	var lado := absf(d.dot(Vector3(fr0.z, 0, -fr0.x)))
+	_confere(parado_nao and rolou and e0 - e1 > 11.0 and inv and nao_pegou and jogador.rola.is_empty() and adiante > 2.0 and lado < 1.2,
+		"rolamento: parado o C só agacha; correndo, C mergulha e rola %.1f m para a frente (%.1f m de lado; gastou %.0f de energia); no meio do giro o golpe não pegou" % [
+			adiante, lado, e0 - e1])
+	jogador.vida = 100.0
+	_devolver_clareira(clar)
+
+
 ## o espaço da mochila com o item (para os testes)
 func _slot_de(id: String) -> int:
 	for i in jogador.inv.slots.size():
@@ -4505,6 +4554,7 @@ func _teste() -> void:
 	await _teste_nado()
 	await _teste_veiculos(livre)
 	await _teste_barcos()
+	await _teste_rolamento(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -5291,6 +5341,21 @@ func _fotos() -> void:
 		veiculos.expulsar(jogador)
 		jogador.alternar_camera(false)
 	veiculos.novo()
+	# o rolamento (etapa 6l): no meio do giro, visto de lado (terceira pessoa)
+	hora = 11.0
+	_jogador_em(lw + X3 * 6.0, lw + X3 * 6.0 + Zf * 5.0 + Vector3(0, 1.0, 0))
+	await _quadros(5)
+	jogador.alternar_camera(true)
+	var dir_r := Vector3(Zf.z, 0, -Zf.x)
+	jogador.energia = 100.0
+	jogador.rolar(dir_r)
+	await _quadros(22)
+	jogador.rola_parado = true
+	await _quadros(4)
+	await _foto("17q_rolamento")
+	jogador.rola_parado = false
+	await _quadros(60)
+	jogador.alternar_camera(false)
 	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()

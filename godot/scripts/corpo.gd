@@ -50,6 +50,9 @@ const VAZIO := {"cabelo": "Careca", "barba": "Sem barba"}
 const SOBREVIVENTE := {"g": "homem", "pele": "h_adulto_clara", "olhos": "castanho", "sobr": "sobr3", "cabelo": "curto_grisalho", "barba": ""}
 ## camada de desenho do corpo: a lanterna da mão (que sai de dentro da cabeça) não faz sombra dele
 const CAMADA := 1 << 10
+## o rolamento (etapa 6l): o clipe "rolar" do jogo antigo vem girado (o personagem dele olha para o lado): o jogo antigo girava
+## o clipe inteiro e o deslocamento do quadril por este ângulo (ROLA.rot)
+const ROLA_ROT := -1.794
 ## ferramentas de duas mãos: onde a mão esquerda fecha no cabo (no espaço do item: cabo ao longo de +z, a mão direita no zero)
 const MAO2 := {"machado": Vector3(0, 0, 0.27), "machadoPedra": Vector3(0, 0, 0.27), "picareta": Vector3(0, 0, 0.27),
 	"pa": Vector3(0, 0, 0.3), "lanca": Vector3(0, 0, 0.11), "taco": Vector3(0, 0, 0.11), "tacoCravado": Vector3(0, 0, 0.11),
@@ -566,6 +569,17 @@ func _soma(nome: String, tt: float, w: float) -> void:
 	lh = lh.lerp(_SH, k)
 
 
+## o quadril no clipe no tempo tt (para o jogador andar junto com o rolamento), girado como o clipe e na escala do corpo
+func raiz(nome: String, tt: float) -> Vector3:
+	if not CL.has(nome):
+		return Vector3.ZERO
+	_amostra(nome, tt)
+	var h := _SH
+	if nome == "rolar":
+		h = Basis(Vector3.UP, ROLA_ROT) * h
+	return h * k_akai * escala
+
+
 static func _dur(n: String) -> float:
 	return float(CL[n]["dur"]) if CL.has(n) else 1.0
 
@@ -588,9 +602,9 @@ func animar(dt: float, ent: Dictionary) -> void:
 	var usar_k: float = ent.get("usar", 0.0)
 	var mira_k: float = ent.get("mira", 0.0)
 	var acao := golpe_s >= 0.0 or usar_k > 0.01
-	# dirigindo (etapa 6j): sentado, virado para a frente do veículo
-	if ent.has("sentado") and not ent.has("yaw_corpo"):
-		yaw = float(ent.get("yaw_sentado", yaw))
+	# dirigindo (etapa 6j): sentado, virado para a frente do veículo; rolando (6l): virado para onde rola
+	if (ent.has("sentado") or ent.has("rola")) and not ent.has("yaw_corpo"):
+		yaw = float(ent.get("yaw_sentado", ent.get("yaw_rola", yaw)))
 		global_rotation = Vector3(0, yaw, 0)
 	else:
 		_virar(dt, ent, sp_real, correndo, acao or mira_k > 0.3)
@@ -615,16 +629,16 @@ func animar(dt: float, ent: Dictionary) -> void:
 	var mao_cheia := na_mao or acao
 	for b in NB:
 		lm[b] = 1.0
-	if mao_cheia and estado != "queda":
+	if mao_cheia and estado != "queda" and estado != "rola":
 		for b in range(L_OMBRO, R_MAO + 1):
 			lm[b] = 0.0
-	if (golpe_s >= 0.0 or mira_k > 0.25) and estado != "queda":
+	if (golpe_s >= 0.0 or mira_k > 0.25) and estado != "queda" and estado != "rola":
 		for b in [SPINE1, SPINE2, NECK, HEAD]:
 			lm[b] = 0.15
 	# o empurrão, a voadora e o pisão (64b_combate.js): as pernas e os braços vêm da pose do jogo só nessa hora
 	var acao_c := str(ent.get("acao", ""))
 	var acao_k := clampf(float(ent.get("acao_k", 0.0)), 0.0, 1.0)
-	if acao_c != "" and estado != "queda":
+	if acao_c != "" and estado != "queda" and estado != "rola":
 		for b in range(L_OMBRO, R_MAO + 1):
 			lm[b] = 0.0
 		if acao_c in ["voadora", "pisao"]:
@@ -753,6 +767,19 @@ func _virar(dt: float, ent: Dictionary, sp: float, correndo: bool, agindo: bool)
 
 ## a locomoção do sobrevivente (survLoco): parado e passos misturados pela velocidade e pela direção
 func _loco(dt: float, ent: Dictionary, vel: Vector3, chao: bool, agachado: bool) -> void:
+	# o rolamento (etapa 6l): o clipe "rolar" inteiro, girado como no jogo antigo; quem anda é o jogador (o deslocamento do
+	# quadril no clipe vira o passo dele), aqui o quadril só desce e sobe
+	if ent.has("rola"):
+		lw = 1.0
+		ln = 0.0
+		lh = Vector3.ZERO
+		estado = "rola"
+		_soma("rolar", float(ent["rola"]), 1.0)
+		var qr := Quaternion(Vector3.UP, ROLA_ROT)
+		for b in NB:
+			D[b] = qr * (D[b] as Quaternion)
+		lh = Vector3(0, lh.y, 0)
+		return
 	# sentado no veículo a pose vem toda do jogo (_pose_sentado), sem os passos das animações
 	var livre: bool = bool(ent.get("vivo", true)) and not ent.has("sentado")
 	lw = _chegar(lw, 1.0 if livre else 0.0, dt * (5.0 if livre else 9.0))

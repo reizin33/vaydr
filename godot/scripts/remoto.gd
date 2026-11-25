@@ -124,7 +124,7 @@ func estado(d: PackedFloat32Array, it: String) -> void:
 	_un = un
 	energia = clampf(d[12], 0.0, 100.0)
 	if d.size() >= 15:
-		acao = ["", "empurrao", "voadora", "pisao"][clampi(int(d[13]), 0, 3)]
+		acao = ["", "empurrao", "voadora", "pisao", "rola"][clampi(int(d[13]), 0, 4)]
 		acao_k = clampf(d[14], 0.0, 1.0)
 	if it != item:
 		item = it
@@ -201,6 +201,10 @@ func _process(dt: float) -> void:
 	var ent := {"vel": vel, "chao": chao, "agachado": agachado, "correndo": correndo, "ferido": ferido, "energia": energia,
 		"item": item, "golpe": gs, "vertical": bool(dd.get("vertical", false)), "usar": maxf(0.0, uk), "mira": 0.0, "vivo": vivo,
 		"primeira": false, "yaw_corpo": yaw_s, "acao": acao, "acao_k": acao_k}
+	# rolando (etapa 6l): o clipe do rolamento no ponto em que ele está
+	if acao == "rola":
+		ent["rola"] = 0.55 + (2.05 - 0.55) * acao_k
+		ent["acao"] = ""
 	# dirigindo (etapa 6j): sentado; dentro da caminhonete ou do carro o boneco fica escondido pela lataria
 	if sentado != "":
 		ent["sentado"] = sentado

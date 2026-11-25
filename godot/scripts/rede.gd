@@ -887,6 +887,10 @@ func _mandar_eu(j) -> void:
 	if not j.acao.is_empty():
 		ac = ["", "empurrao", "voadora", "pisao"].find(str(j.acao["tipo"]))
 		ak = float(j.acao["t"]) / float(j.acao["dur"])
+	# rolando (etapa 6l): o boneco rola junto
+	if not j.rola.is_empty():
+		ac = 4
+		ak = float(j.rola["t"]) / float(j.rola["dur"])
 	var d := PackedFloat32Array([p.x, p.y, p.z, v.x, v.y, v.z, j.corpo.yaw, j.cabeca.rotation.x, fl, j.golpe_n, j.golpe_dur, j.uso_n, j.energia,
 		maxi(ac, 0), ak])
 	_eu.rpc(d, str(j.item_mao().get("id", "")))

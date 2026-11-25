@@ -86,6 +86,9 @@ var queima := 0.0        # pegando fogo: segundos que faltam
 var _queima_t := 0.0
 var _besta_t := -1.0     # a besta arma sozinha um instante depois do tiro
 var fov_base := 75.0     # o campo de visão das configurações (mirando fecha um pouco)
+var rola := {}            # o rolamento (etapa 6l): {t, dur, yaw, ult} (correndo, C mergulha e rola; no meio do giro os golpes não pegam)
+var rola_parado := false  # para a foto: o rolamento fica parado onde está
+const ROLA := {"t0": 0.55, "t1": 2.05, "vel": 1.32, "custo": 12.0}
 var veiculo: Veiculo = null   # dirigindo (etapa 6j): o jogador fica no assento, sem colisão, e a câmera vai com o veículo
 var _olhar_t := 9.0      # dirigindo: quanto tempo faz que o mouse mexeu (sem mexer, a câmera volta para a frente do veículo)
 var _cam_veic := Vector3.INF
@@ -582,6 +585,10 @@ func _physics_process(dt: float) -> void:
 	if veiculo != null:
 		_no_veiculo(dt)
 		return
+	# rolando (etapa 6l): quem anda é o rolamento
+	if not rola.is_empty():
+		_passo_rola(dt)
+		return
 	# movimento
 	var dir := Vector3.ZERO
 	if not preso:
@@ -613,6 +620,9 @@ func _physics_process(dt: float) -> void:
 		if not _dica_frio:
 			_dica_frio = true
 			main.ui.aviso("Está frio: sem roupa quente a sua energia não enche. Fique perto do fogo ou faça um casaco e um gorro de pele.", 7.0)
+	# correndo, C (agachar) mergulha e rola (como no jogo antigo: 41b_movimentos.js)
+	if _corre and dir.length() > 0.1 and Input.is_action_just_pressed("agachar") and rolar(dir):
+		return
 	_corre = corre and dir.length() > 0.1
 	# a natação (etapa 6i): a água acima do peito vira nado
 	if _nadar(dt, dir):
@@ -849,6 +859,67 @@ func sair_veiculo(p: Vector3) -> void:
 	_luz()
 
 
+# ---------------------------------------------------------------- o rolamento (etapa 6l), como no jogo antigo (41b_movimentos.js)
+func pode_rolar() -> bool:
+	return vivo and veiculo == null and rola.is_empty() and is_on_floor() and not nadando and acao.is_empty() \
+		and energia >= float(ROLA["custo"]) and (main.lesoes == null or main.lesoes.pode_pular())
+
+
+## mergulha e rola para onde está correndo (gasta 12 de energia; faz um pouco de barulho)
+func rolar(dir: Vector3) -> bool:
+	if not pode_rolar():
+		return false
+	var d := Vector3(dir.x, 0, dir.z)
+	if d.length() < 0.1:
+		d = -global_transform.basis.z
+	d = d.normalized()
+	var t0: float = ROLA["t0"]
+	rola = {"t": 0.0, "dur": (float(ROLA["t1"]) - t0) / float(ROLA["vel"]), "yaw": atan2(-d.x, -d.z), "ult": corpo.raiz("rolar", t0)}
+	energia -= float(ROLA["custo"])
+	_folego_t = 0.0
+	agachado = false
+	main.sons.tocar(_som_passo(), global_position, 0.0)
+	main.barulho(global_position, 7.0)
+	return true
+
+
+## o passo do rolamento: o jogador vai junto com o quadril do clipe (do começo do mergulho até ficar de pé)
+func _passo_rola(dt: float) -> void:
+	if rola_parado:
+		velocity = Vector3.ZERO
+		return
+	rola["t"] = float(rola["t"]) + dt
+	var k := minf(1.0, float(rola["t"]) / float(rola["dur"]))
+	var t0: float = ROLA["t0"]
+	var ct := t0 + (float(ROLA["t1"]) - t0) * k
+	var q: Vector3 = corpo.raiz("rolar", ct)
+	var dq: Vector3 = q - (rola["ult"] as Vector3)
+	rola["ult"] = q
+	var mov := Basis(Vector3.UP, float(rola["yaw"])) * Basis(Vector3.UP, PI) * Vector3(dq.x, 0, dq.z)
+	velocity.x = mov.x / maxf(dt, 0.001)
+	velocity.z = mov.z / maxf(dt, 0.001)
+	if is_on_floor():
+		velocity.y = -1.0
+	else:
+		velocity.y -= GRAV * dt
+	move_and_slide()
+	cabeca.position.y = lerpf(cabeca.position.y, lerpf(1.62, 0.7, sin(k * PI)), 1.0 - exp(-14.0 * dt))
+	if not terceira:
+		cam.position = Vector3.ZERO
+	if k >= 1.0:
+		rola = {}
+		velocity.x *= 0.6
+		velocity.z *= 0.6
+
+
+## no meio do giro os golpes não pegam (do jogo antigo: de 8% a 72% do rolamento)
+func rolando_invulneravel() -> bool:
+	if rola.is_empty():
+		return false
+	var k := float(rola["t"]) / float(rola["dur"])
+	return k > 0.08 and k < 0.72
+
+
 ## no assento: a energia volta (como sentado), a fome e a sede continuam; sem mexer o mouse a câmera volta para a frente
 func _no_veiculo(dt: float) -> void:
 	if not is_instance_valid(veiculo):
@@ -996,6 +1067,12 @@ func _animar_corpo(dt: float) -> void:
 		"energia": energia, "item": id, "golpe": gs, "vertical": bool(d.get("vertical", false)), "usar": maxf(0.0, uk), "mira": mira_k,
 		"vivo": vivo, "primeira": not terceira, "yaw": rotation.y, "vira_anda": bool(Ajustes.v.get("corpo_anda", false)),
 		"acao": str(acao.get("tipo", "")), "acao_k": (float(acao["t"]) / float(acao["dur"])) if not acao.is_empty() else 0.0}
+	# rolando (etapa 6l): o clipe do rolamento, virado para onde rola
+	if not rola.is_empty():
+		var k := minf(1.0, float(rola["t"]) / float(rola["dur"]))
+		ent["rola"] = float(ROLA["t0"]) + (float(ROLA["t1"]) - float(ROLA["t0"])) * k
+		ent["yaw_rola"] = float(rola["yaw"])
+		ent["vel"] = Vector3.ZERO
 	# dirigindo: sentado, virado para a frente do veículo, as mãos no volante (na moto e no triciclo, no guidão)
 	if veiculo != null and is_instance_valid(veiculo):
 		ent["vel"] = Vector3.ZERO
@@ -1798,6 +1875,11 @@ func vida_max() -> float:
 func ferir(dano: float, tremer := true, de := Vector3.INF) -> void:
 	if not vivo:
 		return
+	# rolando: no meio do giro o golpe passa por cima (etapa 6l)
+	if tremer and rolando_invulneravel():
+		if de != Vector3.INF:
+			main.sons.tocar("golpe", de, -6.0)
+		return
 	# dentro da caminhonete e do carro o golpe pega na lataria (você leva só um pouco), como no jogo antigo
 	if tremer and veiculo != null and is_instance_valid(veiculo) and not bool(veiculo.T.get("exposto", false)):
 		veiculo.hp = maxf(0.0, float(veiculo.hp) - dano * 0.7)
@@ -1824,6 +1906,7 @@ func ferir(dano: float, tremer := true, de := Vector3.INF) -> void:
 
 
 func renascer(p: Vector3) -> void:
+	rola = {}
 	if veiculo != null:
 		veiculo = null
 		cam.transform = Transform3D.IDENTITY
