@@ -50,6 +50,8 @@ var roll := 0.0
 var acel := 0.0              # o acelerador agora (o som do motor sobe junto)
 var freando := false
 var lan := false             # boneco: o veículo de quem abriu a partida, aqui no convidado
+var motorista := 0           # quem abriu: o id do convidado que está dirigindo este (0: ninguém de fora)
+var dono_rede := false       # no convidado: é o veículo de quem abriu que você está dirigindo (o seu jogo diz onde ele está)
 var corpo: Node3D            # o desenho (inclina com o chão)
 var base_mi: MeshInstance3D
 var cabine_mi: MeshInstance3D
@@ -277,7 +279,8 @@ static func _taper(vel: float, maxv: float) -> float:
 
 
 func _physics_process(dt: float) -> void:
-	if lan:
+	# o boneco: no convidado, o de quem abriu; em quem abriu, o que um convidado está dirigindo
+	if lan or motorista != 0:
 		_boneco(dt)
 		return
 	var j = main.jogador
@@ -786,7 +789,7 @@ func fazer(id: String, j) -> String:
 # ================================================================ a partida em rede: o veículo de quem abriu, aqui
 ## [x, y, z, giro, inclinação, deitada, velocidade, volante, giro das rodas, faróis/ligado/freando, combustível, lataria]
 func para_rede() -> PackedFloat32Array:
-	var fl := (1 if ativo else 0) | (2 if luz else 0) | (4 if freando else 0) | (8 if hp > 0.0 else 0)
+	var fl := (1 if ativo or motorista != 0 else 0) | (2 if luz else 0) | (4 if freando else 0) | (8 if hp > 0.0 else 0)
 	var p := global_position
 	return PackedFloat32Array([p.x, p.y, p.z, rotation.y, pitch, roll, v, steer, giro, fl, comb, hp])
 
@@ -837,6 +840,63 @@ func _boneco(dt: float) -> void:
 	mat_lanterna.emission_energy_multiplier = (3.0 if freando else 1.4) if on else 0.0
 
 
+## o estado das peças (quem abriu manda para o convidado que vai dirigir; o convidado manda de volta ao descer)
+func estado_rede() -> Dictionary:
+	var p := global_position
+	return {"x": p.x, "y": p.y, "z": p.z, "yaw": rotation.y, "comb": comb, "hp": hp, "pecas": pecas.duplicate(true), "luz": luz}
+
+
+func receber_estado(d: Dictionary, lugar: bool) -> void:
+	comb = clampf(float(d.get("comb", comb)), 0.0, 100.0)
+	hp = clampf(float(d.get("hp", hp)), 0.0, 100.0)
+	luz = bool(d.get("luz", luz))
+	var pd = d.get("pecas", {})
+	if pd is Dictionary:
+		pecas["motor"] = clampf(float(pd.get("motor", pecas["motor"])), 0.0, 100.0)
+		pecas["oleo"] = clampf(float(pd.get("oleo", pecas["oleo"])), 0.0, 100.0)
+		pecas["bateria"] = bool(pd.get("bateria", pecas["bateria"]))
+		var pn = pd.get("pneus", [])
+		if pn is Array and (pn as Array).size() == (pecas["pneus"] as Array).size():
+			var L: Array = []
+			for q in pn:
+				L.append(clampf(float(q), 0.0, 100.0))
+			pecas["pneus"] = L
+	if lugar and d.has("x"):
+		global_position = Vector3(float(d["x"]), float(d["y"]), float(d["z"]))
+		rotation.y = float(d.get("yaw", rotation.y))
+
+
+## o convidado dirigindo: [x, y, z, giro, inclinação, deitada, velocidade, volante, giro das rodas, faróis/freando, combustível,
+## lataria, motor, óleo] (10 vezes por segundo para quem abriu)
+func para_motorista() -> PackedFloat32Array:
+	var p := global_position
+	var fl := (2 if luz else 0) | (4 if freando else 0)
+	return PackedFloat32Array([p.x, p.y, p.z, rotation.y, pitch, roll, v, steer, giro, fl, comb, hp, float(pecas["motor"]), float(pecas["oleo"])])
+
+
+## quem abriu: onde o convidado que dirige diz que o veículo está
+func do_motorista(L: PackedFloat32Array) -> void:
+	if L.size() < 14:
+		return
+	_lan_p = Vector3(L[0], L[1], L[2])
+	_lan_yaw = L[3]
+	_lan_pr = Vector2(L[4], L[5])
+	v = L[6]
+	steer = L[7]
+	giro = L[8]
+	var fl := int(L[9])
+	luz = (fl & 2) != 0
+	freando = (fl & 4) != 0
+	comb = clampf(L[10], 0.0, 100.0)
+	hp = clampf(L[11], 0.0, 100.0)
+	pecas["motor"] = clampf(L[12], 0.0, 100.0)
+	pecas["oleo"] = clampf(L[13], 0.0, 100.0)
+	set_meta("lan_ativo", true)
+	if global_position.distance_to(_lan_p) > 12.0:
+		global_position = _lan_p
+		rotation.y = _lan_yaw
+
+
 func soltar_rede() -> void:
 	if not lan:
 		return
@@ -848,7 +908,8 @@ func soltar_rede() -> void:
 
 # ================================================================ jogo salvo
 func salvar() -> Dictionary:
-	if lan and not _antes_rede.is_empty():
+	# na partida em rede (convidado) o jogo salvo guarda o veículo do seu mundo, como estava antes de entrar
+	if (lan or dono_rede) and not _antes_rede.is_empty():
 		return _antes_rede.duplicate(true)
 	var p := global_position
 	return {"id": uid, "tipo": tipo, "x": snappedf(p.x, 0.01), "y": snappedf(p.y, 0.01), "z": snappedf(p.z, 0.01), "yaw": snappedf(rotation.y, 0.001),

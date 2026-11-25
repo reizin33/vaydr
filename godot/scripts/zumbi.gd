@@ -275,10 +275,13 @@ func _bloqueio(j) -> Dictionary:
 
 ## dirigindo: o veículo de quem ele persegue não tapa a vista nem o golpe (ele bate na lataria; etapa 6j)
 func _fora_veiculo(j, fora: Array[RID]) -> void:
-	if j != main.jogador or main.jogador.get("veiculo") == null:
-		return
-	var vc = main.jogador.veiculo
-	if is_instance_valid(vc):
+	var vc = null
+	if j == main.jogador:
+		vc = main.jogador.get("veiculo")
+	elif main.get("veiculos") != null and j.get("sentado") != null and str(j.sentado) != "":
+		# o convidado dirigindo um veículo daqui
+		vc = main.veiculos.do_motorista(int(j.id))
+	if vc != null and is_instance_valid(vc):
 		fora.append((vc as CollisionObject3D).get_rid())
 
 

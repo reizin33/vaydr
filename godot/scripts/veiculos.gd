@@ -5,7 +5,9 @@ extends Node3D
 ## triciclo da fazenda (com um pouco de gasolina e um pneu furado). Toque E entra (se der); segure E abre a oficina do veículo
 ## (o estado das peças, os consertos, abastecer e o porta-malas). O barco, a jangada e o helicóptero vêm depois.
 ## As estradas: fora delas (e fora da cidade) os veículos andam mais devagar, menos o triciclo.
-## Na partida em rede os veículos são de quem abriu: o convidado vê eles andando (por enquanto só quem abriu dirige).
+## Na partida em rede os veículos são de quem abriu: o convidado vê eles andando e pode pedir para dirigir um (quem abriu
+## deixa se ninguém estiver nele e se ele andar); dirigindo, o jogo do convidado diz onde o veículo está e quem abriu mostra para
+## todo mundo. A oficina e o porta-malas ficam com quem abriu.
 
 ## [tipo, id, x, z, giro, o estado de como foi achado]
 const PADRAO := [
@@ -137,7 +139,13 @@ func na_estrada(p: Vector3) -> bool:
 ## E no veículo parado: o toque entra (se der; senão diz o que falta e abre a oficina); segurar abre a oficina
 func usar(v: Veiculo, j, segurou: bool) -> void:
 	if v.lan:
-		main.ui.aviso("Na partida em rede, por enquanto só quem abriu a partida dirige e mexe na oficina dos veículos", 5.0)
+		if segurou:
+			main.ui.aviso("Na partida em rede a oficina e o porta-malas dos veículos ficam com quem abriu a partida", 4.0)
+		else:
+			pedir(v)
+		return
+	if v.motorista != 0:
+		main.ui.aviso("Tem alguém da partida dirigindo %s %s" % [v.o_a(), v.nome().to_lower()], 3.0)
 		return
 	var nao := v.pode()
 	if segurou or nao != "":
@@ -158,6 +166,8 @@ func entrar(v: Veiculo, j) -> bool:
 		main.sons.tocar("vazio", v.global_position, 0.0)
 		return false
 	if v.ativo:
+		return false
+	if v.motorista != 0:
 		return false
 	v.ativo = true
 	v.visto = true
@@ -185,6 +195,7 @@ func sair(j) -> bool:
 		main.ui.aviso("Sem espaço para descer", 2.5)
 		return false
 	_desligar(v)
+	_devolver(v)
 	j.sair_veiculo(p)
 	main.sons.tocar("clique", v.global_position, -4.0)
 	if main.get("cao") != null:
@@ -202,9 +213,21 @@ func expulsar(j) -> void:
 	if p == Vector3.INF:
 		p = v.global_position + Vector3(0, float(v.T["alt"]) + 0.3, 0)
 	_desligar(v)
+	_devolver(v)
 	j.sair_veiculo(p)
 	if main.get("cao") != null:
 		main.cao.saiu_veiculo(v)
+
+
+## o convidado desceu do veículo de quem abriu: avisa onde ele ficou e ele volta a ser o boneco do de lá
+func _devolver(v) -> void:
+	if not bool(v.dono_rede):
+		return
+	v.dono_rede = false
+	var k := lista.find(v)
+	if k >= 0:
+		Rede.sair_veic(k, v.estado_rede())
+	v.lan = true
 
 
 func _desligar(v) -> void:
@@ -251,6 +274,10 @@ func rede(L: PackedFloat32Array) -> void:
 		var k := int(L[i])
 		if k >= 0 and k < lista.size() and is_instance_valid(lista[k]):
 			var v: Veiculo = lista[k]
+			# o que você está dirigindo: quem manda onde ele está é você
+			if v.dono_rede and j != null and j.veiculo == v:
+				i += n
+				continue
 			if j != null and j.veiculo == v:
 				expulsar(j)
 			v.rede(L, i + 1)
@@ -258,9 +285,110 @@ func rede(L: PackedFloat32Array) -> void:
 
 
 func soltar_rede() -> void:
+	var j = main.jogador
+	if j != null and j.veiculo != null and is_instance_valid(j.veiculo) and bool(j.veiculo.dono_rede):
+		expulsar(j)
 	for v in lista:
 		if is_instance_valid(v):
+			(v as Veiculo).dono_rede = false
+			(v as Veiculo).motorista = 0
 			(v as Veiculo).soltar_rede()
+
+
+## convidado: pede para dirigir o veículo de quem abriu (quem abriu responde)
+func pedir(v: Veiculo) -> void:
+	var k := lista.find(v)
+	if k < 0:
+		return
+	Rede.pedir_veic(k)
+	main.ui.aviso("Pedindo para dirigir %s %s..." % [v.o_a(), v.nome().to_lower()], 2.0)
+
+
+## convidado: quem abriu deixou dirigir (com o estado das peças de lá) ou disse por que não
+func resposta(k: int, ok: bool, motivo: String, estado: Dictionary) -> void:
+	if k < 0 or k >= lista.size() or not is_instance_valid(lista[k]):
+		return
+	var v: Veiculo = lista[k]
+	if not ok:
+		main.ui.aviso(motivo, 3.5)
+		main.sons.tocar("vazio", v.global_position, 0.0)
+		return
+	var j = main.jogador
+	if j == null or j.veiculo != null or not j.vivo or j.global_position.distance_to(v.global_position) > 8.0:
+		# já não dá (entrou em outro, morreu, se afastou): devolve
+		Rede.sair_veic(k, v.estado_rede())
+		return
+	v.receber_estado(estado, true)
+	v.lan = false
+	v.dono_rede = true
+	v.ativo = true
+	v.v = 0.0
+	v.assentar()
+	j.entrar_veiculo(v)
+	main.sons.tocar("clique", v.global_position, -4.0)
+	main.sons.tocar("partida", v.global_position, 0.0)
+
+
+## quem abriu: um convidado pediu para dirigir; devolve [deixou, o motivo, o estado das peças]
+func pedido(k: int, quem: int) -> Array:
+	if k < 0 or k >= lista.size() or not is_instance_valid(lista[k]):
+		return [false, "Esse veículo não existe aqui", {}]
+	var v: Veiculo = lista[k]
+	if v.ativo or v.motorista != 0:
+		return [false, "Alguém já está dirigindo %s %s" % [v.o_a(), v.nome().to_lower()], {}]
+	var nao := v.pode()
+	if nao != "":
+		return [false, "%s: %s (quem abriu a partida conserta na oficina)" % [v.nome(), nao.to_lower()], {}]
+	v.motorista = quem
+	v._lan_p = v.global_position
+	v._lan_yaw = v.rotation.y
+	v._lan_pr = Vector2(v.pitch, v.roll)
+	v.set_meta("lan_ativo", true)
+	return [true, "", v.estado_rede()]
+
+
+## quem abriu: onde o convidado que dirige diz que o veículo está
+func do_convidado(k: int, quem: int, L: PackedFloat32Array) -> void:
+	if k < 0 or k >= lista.size() or not is_instance_valid(lista[k]):
+		return
+	var v: Veiculo = lista[k]
+	if v.motorista == quem:
+		v.do_motorista(L)
+
+
+## quem abriu: o convidado desceu (onde o veículo ficou e o estado das peças)
+func desceu(k: int, quem: int, d: Dictionary) -> void:
+	if k < 0 or k >= lista.size() or not is_instance_valid(lista[k]):
+		return
+	var v: Veiculo = lista[k]
+	if v.motorista != quem:
+		return
+	v.motorista = 0
+	v.ativo = false
+	v.v = 0.0
+	v.acel = 0.0
+	v.set_meta("lan_ativo", false)
+	v.receber_estado(d, true)
+	v.assentar()
+
+
+## quem abriu: o convidado saiu da partida dirigindo: o veículo fica onde estava
+func soltou(quem: int) -> void:
+	for v in lista:
+		if is_instance_valid(v) and (v as Veiculo).motorista == quem:
+			(v as Veiculo).motorista = 0
+			(v as Veiculo).ativo = false
+			(v as Veiculo).v = 0.0
+			(v as Veiculo).set_meta("lan_ativo", false)
+			(v as Veiculo).assentar()
+
+
+## quem abriu: o veículo que um convidado está dirigindo (para os zumbis acharem ele lá dentro)
+func do_motorista(quem: int) -> Veiculo:
+	for v in lista:
+		if is_instance_valid(v) and (v as Veiculo).motorista == quem:
+			return v
+	return null
 
 
 # ================================================================ jogo salvo

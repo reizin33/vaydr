@@ -216,14 +216,26 @@ func _anfitriao(p0: Vector3) -> void:
 	var viu_c := await _esperar(func(): return _sinal("cao_ok"), 60.0)
 	_confere(viu_c, "o Caramelo daqui apareceu para quem entrou")
 	main.cao.iniciar()
-	# os veículos de quem abriu (etapa 6j): a caminhonete perto do convidado, o boneco dela aparece lá
+	# os veículos de quem abriu (etapa 6j): a caminhonete perto do convidado, o boneco dela aparece lá; ele pede, dirige e desce
 	var cam_v: Veiculo = main.veiculos.por_id("caminhonete")
+	var p_v := Vector3.ZERO
 	if cam_v != null:
-		cam_v.global_position = Vector3(pb.x + 6.0, main.terreno.h(pb.x + 6.0, pb.z), pb.z)
+		cam_v.global_position = Vector3(pb.x + 3.5, main.terreno.h(pb.x + 3.5, pb.z), pb.z)
+		cam_v.rotation.y = 0.0
+		cam_v.comb = 50.0
 		cam_v.assentar()
+		p_v = cam_v.global_position
 	Rede.mandar_controle("veic")
 	var viu_v := await _esperar(func(): return _sinal("veic_ok"), 60.0)
 	_confere(viu_v, "a caminhonete daqui apareceu para quem entrou")
+	var pegou_v := false
+	if cam_v != null:
+		pegou_v = await _esperar(func(): return cam_v.motorista != 0, 30.0)
+	var dirigiu_v := await _esperar(func(): return _sinal("dirigiu"), 60.0)
+	await _quadros(10)
+	var andou_v := cam_v.global_position.distance_to(p_v) if cam_v != null else 0.0
+	_confere(pegou_v and dirigiu_v and cam_v != null and andou_v > 3.0 and cam_v.motorista == 0 and not cam_v.ativo,
+		"o convidado pediu e dirigiu a caminhonete daqui: ela andou %.1f m aqui também e ficou parada onde ele desceu" % andou_v)
 	main.veiculos.novo()
 	# bate-papo
 	var msg_conv := func():
@@ -372,19 +384,40 @@ func _convidado(p0: Vector3) -> void:
 		viu_cao = await _esperar(func(): return main.cao.lan and main.cao.ativo and main.cao.corpo.visible, 20.0)
 	_confere(viu_cao, "o Caramelo de quem abriu aparece aqui (o boneco, a %.0f m de você)" % main.cao.global_position.distance_to(main.jogador.global_position))
 	Rede.mandar_controle("cao_ok")
-	# a caminhonete de quem abriu (etapa 6j): o boneco dela aparece aqui; o convidado ainda não dirige
+	# a caminhonete de quem abriu (etapa 6j): o boneco dela aparece aqui; pede para dirigir, anda e desce
 	var veio_v := await _esperar(func(): return _sinal("veic"), 90.0)
 	var cv: Veiculo = main.veiculos.por_id("caminhonete")
 	var viu_veic := false
 	if veio_v and cv != null:
 		viu_veic = await _esperar(func(): return cv.lan and cv.global_position.distance_to(main.jogador.global_position) < 12.0, 20.0)
-	var nao_dirige := false
-	if cv != null:
-		main.veiculos.usar(cv, main.jogador, false)
-		nao_dirige = main.jogador.veiculo == null
-	_confere(viu_veic and nao_dirige, "a caminhonete de quem abriu aparece aqui (o boneco, a %.0f m de você); por enquanto o convidado não dirige" % (
+	_confere(viu_veic, "a caminhonete de quem abriu aparece aqui (o boneco, a %.0f m de você)" % (
 		cv.global_position.distance_to(main.jogador.global_position) if cv != null else -1.0))
 	Rede.mandar_controle("veic_ok")
+	var dirigiu := false
+	var andou_c := 0.0
+	var de_volta := false
+	if cv != null and viu_veic:
+		var clar: Array = main._clareira_teste(cv.global_position, 24.0)
+		main._por_em(cv.global_position + Vector3(2.8, 0.2, 0))
+		await _quadros(3)
+		main.veiculos.usar(cv, main.jogador, false)
+		var entrou_c := await _esperar(func(): return main.jogador.veiculo == cv, 15.0)
+		if entrou_c:
+			var p0c := cv.global_position
+			Input.action_press("frente")
+			await get_tree().create_timer(2.0).timeout
+			Input.action_release("frente")
+			Input.action_press("pular")
+			await get_tree().create_timer(1.8).timeout
+			Input.action_release("pular")
+			andou_c = cv.global_position.distance_to(p0c)
+			dirigiu = main.veiculos.sair(main.jogador)
+			de_volta = cv.lan and not cv.dono_rede
+		main._devolver_clareira(clar)
+	_confere(dirigiu and andou_c > 3.0 and de_volta,
+		"pediu para dirigir a caminhonete de quem abriu: andou %.1f m e desceu (ela voltou a ser o boneco de lá)" % andou_c)
+	await get_tree().create_timer(0.6).timeout
+	Rede.mandar_controle("dirigiu")
 	# bate-papo
 	Rede.mandar_chat("Oi! Aqui é o convidado.")
 	var msg_anf := func():

@@ -386,6 +386,9 @@ func _desconectou(id: int) -> void:
 	jog.erase(id)
 	visuais.erase(id)
 	_tirar_boneco(id)
+	# estava dirigindo um veículo daqui: ele fica onde parou
+	if main != null and is_instance_valid(main) and main.get("veiculos") != null:
+		main.veiculos.soltou(id)
 	_mandar_lista()
 	_sistema("%s saiu." % nm)
 	mudou.emit()
@@ -616,6 +619,60 @@ func _veics(L: PackedFloat32Array) -> void:
 	main.veiculos.rede(L)
 
 
+## convidado: pede para dirigir o veículo k de quem abriu (etapa 6j)
+func pedir_veic(k: int) -> void:
+	if papel == "convidado" and on and _peer != null:
+		_pedir_veic.rpc_id(1, k)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _pedir_veic(k: int) -> void:
+	if papel != "anfitriao" or main == null or not is_instance_valid(main) or not main.pronto or main.get("veiculos") == null:
+		return
+	var quem := multiplayer.get_remote_sender_id()
+	if not jog.has(quem):
+		return
+	var r: Array = main.veiculos.pedido(k, quem)
+	_veic_resp.rpc_id(quem, k, bool(r[0]), str(r[1]), r[2])
+
+
+@rpc("authority", "call_remote", "reliable")
+func _veic_resp(k: int, ok: bool, motivo: String, estado: Dictionary) -> void:
+	if papel != "convidado" or not on or main == null or not is_instance_valid(main) or not main.pronto or main.get("veiculos") == null:
+		return
+	main.veiculos.resposta(k, ok, motivo, estado)
+
+
+## convidado dirigindo o veículo de quem abriu: onde ele está (junto com o "eu", 10 vezes por segundo)
+func _mandar_veic(j) -> void:
+	var vc = j.get("veiculo")
+	if vc == null or not is_instance_valid(vc) or not bool(vc.dono_rede):
+		return
+	var k: int = main.veiculos.lista.find(vc)
+	if k >= 0:
+		_veic_conv.rpc_id(1, k, vc.para_motorista())
+
+
+@rpc("any_peer", "call_remote", "unreliable_ordered", 1)
+func _veic_conv(k: int, L: PackedFloat32Array) -> void:
+	if papel != "anfitriao" or main == null or not is_instance_valid(main) or not main.pronto or main.get("veiculos") == null:
+		return
+	main.veiculos.do_convidado(k, multiplayer.get_remote_sender_id(), L)
+
+
+## convidado: desceu do veículo de quem abriu (onde ele ficou e o estado das peças)
+func sair_veic(k: int, d: Dictionary) -> void:
+	if papel == "convidado" and on and _peer != null:
+		_sair_veic.rpc_id(1, k, d)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _sair_veic(k: int, d: Dictionary) -> void:
+	if papel != "anfitriao" or main == null or not is_instance_valid(main) or not main.pronto or main.get("veiculos") == null:
+		return
+	main.veiculos.desceu(k, multiplayer.get_remote_sender_id(), d)
+
+
 ## de quem abriu: o tempo (etapa 6b)
 func mandar_clima(tipo: int, k: float, dia_c: int) -> void:
 	if papel == "anfitriao" and on and _peer != null:
@@ -801,6 +858,8 @@ func _process(dt: float) -> void:
 	_mandar_eu(j)
 	if j != null:
 		_mandar_visual(j)
+		if papel == "convidado":
+			_mandar_veic(j)
 	if papel == "anfitriao":
 		_mundo_t -= 0.1
 		if j != null or _mundo_t <= 0.0:
