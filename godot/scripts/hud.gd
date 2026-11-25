@@ -681,6 +681,9 @@ func _chips() -> void:
 		var nomes := {"segue": "Seguindo", "fica": "Vigiando", "ataca": "Brigando", "ferido": "Ferido", "descansa": "Descansando"}
 		var vida_c: int = roundi(float(cao.hp) / Cao.HP_MAX * 20.0) * 5
 		quer.append(["cao", "Caramelo · %s %d%%" % [str(nomes.get(cao.st, "")), vida_c], Color(0.88, 0.64, 0.36) if vida_c > 30 else Color(0.95, 0.45, 0.35)])
+	# nadando (etapa 6i)
+	if bool(j.get("nadando")):
+		quer.append(["agua", "Afogando!" if float(j.energia) <= 0.5 else "Nadando", Color(0.95, 0.4, 0.3) if float(j.energia) <= 0.5 else Color(0.55, 0.78, 0.95)])
 	# os ferimentos (etapa 6f)
 	var le = main.get("lesoes")
 	if le != null:

@@ -102,6 +102,7 @@ func _ready() -> void:
 	# o Caramelo (etapa 6e): o latido (dois "au" curtos), o ganido fino e a mordida
 	bancos["latido"] = [_latido(2, 620.0), _latido(2, 560.0), _latido(3, 660.0)]
 	bancos["ganido"] = [_ganido(0.55, 1150.0), _ganido(0.45, 1050.0)]
+	bancos["bolhas"] = [_bolhas(), _bolhas()]
 	bancos["mordida"] = [_mistura(_ruido(0.12, 1800.0, 0.6, 30.0), _tom(0.1, 240.0, 140.0, 0.4, 30.0))]
 	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
 	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]
@@ -272,6 +273,26 @@ func _latido(n: int, f: float) -> AudioStreamWAV:
 			y += (rng.randf_range(-1.0, 1.0) - y) * 0.35
 			var v := sin(fase) * 0.55 + sin(fase * 2.0) * 0.25 + sin(fase * 3.0) * 0.12 + y * 0.45
 			a[idx] += v * env * 0.6
+	return _wav(a)
+
+
+## as bolhas (afogando): uns "blup" curtos subindo de tom
+func _bolhas() -> AudioStreamWAV:
+	var dur := 0.7
+	var tot := int(dur * HZ)
+	var a := PackedFloat32Array()
+	a.resize(tot)
+	for k in 6:
+		var ini := int(rng.randf() * (dur - 0.08) * HZ)
+		var f0 := rng.randf_range(300.0, 700.0)
+		var fase := 0.0
+		for i in int(0.07 * HZ):
+			var idx: int = ini + i
+			if idx >= tot:
+				break
+			var t := float(i) / HZ
+			fase += TAU * f0 * (1.0 + t * 14.0) / HZ
+			a[idx] += sin(fase) * exp(-t * 45.0) * minf(1.0, t * 600.0) * 0.4
 	return _wav(a)
 
 

@@ -2528,6 +2528,98 @@ func _teste_curtume(livre: Vector3) -> void:
 	hora = hora_antes
 
 
+## a natação (etapa 6i): a água acima do peito vira nado (a cabeça fora d'água), nadar gasta energia (correndo, muito), sem
+## energia você se afoga, o zumbi no fundo fundo não alcança quem nada por cima, na água rasa anda devagar, na margem volta a
+## andar
+func _teste_nado() -> void:
+	var hora_antes := hora
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	hora = 12.0
+	_limpar_zumbis()
+	# um ponto fundo (mais de 2,4 m de água doce), um raso e um seco perto dele
+	var fundo := Vector3.INF
+	for x in range(-150, 160, 3):
+		for z in range(-200, 160, 3):
+			var n: float = terreno.nivel_agua(float(x), float(z))
+			if n < -900.0 or terreno.tipo_agua(float(x), float(z)) != 1:
+				continue
+			if n - terreno.h(float(x), float(z)) > 2.4:
+				fundo = Vector3(float(x), n, float(z))
+				break
+		if fundo != Vector3.INF:
+			break
+	var raso := Vector3.INF
+	var seco := Vector3.INF
+	if fundo != Vector3.INF:
+		for r in range(2, 60):
+			for k in 16:
+				var a := k / 16.0 * TAU
+				var q := fundo + Vector3(cos(a), 0, sin(a)) * float(r)
+				var nq: float = terreno.nivel_agua(q.x, q.z)
+				var dq: float = nq - terreno.h(q.x, q.z)
+				if raso == Vector3.INF and nq > -900.0 and dq > 0.5 and dq < 0.9:
+					raso = q
+				if seco == Vector3.INF and nq < -900.0 and terreno.dentro(q.x, q.z):
+					seco = q
+			if raso != Vector3.INF and seco != Vector3.INF:
+				break
+	_confere(fundo != Vector3.INF and raso != Vector3.INF and seco != Vector3.INF, "natação: achou água funda (%s), rasa e a margem" % str(fundo))
+	if fundo == Vector3.INF or raso == Vector3.INF or seco == Vector3.INF:
+		spawn_t = spawn_antes
+		hora = hora_antes
+		return
+	# entra na água funda: nada com a cabeça fora d'água
+	_jogador_em(fundo, fundo + Vector3(6, 0.5, 0))
+	await _quadros(30)
+	var nadou := jogador.nadando and absf(jogador.global_position.y - (fundo.y - 1.32)) < 0.15
+	var cab: float = jogador.cabeca.global_position.y - fundo.y
+	jogador.energia = 100.0
+	var p0 := jogador.global_position
+	Input.action_press("frente")
+	await _quadros(60)
+	var e_anda := jogador.energia
+	Input.action_press("correr")
+	await _quadros(60)
+	var e_corre := jogador.energia
+	Input.action_release("correr")
+	Input.action_release("frente")
+	var andou := Vector2(jogador.global_position.x - p0.x, jogador.global_position.z - p0.z).length()
+	ui.hud._chips()
+	var chip_n := str(ui.hud.chips.get_meta("chave", "")).contains("Nadando")
+	_confere(nadou and cab > 0.05 and andou > 1.5 and e_anda < 100.0 and e_anda > 98.0 and e_corre < e_anda - 4.0 and chip_n,
+		"natação: na água funda você nada com a cabeça fora d'água (%.2f m acima); nadou %.1f m; a energia cai (%.1f nadando, %.1f correndo); o HUD mostra" % [
+			cab, andou, e_anda, e_corre])
+	# sem energia: afoga
+	jogador.energia = 0.0
+	jogador.vida = 100.0
+	await _quadros(60)
+	var afogou := jogador.vida < 97.0
+	ui.hud._chips()
+	var chip_a := str(ui.hud.chips.get_meta("chave", "")).contains("Afogando")
+	jogador.energia = 100.0
+	jogador.vida = 100.0
+	# o zumbi no fundo fundo não alcança quem nada por cima
+	var pj := jogador.global_position
+	var z := _z_teste(Vector3(pj.x + 1.2, 0, pj.z), "walker", pj, false)
+	z.estado = "caca"
+	z.visto_em = pj
+	await _quadros(150)
+	var nao_alcancou := jogador.vida >= 99.9 and is_instance_valid(z) and z.global_position.distance_to(pj) < 4.0
+	_limpar_zumbis()
+	_confere(afogou and chip_a and nao_alcancou, "natação: sem energia você se afoga (vida %.0f); o zumbi no fundo do lago não te alcança" % jogador.vida)
+	# a água rasa: anda devagar; a margem: volta a andar
+	_jogador_em(raso, raso + Vector3(0, 1, -5))
+	await _quadros(10)
+	var devagar := not jogador.nadando and absf(jogador._vel_agua() - 0.55) < 0.01
+	_jogador_em(seco, seco + Vector3(0, 1, -5))
+	await _quadros(10)
+	_confere(devagar and not jogador.nadando and jogador._vel_agua() == 1.0, "natação: na água rasa anda devagar; na margem volta ao normal")
+	jogador.energia = 100.0
+	spawn_t = spawn_antes
+	hora = hora_antes
+
+
 ## o espaço da mochila com o item (para os testes)
 func _slot_de(id: String) -> int:
 	for i in jogador.inv.slots.size():
@@ -3966,6 +4058,7 @@ func _teste() -> void:
 	await _teste_lesoes(livre)
 	await _teste_plantio()
 	await _teste_curtume(livre)
+	await _teste_nado()
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")

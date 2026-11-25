@@ -224,6 +224,24 @@ func _vestir() -> void:
 
 
 ## o que está entre o zumbi e o jogador (parede, porta, árvore...): vazio se nada
+## na água: no fundo anda devagar (bem devagar no fundo do lago) (etapa 6i)
+func _vel_agua() -> float:
+	var p := global_position
+	var n: float = main.terreno.nivel_agua(p.x, p.z)
+	if n < -900.0 or p.y > n - 0.2:
+		return 1.0
+	return 0.42 if n - p.y > 1.1 else 0.62
+
+
+## quem nada por cima não é alcançado por zumbi no fundo fundo (mais de 1,45 m de água)
+func _alcanca(j) -> bool:
+	if j != main.jogador or not bool(main.jogador.nadando):
+		return true
+	var p := global_position
+	var n: float = main.terreno.nivel_agua(p.x, p.z)
+	return n < -900.0 or n - p.y <= 1.45
+
+
 ## a voz de cada tipo: o Colosso e o brutamontes mais graves, o corredor e o gritador mais agudos (como no jogo antigo)
 func _tom_voz() -> float:
 	return float({"colosso": 0.72, "brute": 0.84, "runner": 1.12, "screamer": 1.2}.get(tipo, 1.0))
@@ -991,7 +1009,7 @@ func _physics_process(dt: float) -> void:
 					golpe_t = 0.0
 					mira_cao = false
 					_tocar("sGolpe", 1.1)
-			elif dist < alcance and bl.is_empty() and j.vivo and absf(para.y) < 2.0:
+			elif dist < alcance and bl.is_empty() and j.vivo and absf(para.y) < 2.0 and _alcanca(j):
 				vel = 0.0
 				alvo_peca = -1
 				# o inchado estoura quando chega perto
@@ -1048,13 +1066,14 @@ func _physics_process(dt: float) -> void:
 				var cao = main.get("cao")
 				if cao != null and cao.livre() and cao.global_position.distance_to(global_position) < float(S["alcance"]) * maxf(1.0, escala * 0.9) + 0.5:
 					cao.ferir(float(S["dano"]) * randf_range(0.85, 1.1), global_position)
-			elif dist < float(S["alcance"]) * maxf(1.0, escala * 0.9) + 0.35 and j.vivo and _bloqueio(j).is_empty():
+			elif dist < float(S["alcance"]) * maxf(1.0, escala * 0.9) + 0.35 and j.vivo and _bloqueio(j).is_empty() and _alcanca(j):
 				j.ferir(float(S["dano"]) * randf_range(0.85, 1.1), true, global_position)
 				if j == main.jogador and main.get("lesoes") != null:
 					main.lesoes.mordida(tipo)
 		if golpe_t > 1.05:
 			golpe_t = -1.0
 			mira_cao = false
+	vel *= _vel_agua()
 	# armadilhas da base
 	if preso_arm > 0.0:
 		preso_arm -= dt

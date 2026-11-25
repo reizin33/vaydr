@@ -38,6 +38,11 @@ var ferramenta_id := ""
 var passo := 0.0
 var tremor := 0.0
 var queda_v := 0.0
+var nadando := false          # a água acima do peito: nadando (etapa 6i)
+var _nado_t := 0.0
+var _bolha_t := 0.0
+var _dica_nado := false
+var _dica_afoga := false
 var preso := false   # menu aberto: não anda nem gira
 var luz_mao: SpotLight3D
 var vistos := {}         # itens que já passaram pela mochila (desbloqueiam receitas, como no jogo antigo)
@@ -599,8 +604,12 @@ func _physics_process(dt: float) -> void:
 			_dica_frio = true
 			main.ui.aviso("Está frio: sem roupa quente a sua energia não enche. Fique perto do fogo ou faça um casaco e um gorro de pele.", 7.0)
 	_corre = corre and dir.length() > 0.1
+	# a natação (etapa 6i): a água acima do peito vira nado
+	if _nadar(dt, dir):
+		_passo_acao(dt)
+		return
 	var vel: float = (AGACHA if agachado else (CORRE if corre else ANDA)) * (main.sono.vel() if main.sono != null else 1.0) \
-		* (main.lesoes.vel() if main.lesoes != null else 1.0)
+		* (main.lesoes.vel() if main.lesoes != null else 1.0) * _vel_agua()
 	var alvo := dir * vel
 	var k := 12.0 if is_on_floor() else 2.5
 	velocity.x = lerpf(velocity.x, alvo.x, 1.0 - exp(-k * dt))
@@ -668,15 +677,108 @@ func _process(dt: float) -> void:
 	for i in Inventario.BARRA:
 		if Input.is_action_just_pressed("barra%d" % (i + 1)):
 			selecionar(i)
-	if Input.is_action_pressed("atacar") and cd <= 0.0:
+	if Input.is_action_pressed("atacar") and cd <= 0.0 and not nadando:
 		atacar()
 	# Q: o empurrão (com o plano na mão o Q troca a aba da construção)
 	if Input.is_action_just_pressed("aba_obra") and not main.construcao.ativo:
 		empurrar()
-	if Input.is_action_just_pressed("usar"):
+	if Input.is_action_just_pressed("usar") and not nadando:
 		usar()
 	if Input.is_action_just_pressed("recarregar") and not main.construcao.ativo:
 		recarregar()
+
+
+# ---------------------------------------------------------------- a natação (etapa 6i), como no jogo antigo (48l_agua.js)
+const NADO_FUNDO := 1.3       # água a partir disto (do chão até a superfície) vira nado
+const NADO_SAI := 1.05        # mais raso que isto volta a andar
+const NADO_VEL := 2.0
+const NADO_RAPIDO := 3.1
+
+
+## na água rasa (até o peito) você anda mais devagar
+func _vel_agua() -> float:
+	var p := global_position
+	var niv: float = main.terreno.nivel_agua(p.x, p.z)
+	if niv < -900.0 or p.y > niv - 0.25:
+		return 1.0
+	return 0.55
+
+
+## nadando: a cabeça fica fora da água, nadar gasta energia (correndo, muita), sem energia você se afoga; o rio te leva
+## devagar rio abaixo; faz barulho; não dá para usar arma nem item. Devolve true enquanto nada
+func _nadar(dt: float, dir: Vector3) -> bool:
+	var p := global_position
+	var niv: float = main.terreno.nivel_agua(p.x, p.z)
+	if niv < -900.0:
+		if nadando:
+			_sair_nado()
+		return false
+	var piso: float = main.chao_em(p.x, p.z, minf(p.y + 0.5, niv - 0.2))["y"]
+	var fundo := niv - piso
+	if not nadando:
+		if fundo < NADO_FUNDO or p.y > niv - 0.25:
+			return false
+		nadando = true
+		velocity.y = 0.0
+		queda_v = 0.0
+		acao = {}
+		main.sons.tocar("nado", p, 4.0)
+		main.barulho(p, 14.0)
+		if not _dica_nado:
+			_dica_nado = true
+			main.ui.aviso("Nadando! Nadar gasta energia (correndo gasta muito). Sem energia você se afoga: volte para a margem. Arma não funciona na água. No fundo do lago os zumbis não te alcançam.", 9.0)
+	elif fundo < NADO_SAI:
+		_sair_nado()
+		return false
+	agachado = false
+	var rapido: bool = Input.is_action_pressed("correr") and dir.length() > 0.15 and energia > 2.0 and not preso
+	var spd: float = (NADO_RAPIDO if rapido else NADO_VEL) * (0.5 if energia <= 0.5 else 1.0) * (main.lesoes.vel() if main.lesoes != null else 1.0)
+	var k := 1.0 - exp(-dt * 3.5)
+	velocity.x += (dir.x * spd - velocity.x) * k
+	velocity.z += (dir.z * spd - velocity.z) * k
+	velocity.y = 0.0
+	# a correnteza do rio empurra rio abaixo (mais forte em cima, mais fraca perto do lago)
+	if main.pesca != null and main.fauna != null and main.pesca.local(p.x, p.z) == "rio":
+		var q: Vector2 = main.fauna.rio_perto(p.x, p.z)
+		var rp: Array = main.fauna.rio_ponto(q.y)
+		var dr: Vector2 = rp[1]
+		var c := lerpf(0.55, 0.25, q.y)
+		global_position += Vector3(dr.x, 0.0, dr.y) * c * dt
+	move_and_slide()
+	global_position.y = niv - 1.32
+	var mov := Vector2(velocity.x, velocity.z).length() > 0.3
+	energia = maxf(0.0, energia - (7.0 if rapido and mov else (0.9 if mov else 0.3)) * dt)
+	_folego_t = 0.0
+	if main.get("clima") != null:
+		main.clima.molhado = 1.0
+	if energia <= 0.5:
+		ferir(4.5 * dt, false)
+		_bolha_t -= dt
+		if _bolha_t <= 0.0:
+			_bolha_t = 0.8
+			main.sons.tocar("bolhas", p, -2.0)
+		if not _dica_afoga:
+			_dica_afoga = true
+			main.ui.aviso("Você está se afogando! Sem energia não dá para nadar: vá para a parte rasa.", 6.0)
+	elif energia > 20.0:
+		_dica_afoga = false
+	_nado_t -= dt
+	if _nado_t <= 0.0 and mov:
+		_nado_t = 0.45 if rapido else 0.9
+		main.barulho(p, 11.0 if rapido else 6.0)
+		main.sons.tocar("nado", p, -4.0 if rapido else -8.0)
+	_corre = rapido and mov
+	tremor = maxf(0.0, tremor - dt)
+	cabeca.position.y = lerpf(cabeca.position.y, 1.62, 1.0 - exp(-10.0 * dt))
+	_bob = Vector3(0, sin(Time.get_ticks_msec() / 1000.0 * 2.1) * 0.03, 0)
+	if not terceira:
+		cam.position = _bob
+	return true
+
+
+func _sair_nado() -> void:
+	nadando = false
+	queda_v = 0.0
 
 
 ## o som do passo pelo chão: na água rasa, no chão duro (piso, rua, laje, ponte) ou na terra e na grama
@@ -760,7 +862,7 @@ func _animar_corpo(dt: float) -> void:
 		if uso_t >= 0.9:
 			uso_t = -1.0
 			uk = 0.0
-	corpo.animar(dt, {"vel": velocity, "chao": is_on_floor(), "agachado": agachado, "correndo": _corre, "ferido": vida < 28.0,
+	corpo.animar(dt, {"vel": velocity, "chao": is_on_floor() or nadando, "agachado": agachado, "correndo": _corre, "ferido": vida < 28.0,
 		"energia": energia, "item": id, "golpe": gs, "vertical": bool(d.get("vertical", false)), "usar": maxf(0.0, uk), "mira": mira_k,
 		"vivo": vivo, "primeira": not terceira, "yaw": rotation.y, "vira_anda": bool(Ajustes.v.get("corpo_anda", false)),
 		"acao": str(acao.get("tipo", "")), "acao_k": (float(acao["t"]) / float(acao["dur"])) if not acao.is_empty() else 0.0})
@@ -1538,6 +1640,7 @@ func renascer(p: Vector3) -> void:
 	global_position = p
 	velocity = Vector3.ZERO
 	acao = {}
+	nadando = false
 	vida = 100.0
 	fome = 80.0
 	sede = 80.0
