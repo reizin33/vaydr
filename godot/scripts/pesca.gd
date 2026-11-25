@@ -286,8 +286,8 @@ func _pulo(p: Vector3, id: String, k: float, saida: bool) -> void:
 	mi.scale = Vector3.ONE * s
 	add_child(mi)
 	var j = main.jogador
-	var dx := (j.global_position.x - p.x) * 0.6 if saida else randf_range(-0.7, 0.7)
-	var dz := (j.global_position.z - p.z) * 0.6 if saida else randf_range(-0.7, 0.7)
+	var dx: float = (j.global_position.x - p.x) * 0.6 if saida else randf_range(-0.7, 0.7)
+	var dz: float = (j.global_position.z - p.z) * 0.6 if saida else randf_range(-0.7, 0.7)
 	_pulos.append({"no": mi, "p": p, "t": 0.0, "dur": 0.5 if saida else 0.55 + randf() * 0.35, "h": 0.9 if saida else 0.35 + randf() * 0.45, "d": Vector2(dx, dz)})
 	_anel(p)
 	if p.distance_to(j.global_position) < 35.0:

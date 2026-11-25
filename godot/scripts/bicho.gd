@@ -794,8 +794,8 @@ func _livre(dx: float, dz: float) -> bool:
 	var k := maxf(1.0, esc * float(S["r"]) * 3.0)
 	var y0 := global_position.y
 	for dist in [1.0 * k, 2.2 * k]:
-		var x := global_position.x + dx * dist
-		var z := global_position.z + dz * dist
+		var x: float = global_position.x + dx * dist
+		var z: float = global_position.z + dz * dist
 		if not fauna.ponto_livre(x, z, 4.0, 12.0):
 			return false
 		if not bool(S.get("escala", false)) and absf(main.terreno.h(x, z) - y0) / dist > 0.8:
@@ -1034,7 +1034,7 @@ func qualidade(lamina: Dictionary) -> int:
 		q -= 1
 	if bool(carc.get("limpo", false)):
 		q += 1
-	var h := (fauna.minutos() - float(carc.get("t0", 0.0))) / 60.0
+	var h: float = (fauna.minutos() - float(carc.get("t0", 0.0))) / 60.0
 	if h > 24.0:
 		q -= 2
 	elif h > 10.0:
