@@ -89,6 +89,9 @@ var fov_base := 75.0     # o campo de visão das configurações (mirando fecha 
 var rola := {}            # o rolamento (etapa 6l): {t, dur, yaw, ult} (correndo, C mergulha e rola; no meio do giro os golpes não pegam)
 var rola_parado := false  # para a foto: o rolamento fica parado onde está
 const ROLA := {"t0": 0.55, "t1": 2.05, "vel": 1.32, "custo": 12.0}
+var _c_antes := false     # o C (agachar) no quadro anterior: o rolamento vê o aperto aqui mesmo, sem depender do "acabou de apertar"
+var _quer_rolar := 0.0    # o C apertado há pouco (vale um instante: se no quadro do aperto ainda não dava, tenta no seguinte)
+var _correu_t := 9.0      # há quanto tempo parou de correr (o C chega no quadro em que você já agachou e parou de correr)
 var veiculo: Veiculo = null   # dirigindo (etapa 6j): o jogador fica no assento, sem colisão, e a câmera vai com o veículo
 var _olhar_t := 9.0      # dirigindo: quanto tempo faz que o mouse mexeu (sem mexer, a câmera volta para a frente do veículo)
 var _cam_veic := Vector3.INF
@@ -581,6 +584,12 @@ func _physics_process(dt: float) -> void:
 		if bateria <= 0.0:
 			luz_mao.visible = false
 			main.ui.aviso("A pilha da lanterna acabou (pilhas: Trocar pilhas)")
+	# o aperto do C (para o rolamento)
+	var c_agora := Input.is_action_pressed("agachar")
+	if c_agora and not _c_antes:
+		_quer_rolar = 0.2
+	_c_antes = c_agora
+	_quer_rolar = maxf(0.0, _quer_rolar - dt)
 	# dirigindo (etapa 6j): no assento, quem anda é o veículo
 	if veiculo != null:
 		_no_veiculo(dt)
@@ -621,9 +630,11 @@ func _physics_process(dt: float) -> void:
 			_dica_frio = true
 			main.ui.aviso("Está frio: sem roupa quente a sua energia não enche. Fique perto do fogo ou faça um casaco e um gorro de pele.", 7.0)
 	# correndo, C (agachar) mergulha e rola (como no jogo antigo: 41b_movimentos.js)
-	if _corre and dir.length() > 0.1 and Input.is_action_just_pressed("agachar") and rolar(dir):
+	if _quer_rolar > 0.0 and _correu_t < 0.2 and dir.length() > 0.1 and rolar(dir):
+		_quer_rolar = 0.0
 		return
 	_corre = corre and dir.length() > 0.1
+	_correu_t = 0.0 if _corre else _correu_t + dt
 	# a natação (etapa 6i): a água acima do peito vira nado
 	if _nadar(dt, dir):
 		_passo_acao(dt)
@@ -865,6 +876,12 @@ func pode_rolar() -> bool:
 		and energia >= float(ROLA["custo"]) and (main.lesoes == null or main.lesoes.pode_pular())
 
 
+## por que o rolamento não sai (para os testes)
+func diag_rolar() -> String:
+	return "chão %s, nadando %s, ação %s, energia %.0f, correu há %.2f s, perna %s" % [str(is_on_floor()), str(nadando),
+		str(acao.get("tipo", "-")), energia, _correu_t, str(main.lesoes != null and not main.lesoes.pode_pular())]
+
+
 ## mergulha e rola para onde está correndo (gasta 12 de energia; faz um pouco de barulho)
 func rolar(dir: Vector3) -> bool:
 	if not pode_rolar():
@@ -877,6 +894,7 @@ func rolar(dir: Vector3) -> bool:
 	rola = {"t": 0.0, "dur": (float(ROLA["t1"]) - t0) / float(ROLA["vel"]), "yaw": atan2(-d.x, -d.z), "ult": corpo.raiz("rolar", t0)}
 	energia -= float(ROLA["custo"])
 	_folego_t = 0.0
+	_correu_t = 9.0
 	agachado = false
 	main.sons.tocar(_som_passo(), global_position, 0.0)
 	main.barulho(global_position, 7.0)
@@ -930,6 +948,7 @@ func _no_veiculo(dt: float) -> void:
 	energia = minf(100.0, energia + 15.0 * dt)
 	cansado = false
 	_corre = false
+	_correu_t = 9.0
 	velocity = Vector3.ZERO
 	queda_v = 0.0
 	cabeca.position.y = 1.62

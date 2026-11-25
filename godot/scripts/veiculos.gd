@@ -18,8 +18,10 @@ const PADRAO := [
 	["sedan", "sedanVila", 57.5, -48.0, 0.35, {"comb": 0.0, "bateria": false, "pneus": [100.0, 0.0, 100.0, 100.0], "motor": 70.0, "oleo": 35.0, "hp": 75.0}],
 	["moto", "motoCidade", 186.0, 15.5, 1.2, {"comb": 0.0, "motor": 0.0, "oleo": 50.0, "hp": 80.0}],
 	["triciclo", "triFazenda", -79.0, 63.0, -2.4, {"comb": 15.0, "pneus": [100.0, 0.0, 100.0], "oleo": 20.0, "hp": 85.0}],
-	["barco", "barcoCais", 74.6, 91.3, 0.05, {"comb": 0.0, "motor": 0.0, "hp": 90.0}],
-	["heli", "heliBase", -112.0, -30.0, 1.57, {"comb": 0.0, "motor": 0.0, "bateria": false, "rotor": 0, "hp": 60.0}]]
+	["barco", "barcoCais", 74.6, 91.3, 0.05, {"comb": 0.0, "motor": 0.0, "hp": 90.0}]]
+## o helicóptero da Base Militar fica pausado (o código dele está pronto, mas ainda sem teste): volta depois do acabamento do
+## básico (andar, lutar, atirar, coletar, construir). Para ligar: pôr de volta na lista acima
+## ["heli", "heliBase", -112.0, -30.0, 1.57, {"comb": 0.0, "motor": 0.0, "bateria": false, "rotor": 0, "hp": 60.0}]
 const CEL := 16.0
 
 var main
@@ -92,6 +94,9 @@ func _lugar(tipo: String, p: Vector3, yaw: float) -> Vector3:
 			if n_a > -900.0 and n_a - main.terreno.h(c.x, c.z) > 0.3:
 				continue
 			var y: float = main.chao_em(c.x, c.z, main.terreno.h(c.x, c.z) + 3.0)["y"]
+			# em cima de alguma coisa (pedra, telhado, caixa): não serve
+			if y - main.terreno.h(c.x, c.z) > 0.8:
+				continue
 			q.transform = Transform3D(Basis(Vector3.UP, yaw), Vector3(c.x, y + 0.5 + bx.size.y / 2.0, c.z))
 			if sp.intersect_shape(q, 1).is_empty():
 				return Vector3(c.x, y, c.z)

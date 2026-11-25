@@ -89,6 +89,9 @@ var alt := 0.0               # a altura do helicóptero sobre o chão (ou o telh
 var _helice_t := 0.0
 var rotor_mi: MeshInstance3D
 var cauda_mi: MeshInstance3D
+var ultimo_choque := ""      # o que o veículo acertou por último (para os testes e para entender batidas estranhas)
+var _criaturas := {}         # zumbis e bichos perto: não seguram o veículo como parede (quem resolve é o atropelamento)
+var _criaturas_t := 0.0
 
 static var _mat_c: StandardMaterial3D
 static var _mat_v: StandardMaterial3D
@@ -338,6 +341,10 @@ func _physics_process(dt: float) -> void:
 		return
 	var j = main.jogador
 	var dirige: bool = ativo and j != null and j.veiculo == self
+	_criaturas_t -= dt
+	if _criaturas_t <= 0.0 and (dirige or absf(v) > 0.05):
+		_criaturas_t = 0.12
+		_sem_colisao_criaturas()
 	# no ar: o helicóptero (com o rotor girando ou no ar, a física dele; parado no chão, nada)
 	if voa():
 		if dirige or alt > 0.05 or rotor > 0.01 or absf(vy) > 0.01:
@@ -435,6 +442,7 @@ func _mover(dt: float, dirige: bool, j) -> void:
 		if mov != Vector3.ZERO:
 			var col := move_and_collide(mov)
 			if col != null:
+				ultimo_choque = _nome_choque(col.get_collider())
 				var nn := col.get_normal()
 				nn.y = 0.0
 				if nn.length() > 0.01:
@@ -734,6 +742,44 @@ func _prof(x: float, z: float) -> float:
 	return maxf(0.0, n - main.terreno.h(x, z))
 
 
+## os zumbis e os bichos por perto não seguram o veículo como uma parede (antes ele quicava neles e nunca atropelava): a
+## colisão com eles sai e quem resolve é o atropelamento (derruba, machuca, empurra para o lado). Eles continuam batendo no
+## veículo do jeito deles (não atravessam a lataria quando andam)
+func _sem_colisao_criaturas() -> void:
+	var p := global_position
+	var perto := {}
+	for z in main.zumbis:
+		if is_instance_valid(z) and (z as Node3D).global_position.distance_squared_to(p) < 196.0:
+			perto[(z as Object).get_instance_id()] = z
+	if main.fauna != null:
+		for b in main.fauna.bichos:
+			if is_instance_valid(b) and (b as Node3D).global_position.distance_squared_to(p) < 196.0:
+				perto[(b as Object).get_instance_id()] = b
+	for k in perto:
+		if not _criaturas.has(k):
+			add_collision_exception_with(perto[k])
+			_criaturas[k] = perto[k]
+	for k in _criaturas.keys():
+		if not perto.has(k):
+			var o = _criaturas[k]
+			if is_instance_valid(o):
+				remove_collision_exception_with(o)
+			_criaturas.erase(k)
+
+
+func _nome_choque(o) -> String:
+	if o == null or not is_instance_valid(o):
+		return "?"
+	var n: String = (o as Node).name if o is Node else str(o)
+	if (o as Object).has_meta("zumbi"):
+		return "zumbi"
+	if (o as Object).has_meta("recurso"):
+		return "recurso " + n
+	if (o as Object).has_meta("veiculo"):
+		return "veículo " + n
+	return "%s %s" % [(o as Object).get_class(), n]
+
+
 ## atropela e empurra os zumbis da frente (o brutamontes e o Colosso amassam e freiam); os bichos também
 func _atropelar(_dt: float, dirige: bool, j, fr: Vector3, hd: float, hw: float) -> void:
 	var sp := absf(v)
@@ -773,7 +819,7 @@ func _atropelar(_dt: float, dirige: bool, j, fr: Vector3, hd: float, hw: float) 
 		if push > 0.0 and not z.lan:
 			var s := 1.0 if lx >= 0.0 else -1.0
 			z.global_position += rx * s * push * 0.5
-	if sp > 3.2 and main.fauna != null:
+	if main.fauna != null:
 		for b in main.fauna.bichos:
 			if not is_instance_valid(b) or not b.vivo:
 				continue
@@ -784,6 +830,13 @@ func _atropelar(_dt: float, dirige: bool, j, fr: Vector3, hd: float, hw: float) 
 			if absf(d.dot(fr)) > hd + r or absf(d.dot(rx)) > hw + r:
 				continue
 			var gr: bool = str(b.S.get("porte", "")) == "grande" or r > 0.7
+			if sp <= 3.2:
+				# devagar: empurra para o lado (sem colisão com o veículo, senão ficava embaixo dele)
+				var lb := d.dot(rx)
+				var pb := hw + r - absf(lb)
+				if pb > 0.0 and not bool(b.get("lan")):
+					b.global_position += rx * (1.0 if lb >= 0.0 else -1.0) * pb * 0.5
+				continue
 			b.ferir(sp * (6.0 if gr else 12.0), p - fr * signf(v) * 2.0, "veiculo", 0)
 			v *= 0.45 if gr else 0.85
 			hp = maxf(0.0, hp - (8.0 if gr else 1.0))

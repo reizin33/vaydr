@@ -2690,8 +2690,9 @@ func _teste_veiculos(livre: Vector3) -> void:
 		var vi: Veiculo = veiculos.lista[i]
 		var d0: Array = Veiculos.PADRAO[i]
 		var dd := Vector2(vi.global_position.x - float(d0[2]), vi.global_position.z - float(d0[3])).length()
-		dists.append("%s %.1f m" % [vi.uid, dd])
-		if dd > 10.5 or absf(vi.global_position.y - terreno.h(vi.global_position.x, vi.global_position.z)) > 1.5:
+		var dyh := vi.global_position.y - terreno.h(vi.global_position.x, vi.global_position.z)
+		dists.append("%s %.1f m%s" % [vi.uid, dd, "" if absf(dyh) <= 1.5 else " (%.1f m acima do chão)" % dyh])
+		if dd > 10.5 or absf(dyh) > 1.5:
 			ok_lugar = false
 	var cv := veiculos.por_id("caminhonete")
 	var sd := veiculos.por_id("sedanVila")
@@ -2699,7 +2700,9 @@ func _teste_veiculos(livre: Vector3) -> void:
 	var tc := veiculos.por_id("triFazenda")
 	_confere(ok_lugar and cv != null and sd != null and mt != null and tc != null and cv.pode() == "Sem combustível"
 		and sd.pode().begins_with("Sem bateria") and mt.pode() == "O motor está quebrado" and tc.pode() == "" and sd.furados() == 1,
-		"veículos: a caminhonete (sem gasolina), o carro (sem bateria, um pneu furado), a moto (motor quebrado), o triciclo (pronto) e o barco perto dos lugares do jogo antigo (%s)" % ", ".join(PackedStringArray(dists)))
+		"veículos: a caminhonete (sem gasolina), o carro (sem bateria, um pneu furado), a moto (motor quebrado), o triciclo (pronto) e o barco perto dos lugares do jogo antigo (%s)%s" % [
+			", ".join(PackedStringArray(dists)), "" if ok_lugar else " [%d de %d; %s | %s | %s | %s]" % [veiculos.lista.size(), Veiculos.PADRAO.size(),
+			cv.pode() if cv != null else "-", sd.pode() if sd != null else "-", mt.pode() if mt != null else "-", tc.pode() if tc != null else "-"]])
 	if cv == null or sd == null or mt == null or tc == null:
 		spawn_t = spawn_antes
 		hora = hora_antes
@@ -2749,15 +2752,19 @@ func _teste_veiculos(livre: Vector3) -> void:
 	var cao_junto := cao.global_position.distance_to(cacamba) < 0.4
 	# vira para a direita (a frente vai para o lado do -x)
 	var y0 := cv.rotation.y
+	cv.ultimo_choque = ""
 	Input.action_press("direita")
-	await _quadros(50)
+	var v_min := 99.0
+	for k in 50:
+		await get_tree().physics_frame
+		v_min = minf(v_min, cv.v)
 	Input.action_release("direita")
 	Input.action_release("frente")
 	var dy := angle_difference(y0, cv.rotation.y)
 	var fx := cv.frente().x
 	_confere(v1 > 4.0 and andou.length() > 6.0 and absf(andou.normalized().y) > 0.9 and cv.comb < c0 and painel and cao_junto and dy < -0.15 and fx < -0.1,
-		"veículos: W acelera (%.1f m/s em 2,5 s, andou %.1f m para a frente), gasta gasolina (%.2f%%), o painel aparece, o Caramelo vai na caçamba; D vira para a direita (%.2f rad)" % [
-			v1, andou.length(), c0 - cv.comb, dy])
+		"veículos: W acelera (%.1f m/s em 2,5 s, andou %.1f m para a frente), gasta gasolina (%.2f%%), o painel aparece, o Caramelo vai na caçamba; D vira para a direita (%.2f rad%s)" % [
+			v1, andou.length(), c0 - cv.comb, dy, "" if dy < -0.15 else "; na curva a menor velocidade foi %.1f m/s; bateu em: %s" % [v_min, cv.ultimo_choque if cv.ultimo_choque != "" else "nada"]])
 	# freia e dá ré; o freio de mão para
 	Input.action_press("tras")
 	await _quadros(50)
@@ -2820,6 +2827,7 @@ func _teste_veiculos(livre: Vector3) -> void:
 	await _quadros(2)
 	var zv0: float = z.vida
 	var hp1 := cv.hp
+	cv.ultimo_choque = ""
 	Input.action_press("frente")
 	for k in 300:
 		await get_tree().physics_frame
@@ -2827,8 +2835,9 @@ func _teste_veiculos(livre: Vector3) -> void:
 			break
 	Input.action_release("frente")
 	var pegou: bool = not is_instance_valid(z) or z.estado in ["derrubado", "morto"] or z.vida < zv0 * 0.7
-	_confere(pegou and cv.hp < hp1, "veículos: atropelou o zumbi (%s, vida %.0f de %.0f) e a lataria sentiu (%.1f%%)" % [
-		z.estado if is_instance_valid(z) else "sumiu", z.vida if is_instance_valid(z) else 0.0, zv0, hp1 - cv.hp])
+	_confere(pegou and cv.hp < hp1, "veículos: atropelou o zumbi (%s, vida %.0f de %.0f) e a lataria sentiu (%.1f%%)%s" % [
+		z.estado if is_instance_valid(z) else "sumiu", z.vida if is_instance_valid(z) else 0.0, zv0, hp1 - cv.hp,
+		"" if pegou else " [bateu em: %s]" % (cv.ultimo_choque if cv.ultimo_choque != "" else "nada")])
 	Input.action_press("pular")
 	await _quadros(90)
 	Input.action_release("pular")
@@ -2992,11 +3001,19 @@ func _teste_barcos() -> void:
 	var n1: float = terreno.nivel_agua(bc.global_position.x, bc.global_position.z)
 	_confere(entrou and jogador.veiculo == bc and v1 > 2.0 and andou > 2.5 and n1 > -900.0 and bc.comb < c0 and dy > 0.1,
 		"barcos: subiu no barco e ele anda na água (%.1f m/s, andou %.1f m, gasta gasolina); A vira para a esquerda (%.2f rad)" % [v1, andou, dy])
-	# desce no meio do lago: cai na água e nada
+	# desce no meio do lago (no fundo, a uns 6 m de qualquer margem e da ilha): cai na água e nada
 	await _quadros(30)
+	bc.global_position = Vector3(59.0, 0.0, 102.0)
+	bc.v = 0.0
+	bc.assentar()
+	await _quadros(3)
 	var desceu := veiculos.sair(jogador)
 	await _quadros(40)
-	_confere(desceu and jogador.veiculo == null and jogador.nadando, "barcos: desceu no meio do lago e caiu na água (nadando)")
+	var pjb := jogador.global_position
+	var nj_n: float = terreno.nivel_agua(pjb.x, pjb.z)
+	_confere(desceu and jogador.veiculo == null and jogador.nadando, "barcos: desceu no meio do lago e caiu na água (nadando)%s" % [
+		"" if jogador.nadando else " [desceu %s; água %.1f m de fundo; altura %.1f do nível]" % [str(desceu),
+		nj_n - terreno.h(pjb.x, pjb.z) if nj_n > -900.0 else -1.0, pjb.y - nj_n if nj_n > -900.0 else 0.0]])
 	# a jangada: no remo, sem gasolina
 	var jg := veiculos.nova_jangada(Vector3(66.0, 0, 104.0), 0.0)
 	await _quadros(3)
@@ -3081,6 +3098,7 @@ func _teste_rolamento(livre: Vector3) -> void:
 	await _quadros(30)
 	var p0 := jogador.global_position
 	var e0 := jogador.energia
+	var diag_r := jogador.diag_rolar()
 	Input.action_press("agachar")
 	await _quadros(2)
 	Input.action_release("agachar")
@@ -3102,8 +3120,8 @@ func _teste_rolamento(livre: Vector3) -> void:
 	var adiante := d.dot(fr0)
 	var lado := absf(d.dot(Vector3(fr0.z, 0, -fr0.x)))
 	_confere(parado_nao and rolou and e0 - e1 > 11.0 and inv and nao_pegou and jogador.rola.is_empty() and adiante > 2.0 and lado < 1.2,
-		"rolamento: parado o C só agacha; correndo, C mergulha e rola %.1f m para a frente (%.1f m de lado; gastou %.0f de energia); no meio do giro o golpe não pegou" % [
-			adiante, lado, e0 - e1])
+		"rolamento: parado o C só agacha; correndo, C mergulha e rola %.1f m para a frente (%.1f m de lado; gastou %.0f de energia); no meio do giro o golpe não pegou%s" % [
+			adiante, lado, e0 - e1, "" if rolou else " [não rolou: %s; parado agachou %s]" % [diag_r, str(parado_nao)]])
 	jogador.vida = 100.0
 	_devolver_clareira(clar)
 
