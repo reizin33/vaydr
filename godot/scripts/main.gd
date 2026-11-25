@@ -3261,19 +3261,31 @@ func _teste_acabamento(livre: Vector3) -> void:
 	_confere(i_arv >= 0 and tremeu and caindo and lado_ok and bateu and deitou and sumiu,
 		"acabamento: a árvore tremeu com a machadada (%s), caiu para o lado de lá (%s), bateu no chão (%s), ficou deitada (%s) e depois sumiu (%s)" % [
 		str(tremeu), str(caindo and lado_ok), str(bateu), str(deitou), str(sumiu)])
-	# a pedra: a picareta quebra e ela encolhe e some na poeira
-	var i_pe := -1
-	melhor = 1e9
+	# a pedra: a picareta quebra e ela encolhe e some na poeira. A pedra escolhida é a mais perto que tem o alto à vista (um
+	# raio de cima pega nela mesma); o Caramelo fica longe para não entrar na frente do golpe
+	var cao_ativo: bool = cao.ativo
+	cao.ativo = false
+	cao._no_chao(c + Vector3(40, 0, 40))
+	var sp_q := get_world_3d().direct_space_state
+	var cand := []
 	for i in mundo.recursos.size():
 		var r: Dictionary = mundo.recursos[i]
 		if str(r["tipo"]) != "pedra" or float(r["vida"]) <= 0.0 or not r.has("no"):
 			continue
-		var d := Vector2(float(r["pos"].x) - c.x, float(r["pos"].z) - c.z).length()
-		if d < melhor:
-			melhor = d
-			i_pe = i
+		cand.append([Vector2(float(r["pos"].x) - c.x, float(r["pos"].z) - c.z).length(), i])
+	cand.sort_custom(func(a, b): return float(a[0]) < float(b[0]))
+	var i_pe := -1
+	var topo_p := Vector3.ZERO
+	for e in cand.slice(0, 30):
+		var r: Dictionary = mundo.recursos[int(e[1])]
+		var pr: Vector3 = r["pos"]
+		var hq := sp_q.intersect_ray(PhysicsRayQueryParameters3D.create(pr + Vector3(0, 5.0, 0), pr - Vector3(0, 3.0, 0), 1, [jogador.get_rid()]))
+		if not hq.is_empty() and hq["collider"] == r["corpo"] and (hq["position"] as Vector3).y - terreno.h(pr.x, pr.z) > 0.25:
+			i_pe = int(e[1])
+			topo_p = hq["position"]
+			break
 	var quebrou := false
-	var diag_p := "nenhuma pedra"
+	var diag_p := "nenhuma pedra com o alto à vista"
 	if i_pe >= 0:
 		var rp: Dictionary = mundo.recursos[i_pe]
 		var pp: Vector3 = rp["pos"]
@@ -3282,14 +3294,18 @@ func _teste_acabamento(livre: Vector3) -> void:
 		var ab: AABB = (rp["no"] as MeshInstance3D).get_aabb()
 		var sc: Vector3 = (rp["no"] as Node3D).transform.basis.get_scale()
 		var raio_p := maxf(ab.size.x * sc.x, ab.size.z * sc.z) * 0.5
-		var dp := pp - X * (raio_p + 1.0)
+		var dp := pp - X * (raio_p + 0.9)
 		_por_em(Vector3(dp.x, terreno.h(dp.x, dp.z) + 0.2, dp.z))
 		await _quadros(8)
-		_olhar(pp + Vector3(0, ab.size.y * sc.y * 0.4, 0))
+		var alvo_p := Vector3(pp.x, lerpf(terreno.h(pp.x, pp.z), topo_p.y, 0.6), pp.z)
+		_olhar(alvo_p)
 		await _quadros(3)
+		var mirou := jogador.mira(2.9)
+		var na_mira: String = "nada" if mirou.is_empty() else ("a pedra" if mirou["collider"] == rp["corpo"] else str(mirou["collider"]))
 		var g2 := 0
 		var rachou := false
 		while float(rp["vida"]) > 0.0 and g2 < 8:
+			_olhar(alvo_p)
 			await _golpear()
 			g2 += 1
 			if mundo._anims.has(i_pe) and str(mundo._anims[i_pe]["tipo"]) == "racha":
@@ -3297,11 +3313,12 @@ func _teste_acabamento(livre: Vector3) -> void:
 			await _quadros(3)
 		await _quadros(40)
 		quebrou = rachou and not (rp["no"] as Node3D).visible
-		diag_p = "%d golpes, vida %.0f, rachou %s, visível %s, a %.1f m" % [g2, float(rp["vida"]), str(rachou), str((rp["no"] as Node3D).visible),
-			jogador.global_position.distance_to(pp)]
+		diag_p = "%d golpes, vida %.0f, rachou %s, visível %s, a %.1f m; na mira: %s" % [g2, float(rp["vida"]), str(rachou),
+			str((rp["no"] as Node3D).visible), jogador.global_position.distance_to(pp), na_mira]
 		var n_p := jogador.inv.conta("picareta")
 		if n_p > 0:
 			jogador.inv.tirar("picareta", n_p)
+	cao.ativo = cao_ativo
 	_confere(i_pe >= 0 and quebrou, "acabamento: a picareta quebrou a pedra (ela encolheu e sumiu na poeira)%s" % ("" if quebrou else " [%s]" % diag_p))
 	_mao_vazia()
 	spawn_t = spawn_antes
