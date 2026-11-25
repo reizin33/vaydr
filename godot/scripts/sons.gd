@@ -2,9 +2,30 @@ class_name Sons
 extends Node3D
 ## Sons feitos por código (ruído filtrado e tons): passo, golpe, madeira, pedra, planta, acerto, zumbi, porta, construir...
 ## Cada som nasce uma vez (AudioStreamWAV) e toca num AudioStreamPlayer3D livre perto de onde aconteceu.
+## Os mais ouvidos tocam gravações de verdade (as mesmas do jogo antigo, v10.1; licença CC0, domínio público: ver
+## assets/sons/CREDITOS.txt): passos na grama, no chão duro e na água, golpe no ar e acertando, machado na madeira,
+## picareta na pedra, vidro e madeira quebrando, martelo, zumbi gemendo, atacando e morrendo, o rugido, a dor, os tiros, a
+## explosão, a arma vazia, a recarga, o latido, o uivo, a tosse, o trovão, o baú e pegar item. Cada som tem várias gravações,
+## nunca toca a mesma duas vezes seguidas e cada vez sai com o tom um pouco diferente; o volume foi medido para ficar no
+## nível dos sons por código (o pico de 100 ms), e um limitador no som geral segura os estouros.
 
 const HZ := 22050
+## o banco -> [o nome das gravações, quantas, o ganho em dB]
+const GRAVADOS := {
+	"passo": ["passo_grama", 5, 0.7], "passo_asf": ["passo_asf", 5, 2.1], "passo_agua": ["passo_agua", 3, 0.6],
+	"golpe": ["golpe", 6, 4.0], "acerto": ["acerto", 8, 0.9], "madeira": ["madeira", 6, 4.0], "pedra": ["pedra", 5, 3.7],
+	"quebrar": ["quebrar", 5, 4.0], "vidro": ["vidro", 6, 4.0], "construir": ["construir", 6, 4.0],
+	"gemido": ["gemido", 7, -3.1], "grito_z": ["ataqueZ", 5, -3.7], "morte_z": ["morteZ", 4, -5.1], "bicho_rugido": ["rugido", 5, 4.0],
+	"dor": ["dor", 4, -0.5], "tiro": ["tiro", 3, 4.0], "espingarda": ["espingarda", 3, 4.0], "rifle": ["rifle", 2, 4.0],
+	"explosao": ["explosao", 4, 4.0], "vazio": ["vazio", 1, -10.8], "recarga": ["recarga", 2, 4.0], "latido": ["latido", 6, -4.3],
+	"tosse": ["tosse", 3, 1.2], "trovao": ["trovao", 1, 4.0], "caixa": ["bau", 4, 1.7],
+	"pegar": ["pegar", 6, 0.0]}
+## sem a gravação, o som parecido feito por código
+const RESERVA := {"passo_asf": "passo", "passo_agua": "passo", "quebrar": "construir", "pegar": "caixa"}
 var bancos := {}
+var ganho := {}               # o ganho em dB de cada banco gravado
+var _ult := {}                # a última gravação de cada banco (para não repetir)
+var gravados := 0             # quantas gravações carregaram
 var tocadores: Array[AudioStreamPlayer3D] = []
 var prox := 0
 var rng := RandomNumberGenerator.new()
@@ -12,6 +33,7 @@ var rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	rng.seed = 99
+	_limitador()
 	for i in 16:
 		var a := AudioStreamPlayer3D.new()
 		a.max_distance = 60.0
@@ -77,20 +99,60 @@ func _ready() -> void:
 	bancos["puxar"] = [_mistura(_ruido(0.45, 2600.0, 0.3, 6.0), _tom(0.4, 900.0, 1300.0, 0.12, 6.0))]
 	bancos["nado"] = [_ruido(0.35, 1300.0, 0.35, 9.0)]
 	bancos["bicho_fuga"] = [_ruido(0.45, 2400.0, 0.32, 5.0), _ruido(0.5, 1900.0, 0.3, 4.5)]
+	# o Caramelo (etapa 6e): o latido (dois "au" curtos), o ganido fino e a mordida
+	bancos["latido"] = [_latido(2, 620.0), _latido(2, 560.0), _latido(3, 660.0)]
+	bancos["ganido"] = [_ganido(0.55, 1150.0), _ganido(0.45, 1050.0)]
+	bancos["mordida"] = [_mistura(_ruido(0.12, 1800.0, 0.6, 30.0), _tom(0.1, 240.0, 140.0, 0.4, 30.0))]
 	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
 	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]
+	_gravacoes()
 
 
-func tocar(nome: String, onde: Vector3, db := 0.0) -> void:
+## as gravações de verdade: onde carregam, ficam no lugar do som por código (se faltar alguma, fica o som por código)
+func _gravacoes() -> void:
+	for b in GRAVADOS:
+		var g: Array = GRAVADOS[b]
+		var L: Array = []
+		for i in int(g[1]):
+			var cam := "res://assets/sons/%s_%d.mp3" % [str(g[0]), i]
+			if ResourceLoader.exists(cam):
+				var s = load(cam)
+				if s is AudioStream:
+					L.append(s)
+		if not L.is_empty():
+			bancos[b] = L
+			ganho[b] = float(g[2])
+			gravados += L.size()
+
+
+## o limitador no som geral: os tiros e a explosão de perto não estouram (como o compressor do jogo antigo)
+func _limitador() -> void:
+	for i in AudioServer.get_bus_effect_count(0):
+		if AudioServer.get_bus_effect(0, i) is AudioEffectHardLimiter:
+			return
+	var lim := AudioEffectHardLimiter.new()
+	lim.ceiling_db = -0.5
+	lim.pre_gain_db = 0.0
+	AudioServer.add_bus_effect(0, lim)
+
+
+## toca o som nome em onde (db: mais alto ou mais baixo; tom: mais grave ou mais agudo, como a voz de cada zumbi)
+func tocar(nome: String, onde: Vector3, db := 0.0, tom := 1.0) -> void:
 	if not bancos.has(nome):
-		return
+		nome = str(RESERVA.get(nome, ""))
+		if not bancos.has(nome):
+			return
 	var L: Array = bancos[nome]
 	var a := tocadores[prox]
 	prox = (prox + 1) % tocadores.size()
-	a.stream = L[rng.randi() % L.size()]
+	var i := rng.randi() % L.size()
+	if L.size() > 1 and i == int(_ult.get(nome, -1)):
+		i = (i + 1) % L.size()
+	_ult[nome] = i
+	a.stream = L[i]
 	a.global_position = onde
-	a.volume_db = db
-	a.pitch_scale = rng.randf_range(0.92, 1.08)
+	a.volume_db = db + float(ganho.get(nome, 0.0))
+	a.pitch_scale = tom * rng.randf_range(0.95, 1.05) if ganho.has(nome) else tom * rng.randf_range(0.92, 1.08)
 	a.play()
 
 
@@ -185,6 +247,47 @@ func _bale(dur: float, f: float, tremido: float) -> AudioStreamWAV:
 		fase += TAU * ff / HZ
 		var v := sin(fase) * 0.45 + sin(fase * 2.0) * 0.3 + sin(fase * 3.0) * 0.18 + sin(fase * 4.0) * 0.08
 		a[i] = v * env * 0.45
+	return _wav(a)
+
+
+## o latido: n "au" curtos (o tom cai rápido, com o rouco do ruído), um atrás do outro
+func _latido(n: int, f: float) -> AudioStreamWAV:
+	var dur := n * 0.21 + 0.1
+	var tot := int(dur * HZ)
+	var a := PackedFloat32Array()
+	a.resize(tot)
+	var y := 0.0
+	for k in n:
+		var ini := int((k * 0.21 + rng.randf() * 0.03) * HZ)
+		var fase := 0.0
+		var fk := f * rng.randf_range(0.94, 1.06)
+		for i in int(0.13 * HZ):
+			var idx: int = ini + i
+			if idx >= tot:
+				break
+			var t := float(i) / HZ
+			var env := minf(1.0, t * 220.0) * exp(-t * 26.0)
+			var ff := lerpf(fk, fk * 0.48, minf(1.0, t / 0.13))
+			fase += TAU * ff / HZ
+			y += (rng.randf_range(-1.0, 1.0) - y) * 0.35
+			var v := sin(fase) * 0.55 + sin(fase * 2.0) * 0.25 + sin(fase * 3.0) * 0.12 + y * 0.45
+			a[idx] += v * env * 0.6
+	return _wav(a)
+
+
+## o ganido: um choro fino que sobe e desce
+func _ganido(dur: float, f: float) -> AudioStreamWAV:
+	var n := int(dur * HZ)
+	var a := PackedFloat32Array()
+	a.resize(n)
+	var fase := 0.0
+	for i in n:
+		var t := float(i) / HZ
+		var u := t / dur
+		var env := sin(u * PI) * 0.8
+		var ff := f * (1.0 + 0.3 * sin(u * PI) - 0.25 * u) * (1.0 + 0.02 * sin(t * 40.0))
+		fase += TAU * ff / HZ
+		a[i] = (sin(fase) * 0.7 + sin(fase * 2.0) * 0.12) * env * 0.3
 	return _wav(a)
 
 

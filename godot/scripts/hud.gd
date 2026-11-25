@@ -298,6 +298,12 @@ func marcas() -> Array:
 		if b is Dictionary and b.get("mochila", false) and b.has("no") and is_instance_valid(b["no"]):
 			var p2: Vector3 = (b["no"] as Node3D).global_position
 			r.append({"x": p2.x, "z": p2.z, "cor": Estilo.MUSGO, "ico": "mochila"})
+	# o Caramelo, quando está longe (mais de 12 m)
+	var cao = main.get("cao")
+	if cao != null and cao.ativo and main.jogador != null:
+		var pc: Vector3 = cao.global_position
+		if Vector2(pc.x - main.jogador.global_position.x, pc.z - main.jogador.global_position.z).length() > 12.0:
+			r.append({"x": pc.x, "z": pc.z, "cor": Color(0.88, 0.64, 0.36), "ico": "cao"})
 	# os amigos da partida em rede que estão num mundo (azul)
 	for q in Rede.no_mundo():
 		r.append({"x": q.alvo.x, "z": q.alvo.z, "cor": Estilo.AGUA, "ico": "grupo"})
@@ -669,6 +675,12 @@ func _chips() -> void:
 			quer.append(["gota", "Molhado", Color(0.55, 0.75, 0.95)])
 		if bool(cl.com_frio_rapido()):
 			quer.append(["frio", "Com frio", Color(0.7, 0.85, 1.0)])
+	# o Caramelo (etapa 6e): o que ele está fazendo e a vida dele
+	var cao = main.get("cao")
+	if cao != null and cao.ativo and not cao.lan:
+		var nomes := {"segue": "Seguindo", "fica": "Vigiando", "ataca": "Brigando", "ferido": "Ferido", "descansa": "Descansando"}
+		var vida_c: int = roundi(float(cao.hp) / Cao.HP_MAX * 20.0) * 5
+		quer.append(["cao", "Caramelo · %s %d%%" % [str(nomes.get(cao.st, "")), vida_c], Color(0.88, 0.64, 0.36) if vida_c > 30 else Color(0.95, 0.45, 0.35)])
 	var chave := str(quer)
 	if chave == str(chips.get_meta("chave", "")):
 		return

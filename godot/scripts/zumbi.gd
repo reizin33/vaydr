@@ -71,6 +71,7 @@ var alvo_vaga := Vector3.ZERO
 var casa := Vector3.ZERO   # em volta de onde ele vaga
 var tempo := 0.0
 var golpe_t := -1.0
+var mira_cao := false      # o golpe vai no Caramelo (o cachorro estava mais perto que você)
 var morto_t := 0.0
 var gemido := 0.0
 var preso_t := 0.0
@@ -223,6 +224,26 @@ func _vestir() -> void:
 
 
 ## o que está entre o zumbi e o jogador (parede, porta, árvore...): vazio se nada
+## a voz de cada tipo: o Colosso e o brutamontes mais graves, o corredor e o gritador mais agudos (como no jogo antigo)
+func _tom_voz() -> float:
+	return float({"colosso": 0.72, "brute": 0.84, "runner": 1.12, "screamer": 1.2}.get(tipo, 1.0))
+
+
+## o Caramelo perto (até 4 m), no mesmo nível e mais perto que você (ou você caído): devolve a distância até ele (-1: o zumbi
+## continua em você). O Colosso não perde tempo com o cachorro.
+func _cao_perto(j, dist: float) -> float:
+	var cao = main.get("cao")
+	if cao == null or not cao.livre() or bool(S.get("chefe", false)):
+		return -1.0
+	var cp: Vector3 = cao.global_position
+	if absf(cp.y - global_position.y) > 1.7:
+		return -1.0
+	var dc := Vector2(cp.x - global_position.x, cp.z - global_position.z).length()
+	if dc < 4.0 and (dc < dist - 0.3 or not j.vivo):
+		return dc
+	return -1.0
+
+
 func _bloqueio(j) -> Dictionary:
 	var a := global_position + Vector3(0, 1.3, 0)
 	var b: Vector3 = j.pos_alvo() + Vector3(0, 1.3, 0)
@@ -445,7 +466,7 @@ func morrer(quem := 0) -> void:
 	golpe_t = -1.0
 	_tocar("sQueda")
 	collision_layer = 0
-	main.sons.tocar("morte_z", global_position, 0.0)
+	main.sons.tocar("morte_z", global_position, 0.0, _tom_voz())
 	if S.has("gas") and not estourou:
 		_estourar()
 	if bool(S.get("chefe", false)):
@@ -588,6 +609,10 @@ func _pisao_onda() -> void:
 			var fr: Vector3 = a.global_position - global_position
 			fr.y = 0.0
 			a.velocity += fr.normalized() * 7.0 + Vector3(0, 3.5, 0)
+	# o Caramelo também leva o tranco (como no jogo antigo)
+	var cao = main.get("cao")
+	if cao != null and cao.livre() and cao.global_position.distance_to(global_position) < R:
+		cao.ferir(15.0, global_position)
 	var j = main.jogador
 	var dj: float = j.global_position.distance_to(global_position)
 	if dj < 25.0:
@@ -733,7 +758,7 @@ func rede(p: Vector3, yaw: float, st: int, hp: float, v: float, cap := true, fog
 			golpe_t = -1.0
 			_tocar("sQueda")
 			collision_layer = 0
-			main.sons.tocar("morte_z", global_position, 0.0)
+			main.sons.tocar("morte_z", global_position, 0.0, _tom_voz())
 		lan_st = st
 		return
 	if st == 4 and lan_st != 4:
@@ -753,7 +778,7 @@ func rede(p: Vector3, yaw: float, st: int, hp: float, v: float, cap := true, fog
 		main.sons.tocar("grito", global_position, 6.0)
 		main.efeitos.anel(global_position + Vector3(0, 1.9 * escala, 0))
 	if st in [1, 2, 6] and lan_st in [0, 5]:
-		main.sons.tocar("grito_z", global_position, 2.0)
+		main.sons.tocar("grito_z", global_position, 2.0, _tom_voz())
 	if st in [0, 1, 2, 6]:
 		estado = "caca" if st >= 1 else "vaga"
 	lan_st = st
@@ -795,7 +820,7 @@ func _boneco(dt: float) -> void:
 	if gemido <= 0.0:
 		gemido = randf_range(5.0, 12.0)
 		if main.jogador != null and global_position.distance_to(main.jogador.global_position) < 40.0:
-			main.sons.tocar("gemido", global_position, -4.0)
+			main.sons.tocar("gemido", global_position, -4.0, _tom_voz())
 
 
 ## uma peça da base de quem joga aqui no caminho do boneco (a parede, a porta fechada)
@@ -919,6 +944,7 @@ func _physics_process(dt: float) -> void:
 		return
 	var vel := 0.0
 	var dir := Vector3.ZERO
+	var foco_cao := false
 	match estado:
 		"caca":
 			var alvo_p: Vector3 = jp if viu < 0.5 else visto_em
@@ -931,13 +957,34 @@ func _physics_process(dt: float) -> void:
 			if not bl.is_empty() and (bl["collider"] as Object).has_meta("peca") and global_position.distance_to(bl["position"]) < 1.9 + float(S["r"]):
 				peca = (bl["collider"] as Object).get_meta("peca")
 			var alcance: float = float(S["alcance"]) * maxf(1.0, escala * 0.9)
-			if peca >= 0 and main.construcao.peca_viva(peca):
+			var dc := _cao_perto(j, dist)
+			if dc >= 0.0:
+				# o Caramelo está mais perto que você: o zumbi vai nele (como no jogo antigo)
+				var cp: Vector3 = main.cao.global_position
+				dir = Vector3(cp.x - global_position.x, 0, cp.z - global_position.z).normalized()
+				alvo_peca = -1
+				foco_cao = true
+				if dc < alcance * 0.8:
+					vel = 0.0
+					# o inchado estoura perto do cachorro também
+					if S.has("gas") and not estourou:
+						_estourar()
+						morrer()
+						return
+					if golpe_t < 0.0:
+						golpe_t = 0.0
+						mira_cao = true
+						_tocar("sGolpe", 1.3)
+				else:
+					vel = float(S["caca"]) * mult_noite
+			elif peca >= 0 and main.construcao.peca_viva(peca):
 				# parede ou porta no caminho: bate nela até cair
 				vel = 0.0
 				alvo_peca = peca
 				ponto_peca = bl["position"]
 				if golpe_t < 0.0:
 					golpe_t = 0.0
+					mira_cao = false
 					_tocar("sGolpe", 1.1)
 			elif dist < alcance and bl.is_empty() and j.vivo and absf(para.y) < 2.0:
 				vel = 0.0
@@ -949,9 +996,10 @@ func _physics_process(dt: float) -> void:
 					return
 				if golpe_t < 0.0:
 					golpe_t = 0.0
+					mira_cao = false
 					_tocar("sGolpe", 1.3)
 					if randf() < 0.7:
-						main.sons.tocar("grito_z", global_position, -2.0)
+						main.sons.tocar("grito_z", global_position, -2.0, _tom_voz())
 			else:
 				alvo_peca = -1
 				vel = float(S["caca"]) * mult_noite
@@ -991,10 +1039,15 @@ func _physics_process(dt: float) -> void:
 		if golpe_t > 0.55 and golpe_t - dt <= 0.55:
 			if alvo_peca >= 0:
 				main.construcao.ferir_peca(alvo_peca, 3.0 * float(S.get("obra", 1.0)) * (1.3 if tipo == "runner" else 1.0), ponto_peca)
+			elif mira_cao:
+				var cao = main.get("cao")
+				if cao != null and cao.livre() and cao.global_position.distance_to(global_position) < float(S["alcance"]) * maxf(1.0, escala * 0.9) + 0.5:
+					cao.ferir(float(S["dano"]) * randf_range(0.85, 1.1), global_position)
 			elif dist < float(S["alcance"]) * maxf(1.0, escala * 0.9) + 0.35 and j.vivo and _bloqueio(j).is_empty():
 				j.ferir(float(S["dano"]) * randf_range(0.85, 1.1), true, global_position)
 		if golpe_t > 1.05:
 			golpe_t = -1.0
+			mira_cao = false
 	# armadilhas da base
 	if preso_arm > 0.0:
 		preso_arm -= dt
@@ -1009,7 +1062,7 @@ func _physics_process(dt: float) -> void:
 	move_and_slide()
 	if vel > 0.05 and is_on_wall() and is_on_floor():
 		Jogador.degrau(self, dir * vel * dt)
-	if estado == "caca" and dist < 4.0 and vel <= 0.05:
+	if estado == "caca" and dist < 4.0 and vel <= 0.05 and not foco_cao:
 		dir = Vector3(para.x, 0, para.z).normalized()
 	if dir.length() > 0.1 and (vel > 0.05 or estado == "caca"):
 		var giro := atan2(-dir.x, -dir.z)
@@ -1031,7 +1084,7 @@ func _physics_process(dt: float) -> void:
 	if gemido <= 0.0:
 		gemido = randf_range(5.0, 12.0)
 		if dist < 40.0:
-			main.sons.tocar("gemido", global_position, -4.0)
+			main.sons.tocar("gemido", global_position, -4.0, _tom_voz())
 
 
 ## vê o alvo? de frente até a distância da visão (de dia mais longe; a lanterna acesa no escuro ajuda a te ver; agachado, menos),
@@ -1070,7 +1123,7 @@ func _perceber(j, para: Vector3, dist: float, noite_k: float, dt: float) -> void
 			_tocar("sGolpe", 0.55)
 		else:
 			estado = "caca"
-			main.sons.tocar("grito_z", global_position, 2.0)
+			main.sons.tocar("grito_z", global_position, 2.0, _tom_voz())
 
 
 ## dormindo no escuro: acorda com quem chega perto (agachado, mais perto), com barulho ou com golpe
@@ -1087,7 +1140,7 @@ func _dormindo(j, dist: float, dt: float) -> void:
 		_levantar(LEVANTA_T * 0.8, "caca")
 		visto_em = j.pos_alvo()
 		viu = 0.0
-		main.sons.tocar("grito_z", global_position, 4.0)
+		main.sons.tocar("grito_z", global_position, 4.0, _tom_voz())
 
 
 func _gravidade_parado(dt: float) -> void:

@@ -205,6 +205,17 @@ func _anfitriao(p0: Vector3) -> void:
 	var esfolada := await _esperar(func(): return bool(ov.carc.get("vazia", false)), 45.0)
 	_confere(esfolada, "o convidado esfolou a ovelha: a carcaça daqui ficou vazia (o que ela tinha foi para ele)")
 	main.fauna.limpar()
+	# o Caramelo de quem abriu (etapa 6e): vigiando perto do convidado, o boneco dele aparece lá
+	main.cao.iniciar()
+	main.cao.ativo = true
+	main.cao.st = "fica"
+	main.cao.modo = "fica"
+	main.cao._no_chao(pb + Vector3(-2.0, 0, 2.0))
+	main.cao.fica = main.cao.global_position
+	Rede.mandar_controle("cao")
+	var viu_c := await _esperar(func(): return _sinal("cao_ok"), 60.0)
+	_confere(viu_c, "o Caramelo daqui apareceu para quem entrou")
+	main.cao.iniciar()
 	# bate-papo
 	var msg_conv := func():
 		for c in Rede.chat:
@@ -345,6 +356,13 @@ func _convidado(p0: Vector3) -> void:
 			Input.action_release("usar")
 		var veio := await _esperar(func(): return main.jogador.inv.conta("carneCrua") > antes_carne, 12.0)
 		_confere(veio, "esfolou o bicho de quem abriu: a carne e o couro vieram para cá (%d carnes)" % (main.jogador.inv.conta("carneCrua") - antes_carne))
+	# o Caramelo de quem abriu (etapa 6e): o boneco dele aparece aqui
+	var veio_c := await _esperar(func(): return _sinal("cao"), 120.0)
+	var viu := false
+	if veio_c:
+		viu = await _esperar(func(): return main.cao.lan and main.cao.ativo and main.cao.corpo.visible, 20.0)
+	_confere(viu, "o Caramelo de quem abriu aparece aqui (o boneco, a %.0f m de você)" % main.cao.global_position.distance_to(main.jogador.global_position))
+	Rede.mandar_controle("cao_ok")
 	# bate-papo
 	Rede.mandar_chat("Oi! Aqui é o convidado.")
 	var msg_anf := func():

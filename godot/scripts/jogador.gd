@@ -628,7 +628,7 @@ func _physics_process(dt: float) -> void:
 		passo -= dt * hs
 		if passo <= 0.0:
 			passo = 1.9 if corre else 1.5
-			main.sons.tocar("passo", global_position, -10.0 if agachado else -2.0)
+			main.sons.tocar(_som_passo(), global_position, -10.0 if agachado else -2.0)
 			# correndo faz barulho (os zumbis ouvem); andando, pouco; agachado, nada
 			if not agachado:
 				main.barulho(global_position, 9.0 if corre else 3.0)
@@ -673,6 +673,17 @@ func _process(dt: float) -> void:
 		usar()
 	if Input.is_action_just_pressed("recarregar") and not main.construcao.ativo:
 		recarregar()
+
+
+## o som do passo pelo chão: na água rasa, no chão duro (piso, rua, laje, ponte) ou na terra e na grama
+func _som_passo() -> String:
+	var p := global_position
+	if main.terreno.tipo_agua(p.x, p.z) != 0 and main.terreno.nivel_agua(p.x, p.z) > p.y - 0.05:
+		return "passo_agua"
+	var c: Dictionary = main.chao_em(p.x, p.z, p.y + 0.4)
+	if not bool(c["terra"]) and absf(float(c["y"]) - p.y) < 0.6:
+		return "passo_asf"
+	return "passo"
 
 
 ## o que a mira pega (até "alcance")
@@ -1104,7 +1115,7 @@ func _passo_acao(dt: float) -> void:
 					main.barulho(global_position, 6.0)
 					main.ui.acerto()
 				else:
-					main.sons.tocar("passo", global_position, 0.0)
+					main.sons.tocar(_som_passo(), global_position, 0.0)
 	if not acao.is_empty() and t >= float(acao.get("dur", 0.0)):
 		acao = {}
 
@@ -1207,7 +1218,7 @@ func _colher(i: int, h: Dictionary) -> void:
 			_ganhar("fibra", 2 + (1 if randf() < 0.5 else 0))
 		"cogumelo":
 			_ganhar("cogumelo", 1)
-	main.sons.tocar("caixa", h["position"], -3.0)
+	main.sons.tocar("pegar", h["position"], -3.0)
 
 
 func usar() -> void:
@@ -1218,9 +1229,18 @@ func usar() -> void:
 	if str(item_mao().get("id", "")) == "vara" and main.pesca != null and main.pesca.agua_na_frente(self) != Vector3.INF:
 		main.pesca.comecar(self)
 		return
+	# o Caramelo (etapa 6e): dar comida, mandar ficar, chamar
+	if main.cao != null and main.cao.na_mira(self):
+		var tc: String = main.cao.texto(self)
+		if tc.begins_with("E  ") or main.cao.st == "espera" or main.cao.lan:
+			main.cao.interagir(self)
+			return
 	var h := mira(ALCANCE + 0.4)
 	if not h.is_empty():
 		var c: Object = h["collider"]
+		if c.has_meta("cao") and main.cao != null:
+			main.cao.interagir(self)
+			return
 		if c.has_meta("bicho"):
 			var b = c.get_meta("bicho")
 			if is_instance_valid(b) and not b.vivo:

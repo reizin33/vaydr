@@ -21,6 +21,7 @@ var fauna: Fauna            # os bichos do mato: as regiões, a caça e as carca
 var clima: Clima            # o tempo, as estações e a lua (etapa 6b)
 var sono: Sono              # o sono e o dormir (etapa 6c)
 var pesca: Pesca            # a pesca (etapa 6d)
+var cao: Cao                # o Caramelo, o cachorro (etapa 6e)
 var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
@@ -119,6 +120,10 @@ func _ready() -> void:
 	add_child(sono)
 	pesca = Pesca.new(self)
 	add_child(pesca)
+	cao = Cao.new(self)
+	cao.name = "Caramelo"
+	add_child(cao)
+	cao.iniciar()
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -774,6 +779,7 @@ func rede_desligou() -> void:
 	z_rede.clear()
 	lugares_z.clear()
 	fauna.limpar()
+	cao.soltar_rede()
 	spawn_t = 3.0
 	if em_jogo and telas.atual in ["pausa", "mapa"]:
 		get_tree().paused = true
@@ -869,10 +875,17 @@ func texto_mira() -> String:
 		return pesca.texto()
 	if pesca != null and str(jogador.item_mao().get("id", "")) == "vara" and pesca.agua_na_frente(jogador) != Vector3.INF:
 		return "E  Pescar (jogue a linha e espere morder)"
+	# o Caramelo perto e na frente (como no jogo antigo: não precisa mirar certinho no cachorro)
+	if cao != null and cao.na_mira(jogador):
+		var tc := cao.texto(jogador)
+		if tc != "":
+			return tc
 	var h := jogador.mira(Jogador.ALCANCE + 0.4)
 	if h.is_empty():
 		return ""
 	var c: Object = h["collider"]
+	if c.has_meta("cao") and cao != null:
+		return cao.texto(jogador)
 	if c.has_meta("bicho") and is_instance_valid(c.get_meta("bicho")):
 		return fauna.texto(c.get_meta("bicho"), jogador)
 	if c.has_meta("laco"):
@@ -968,7 +981,8 @@ func salvar_jogo() -> bool:
 		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
-		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar(), "pesca": pesca.salvar()}
+		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar(), "pesca": pesca.salvar(),
+		"cao": cao.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -1030,6 +1044,8 @@ func carregar_jogo() -> bool:
 	var pd = d.get("pesca", {})
 	if pd is Dictionary:
 		pesca.carregar(pd)
+	var kd = d.get("cao", {})
+	cao.carregar(kd if kd is Dictionary else {})
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -1620,9 +1636,11 @@ func _teste_fauna(livre: Vector3) -> void:
 	# as regiões do jogo antigo (os pastos da fazenda, o vale do Rio Claro...) e a população de cada uma
 	var zp: Dictionary = fauna.zona_em(-72, 60)
 	var zr: Dictionary = fauna.zona("rio")
-	_confere(str(zp.get("id", "")) == "pastos" and fauna.dentro_zona(zr, 16.0, -45.0) and fauna.rio_perto(16.0, -45.0).x < 1.0
+	var rio_d := fauna.rio_perto(14.0, -45.0).x
+	_confere(str(zp.get("id", "")) == "pastos" and fauna.dentro_zona(zr, 20.0, -45.0) and rio_d < 1.0
 		and int(fauna.pop["pastos"]["vaca"]["n"]) == 5 and int(fauna.pop["serra"]["urso"]["n"]) == 1,
-		"bichos: as regiões (pastos da fazenda com 5 vacas, a serra com 1 urso, o vale ao longo do Rio Claro)")
+		"bichos: as regiões (pastos da fazenda com %d vacas, a serra com %d urso, o vale ao longo do Rio Claro: o rio a %.1f m)" % [
+			int(fauna.pop["pastos"]["vaca"]["n"]), int(fauna.pop["serra"]["urso"]["n"]), rio_d])
 	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
 	var clareira := _clareira_teste(c, 60.0)
 	var X := Vector3(1, 0, 0)
@@ -1975,7 +1993,7 @@ func _teste_clima(livre: Vector3) -> void:
 	# a temperatura: inverno de madrugada faz frio de verdade; verão à tarde faz calor e a sede aperta
 	clima.atual = "limpo"
 	clima.antes = "limpo"
-	dia = 22
+	dia = 23
 	hora = 2.0
 	var t_inv := clima.temperatura()
 	var frio_inv := clima.com_frio()
@@ -2108,7 +2126,7 @@ func _teste_sono(livre: Vector3) -> void:
 	var sv := sono.salvar()
 	jogador.sono = 5.0
 	sono.carregar(sv)
-	_confere(absf(jogador.sono - 30.0) < 20.0 and absf(jogador.sono - float(sv["sono"])) < 0.2, "jogo salvo: o sono volta como estava (%.0f)" % jogador.sono)
+	_confere(jogador.sono > 40.0 and absf(jogador.sono - float(sv["sono"])) < 0.2, "jogo salvo: o sono volta como estava (%.0f)" % jogador.sono)
 	jogador.sono = 100.0
 	jogador.vida = 100.0
 	hora = hora_antes
@@ -2199,6 +2217,149 @@ func _teste_pesca() -> void:
 			jogador.inv.tirar(id, n)
 	_mao_vazia()
 	hora = hora_antes
+
+
+## os sons gravados (CC0) do jogo antigo: carregaram e tocam no lugar dos sons por código; o limitador no som geral
+func _teste_sons() -> void:
+	var mp3 := 0
+	for b in Sons.GRAVADOS:
+		if sons.bancos.has(b) and (sons.bancos[b] as Array).size() > 0 and (sons.bancos[b][0] is AudioStreamMP3):
+			mp3 += 1
+	var lim := false
+	for i in AudioServer.get_bus_effect_count(0):
+		if AudioServer.get_bus_effect(0, i) is AudioEffectHardLimiter:
+			lim = true
+	sons.tocar("tiro", jogador.global_position)
+	sons.tocar("passo_asf", jogador.global_position)
+	_confere(sons.gravados >= 110 and mp3 == Sons.GRAVADOS.size() and lim,
+		"sons: as gravações de verdade do jogo antigo (%d gravações em %d de %d sons) e o limitador no som geral" % [sons.gravados, mp3, Sons.GRAVADOS.size()])
+
+
+## o Caramelo (etapa 6e): espera com fome na beira da mata, come e passa a seguir; longe, aparece atrás de você; late e morde
+## o zumbi que chega e o zumbi bate nele; machucado volta mancando para a clareira e no amanhecer melhora; E manda ficar e
+## chama; os bichos do mato fogem dele; o jogo salvo
+func _teste_cao(livre: Vector3) -> void:
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	_limpar_zumbis()
+	_limpar_bichos()
+	var hora_antes := hora
+	hora = 12.0
+	# a comida que sobrou dos outros testes sai da mochila (ele precisa de comida para vir)
+	var tirar_comida := func():
+		for s in jogador.inv.slots.duplicate():
+			if s != null and str(Dados.item(str(s["id"])).get("tipo", "")) == "comida":
+				jogador.inv.tirar(str(s["id"]), jogador.inv.conta(str(s["id"])))
+	tirar_comida.call()
+	cao.iniciar()
+	await _quadros(5)
+	var pe: Vector3 = cao.global_position
+	var espera_ok := cao.st == "espera" and not cao.ativo and Vector2(pe.x - Cao.ESPERA.x, pe.z - Cao.ESPERA.z).length() < 1.5
+	_jogador_em(Cao.ESPERA + Vector3(0, 0, 1.8), Cao.ESPERA + Vector3(0, 0.3, 0))
+	await _quadros(3)
+	var mira_ok := cao.na_mira(jogador)
+	var txt0 := texto_mira()
+	jogador.usar()
+	var sem := not cao.ativo
+	jogador.inv.por("frutas", 2)
+	var txt1 := texto_mira()
+	jogador.usar()
+	var comeu := cao.ativo and cao.st == "segue" and jogador.inv.conta("frutas") == 1
+	_confere(espera_ok and mira_ok and sem and comeu and txt0.begins_with("Cachorro com fome") and txt1.begins_with("E  Dar comida"),
+		"Caramelo: esperando com fome na beira da mata (%s); sem comida não vem; com as frutas (%s) comeu e passou a te seguir" % [txt0, txt1])
+	tirar_comida.call()
+	# longe, ele aparece atrás de você; andando, ele vem junto
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clareira := _clareira_teste(c, 60.0)
+	var X := Vector3(1, 0, 0)
+	_jogador_em(c, c + X * 10.0 + Vector3(0, 1.0, 0))
+	await _quadros(40)
+	var d1 := Vector2(cao.global_position.x - c.x, cao.global_position.z - c.z).length()
+	_jogador_em(c + X * 12.0, c + X * 24.0 + Vector3(0, 1.0, 0))
+	await _quadros(200)
+	var jp := jogador.global_position
+	var d2 := Vector2(cao.global_position.x - jp.x, cao.global_position.z - jp.z).length()
+	_confere(d1 < 12.0 and d2 < 4.0, "Caramelo: estava longe e apareceu atrás de você (a %.0f m); você foi 12 m para a frente e ele veio junto (a %.1f m)" % [d1, d2])
+	# o zumbi chega: ele late, parte para cima e morde; o zumbi bate nele
+	var z := _z_teste(jp + X * 7.0 + Vector3(0, 0, 1.5), "walker", jp, false)
+	z.estado = "caca"
+	z.visto_em = jp
+	var tz := 0
+	var brigou := false
+	while tz < 600 and is_instance_valid(z) and z.estado != "morto" and (cao.mordidas == 0 or cao.hp >= Cao.HP_MAX):
+		await get_tree().physics_frame
+		tz += 1
+		jogador.vida = 100.0
+		if cao.st == "ataca":
+			brigou = true
+	var vida_z: float = z.vida if is_instance_valid(z) else 0.0
+	_confere(brigou and cao.mordidas > 0 and (cao.hp < Cao.HP_MAX or not is_instance_valid(z) or z.estado == "morto"),
+		"Caramelo: partiu para cima do zumbi e mordeu (%d mordidas, o zumbi com %.0f de vida); o zumbi bateu nele (vida dele %.0f de %.0f)" % [
+			cao.mordidas, vida_z, cao.hp, Cao.HP_MAX])
+	_limpar_zumbis()
+	await _quadros(3)
+	# machucado feio: volta mancando para a clareira, descansa e no amanhecer melhora
+	cao.st = "segue"
+	cao.medo_t = 0.0
+	cao.ferir(999.0)
+	var ferido := cao.st == "ferido"
+	cao._no_chao(Cao.CLAREIRA + Vector3(1.5, 0, 0))
+	var tf := 0
+	while tf < 600 and cao.st != "descansa":
+		await get_tree().physics_frame
+		tf += 1
+	var descansou := cao.st == "descansa"
+	var txt_d := ""
+	_jogador_em(cao.global_position + Vector3(0, 0, -1.8), cao.global_position + Vector3(0, 0.3, 0))
+	await _quadros(3)
+	txt_d = texto_mira()
+	hora = 5.9
+	await _quadros(3)
+	hora = 6.1
+	await _quadros(3)
+	_confere(ferido and descansou and cao.st == "fica" and cao.hp >= Cao.HP_MAX and txt_d.begins_with("O Caramelo está se recuperando"),
+		"Caramelo: machucado feio foi mancando para a clareira e deitou (%s); no amanhecer melhorou e ficou te esperando (%s, vida %.0f)" % [txt_d, cao.st, cao.hp])
+	hora = 12.0
+	# E: chama (vem) e manda ficar
+	_jogador_em(cao.global_position + Vector3(0, 0, 1.8), cao.global_position + Vector3(0, 0.3, 0))
+	await _quadros(3)
+	var txt_vem := texto_mira()
+	jogador.usar()
+	var veio := cao.st == "segue"
+	await _quadros(30)
+	_olhar(cao.global_position + Vector3(0, 0.3, 0))
+	await _quadros(2)
+	var txt_fica := texto_mira()
+	jogador.usar()
+	var ficou := cao.st == "fica"
+	_confere(veio and ficou and txt_vem.begins_with("E  Chamar") and txt_fica.begins_with("E  Mandar"),
+		"Caramelo: E chamou (%s) e E mandou ficar (%s)" % [txt_vem, txt_fica])
+	# os bichos do mato fogem dele (você agachado e de costas para o cervo: ele não te vê)
+	cao.st = "segue"
+	cao.modo = "segue"
+	_jogador_em(c, c - X * 10.0 + Vector3(0, 1.0, 0))
+	Input.action_press("agachar")
+	await _quadros(60)
+	var pcao: Vector3 = cao.global_position
+	var cv := _b_teste("cervo", pcao + X * 9.0, pcao + X * 30.0)
+	var ec: String = await _b_ate(cv, ["foge"], 300)
+	await _quadros(60)
+	var dcv: float = Vector2(cv.global_position.x - pcao.x, cv.global_position.z - pcao.z).length() if is_instance_valid(cv) else 0.0
+	Input.action_release("agachar")
+	_confere(ec == "foge" and dcv > 11.0, "Caramelo: o cervo a 9 m fugiu do cachorro (%s, a %.0f m dele)" % [ec, dcv])
+	_limpar_bichos()
+	# o jogo salvo: ele continua seu
+	var sv := cao.salvar()
+	cao.iniciar()
+	var zerou := not cao.ativo and cao.st == "espera"
+	cao.carregar(sv)
+	_confere(zerou and cao.ativo and cao.st == str(sv["st"]) and cao.mordidas == int(sv["mordidas"]),
+		"jogo salvo: o Caramelo continua seu (%s, %d mordidas)" % [cao.st, cao.mordidas])
+	cao.iniciar()
+	_devolver_clareira(clareira)
+	hora = hora_antes
+	jogador.vida = 100.0
+	spawn_t = spawn_antes
 
 
 ## o HUD com a arma de fogo na mão: as balas no pente / na mochila
@@ -3479,6 +3640,8 @@ func _teste() -> void:
 	await _teste_clima(livre)
 	await _teste_sono(livre)
 	await _teste_pesca()
+	_teste_sons()
+	await _teste_cao(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -4148,6 +4311,36 @@ func _fotos() -> void:
 	dia = dia_f
 	hora = hora_f
 	_ciclo()
+	# o Caramelo (etapa 6e): magro e com fome (a mira mostra o que fazer); depois de comer, sentado do seu lado (terceira pessoa)
+	cao.iniciar()
+	cao._no_chao(lw + X3 * 4.0 + Zf * 1.5)
+	jogador.inv.por("frutas", 3)
+	_jogador_em(cao.global_position + Vector3(-2.0, 0, 0.6), cao.global_position + Vector3(0, 0.35, 0))
+	await _quadros(40)
+	await _foto("17g_caramelo_com_fome")
+	jogador.usar()
+	await _quadros(5)
+	var fr_c := -jogador.global_transform.basis.z
+	fr_c.y = 0.0
+	fr_c = fr_c.normalized()
+	var esq_c := Vector3(fr_c.z, 0, -fr_c.x)
+	cao.set_physics_process(false)
+	cao._no_chao(jogador.global_position + fr_c * 1.7 + esq_c * 0.8)
+	cao.yaw = atan2(-fr_c.x, -fr_c.z) + 0.5
+	cao.rotation.y = cao.yaw
+	cao._hy = -0.4
+	cao._t = 1.3
+	cao._pose("senta", 1.0)
+	cao.corpo.visible = true
+	jogador.alternar_camera(true)
+	await _quadros(20)
+	await _foto("17h_caramelo_junto")
+	jogador.alternar_camera(false)
+	cao.set_physics_process(true)
+	cao.iniciar()
+	var nfr := jogador.inv.conta("frutas")
+	if nfr > 0:
+		jogador.inv.tirar("frutas", nfr)
 	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()

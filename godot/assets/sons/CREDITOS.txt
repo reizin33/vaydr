@@ -1,0 +1,11 @@
+Sons gravados do VAYDR (os mesmos do jogo antigo, v10.1)
+
+Todas as gravações são de licença CC0 (domínio público), da coleção
+github.com/lavenderdotpet/CC0-Public-Domain-Sounds:
+- Kenney (Impact Sounds, RPG Audio)
+- rubberduck (pacotes CC0 do OpenGameArt: SFX, madeira e metal, quebrando e batendo, criaturas, RPG e estouros)
+- Ben Burnes (Organic Wooshes)
+- Team Forbidden (Warfork, pasta cc0)
+- as pastas beast_or_animal e angerdog
+
+Não precisa de crédito, mas fica aqui.

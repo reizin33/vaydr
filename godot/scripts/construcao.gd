@@ -476,7 +476,7 @@ func ferir_peca(i: int, dano: float, onde: Vector3) -> void:
 	main.efeitos.lascas(onde, Vector3.UP, "madeira")
 	if float(pe["vida"]) <= 0.0:
 		_cair(i)
-		main.sons.tocar("construir", onde, 4.0)
+		main.sons.tocar("quebrar", onde, 4.0)
 		main.ui.aviso("Caiu: " + Dados.nome(str(pe["id"])) + "!")
 
 

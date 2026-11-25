@@ -742,7 +742,7 @@ func salvar() -> Dictionary:
 	for L in lacos:
 		var p: Vector3 = L["p"]
 		ls.append([p.x, p.y, p.z, float(L["yaw"]), bool(L["armado"]), float(L["tc"]), str(L.get("pego", ""))])
-	return {"pop": pop, "mortos": mortos, "migra": migra, "dicas": _dicas.keys(), "lacos": ls}
+	return {"pop": pop.duplicate(true), "mortos": mortos.duplicate(true), "migra": migra, "dicas": _dicas.keys(), "lacos": ls}
 
 
 func carregar(d: Dictionary) -> void:

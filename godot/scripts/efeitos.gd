@@ -321,6 +321,7 @@ class Nuvem extends Node3D:
 	var dur := 9.0
 	var t := 0.0
 	var tick := 0.0
+	var tick_cao := 0.0
 	var tosse := 0.0
 	var part: CPUParticles3D
 
@@ -368,6 +369,13 @@ class Nuvem extends Node3D:
 			return
 		tick -= dt
 		tosse -= dt
+		# o Caramelo dentro da nuvem também se machuca (como no jogo antigo)
+		tick_cao -= dt
+		if tick_cao <= 0.0:
+			tick_cao = 0.8
+			var cao = main.get("cao")
+			if cao != null and cao.livre() and cao.global_position.distance_to(global_position) < r:
+				cao.ferir(3.0, global_position)
 		if tick > 0.0:
 			return
 		tick = 0.25

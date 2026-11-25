@@ -596,6 +596,16 @@ func _fauna(L: PackedFloat32Array) -> void:
 	main.fauna.rede(L)
 
 
+## de quem abriu: o Caramelo (etapa 6e); aqui ele vira o boneco do cachorro de quem abriu
+@rpc("authority", "call_remote", "unreliable_ordered", 2)
+func _cao(L: PackedFloat32Array) -> void:
+	if papel != "convidado" or not on:
+		return
+	if main == null or not is_instance_valid(main) or not main.pronto or not main.em_jogo or main.get("cao") == null:
+		return
+	main.cao.rede(L)
+
+
 ## de quem abriu: o tempo (etapa 6b)
 func mandar_clima(tipo: int, k: float, dia_c: int) -> void:
 	if papel == "anfitriao" and on and _peer != null:
@@ -851,6 +861,9 @@ func _mandar_mundo(j) -> void:
 	# os bichos perto de alguém (etapa 6a)
 	if main.fauna != null:
 		_fauna.rpc(main.fauna.para_rede(perto, ALCANCE_MUNDO))
+	# o Caramelo (etapa 6e)
+	if main.get("cao") != null:
+		_cao.rpc(main.cao.para_rede())
 
 
 ## o zumbi de quem abriu bateu num convidado (o boneco dele aqui): o golpe vai para o jogo dele

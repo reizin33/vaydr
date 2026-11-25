@@ -227,6 +227,14 @@ func _percebe(dt: float) -> void:
 				if q2 < lim * lim and q2 < pd:
 					pd = q2
 					_predador = o
+	# o Caramelo: a caça, o rebanho e os ariscos fogem dele até 12 m (como no jogo antigo)
+	var cao = main.get("cao")
+	if cao != null and cao.ativo and forca < 1.1 and str(S["ia"]) in ["presa", "rebanho", "arisco"] and cao.corpo.visible \
+			and (cao.global_position as Vector3).distance_squared_to(global_position) < 144.0:
+		alerta = minf(1.5, alerta + dt * 1.5)
+		am_p = cao.global_position
+		forca = 1.1
+		eh_j = false
 	if _zumbi != null and is_instance_valid(_zumbi) and forca < 1.2:
 		alerta = minf(1.5, alerta + dt * 2.0)
 		am_p = _zumbi.global_position
@@ -283,12 +291,20 @@ func _lider_vivo() -> Bicho:
 
 
 func fugir(de: Vector3, dur := 6.0) -> void:
-	if st != "foge":
+	var ja := st == "foge"
+	if not ja:
 		_som("fuga")
+		_rumo_t = 0.0
 	st = "foge"
-	t = dur
+	t = maxf(t, dur) if ja else dur
 	foge_de = de
-	_rumo_t = 0.0
+	# o rumo e a velocidade da fuga já aqui: enquanto a ameaça continua, a decisão chama a fuga a cada quadro e não chega na
+	# rotina (antes ele ficava parado, "fugindo" no lugar, até você sumir de vista)
+	_rumo_t -= get_physics_process_delta_time()
+	if _rumo_t <= 0.0:
+		_rumo_t = 0.5
+		rumo = _rumo_fuga()
+	v_alvo = float(S["trota"]) * 1.2 if devagar else float(S["corre"]) * (0.75 if hp < hp_max * 0.4 else 1.0)
 	# o susto passa para o grupo
 	var ia := str(S["ia"])
 	if ia in ["rebanho", "presa", "matilha"]:
