@@ -219,7 +219,8 @@ func _ponto(Z: Dictionary, sp_id: String, perto: Array) -> Vector3:
 		for q in perto:
 			var pq: Vector3 = q["p"]
 			var dp := Vector2(x - pq.x, z - pq.z).length()
-			if dp < float(POP["spawnMin"]):
+			# o grupo se espalha até uns 4 m em volta do líder: o líder nasce mais longe para ninguém do grupo nascer perto
+			if dp < float(POP["spawnMin"]) + 4.5:
 				ok = false
 				break
 			# nunca nasce na frente de quem está olhando: à vista só bem longe
