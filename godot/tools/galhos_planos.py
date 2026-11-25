@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Tira os "losangos escuros" das árvores: os pedaços chatos da malha dos galhos.
 
-Na malha dos galhos (o material "..._branches", casca opaca) há pedaços que não são galho de verdade: são placas chatas
-(um plano só, em geral um losango) que no modelo original levavam uma textura de raminho com recorte. Aqui a textura dos
-galhos é a casca inteira, sem recorte, então cada placa aparecia como um losango marrom-escuro flutuando ao longo dos
-galhos (o jacarandá tinha 214 delas, algumas de 2 m). Este script tira da malha dos galhos os pedaços chatos maiores que
-TAM_MIN (nas unidades do modelo): os galhos de verdade (cilindros) e as pontinhas chatas de poucos centímetros ficam.
+Na malha dos galhos (o material "..._branches", casca opaca) há pedaços que não são galho de verdade: placas chatas (um
+plano só, em geral um losango) e fitas chatas torcidas (uma tira de losangos ao longo do galho), que no modelo original
+levavam uma textura de raminho com recorte. Aqui a textura dos galhos é a casca inteira, sem recorte, então cada placa
+aparecia como um losango marrom-escuro flutuando ao longo dos galhos (o jacarandá tinha 214 placas, algumas de 2 m, e 161
+fitas). Este script tira da malha dos galhos os pedaços chatos maiores que TAM_MIN (nas unidades do modelo): a placa
+(plana) e a fita (os triângulos vizinhos quase no mesmo plano, dobrando menos que DOBRA_MAX graus em média; um galho de
+verdade é um tubo e os vizinhos em volta dele dobram de 60 a 120 graus). As pontinhas de poucos centímetros ficam.
 
 Uso, da raiz do repositório:  python3 -I godot/tools/galhos_planos.py godot/assets/mata/jacaranda.glb ...
 """
@@ -14,6 +16,7 @@ import numpy as np
 
 TAM_MIN = 0.12     # pedaço chato maior que isto sai (nas unidades do modelo)
 CHATO = 0.02       # espessura / tamanho abaixo disto é um plano
+DOBRA_MAX = 25.0   # dobra média entre triângulos vizinhos abaixo disto (graus) é uma fita
 
 
 def ler_glb(caminho):
@@ -65,6 +68,50 @@ def acessor(j, binario, i):
     return arr.reshape(n, t) if t > 1 else arr
 
 
+def fitas(V, I):
+    """os triângulos das fitas chatas (por aresta, com os vértices da mesma posição soldados): devolve a máscara"""
+    chave = {}
+    sold = np.zeros(len(V), int)
+    for i, p in enumerate(np.round(V, 5)):
+        sold[i] = chave.setdefault(tuple(p), len(chave))
+    T = sold[I]
+    pos = np.zeros((len(chave), 3))
+    pos[sold] = V
+    nrm = np.cross(pos[T[:, 1]] - pos[T[:, 0]], pos[T[:, 2]] - pos[T[:, 0]])
+    nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-12)
+    pai = np.arange(len(T))
+
+    def raiz(x):
+        while pai[x] != x:
+            pai[x] = pai[pai[x]]
+            x = pai[x]
+        return x
+    arestas = {}
+    for ti, t in enumerate(T):
+        for x, y in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            arestas.setdefault((min(x, y), max(x, y)), []).append(ti)
+    for ts in arestas.values():
+        for k in range(1, len(ts)):
+            pai[raiz(ts[k])] = raiz(ts[0])
+    comp = np.array([raiz(i) for i in range(len(T))])
+    soma = {}
+    cont = {}
+    for ts in arestas.values():
+        if len(ts) == 2:
+            c = comp[ts[0]]
+            ang = float(np.degrees(np.arccos(np.clip(abs(float(np.dot(nrm[ts[0]], nrm[ts[1]]))), 0.0, 1.0))))
+            soma[c] = soma.get(c, 0.0) + ang
+            cont[c] = cont.get(c, 0) + 1
+    tirar = np.zeros(len(T), bool)
+    for c in np.unique(comp):
+        sel = comp == c
+        vs = pos[np.unique(T[sel].reshape(-1))]
+        # sem aresta dividida com outro triângulo (um triângulo solto, ou dois encostados só pela ponta) também é chato
+        if float(np.ptp(vs, axis=0).max()) > TAM_MIN and (cont.get(c, 0) == 0 or soma[c] / cont[c] < DOBRA_MAX):
+            tirar |= sel
+    return tirar
+
+
 def pedacos(n, tris):
     """os pedaços ligados da malha (cada vértice -> o pedaço dele)"""
     pai = np.arange(n)
@@ -103,9 +150,9 @@ def main():
                     tam = float(np.ptp(vs, axis=0).max())
                     if s[0] > 1e-6 and s[2] / s[0] < CHATO and tam > TAM_MIN:
                         tirar.add(int(u))
-                if not tirar:
+                fica = np.array([int(comp[t[0]]) not in tirar for t in I]) & ~fitas(V, I)
+                if fica.all():
                     continue
-                fica = np.array([int(comp[t[0]]) not in tirar for t in I])
                 novo = I[fica].reshape(-1)
                 acc = j['accessors'][ia]
                 dt = {5123: np.uint16, 5125: np.uint32}[acc['componentType']]
@@ -114,7 +161,7 @@ def main():
                 binario = trocar_view(j, binario, acc['bufferView'], dados)
                 acc['byteOffset'] = 0
                 acc['count'] = int(len(novo))
-                print('%s: %s, %d pedaços chatos tirados (%d de %d triângulos)' % (caminho, nome, len(tirar), int((~fica).sum()), len(I)))
+                print('%s: %s, %d placas chatas e as fitas tiradas (%d de %d triângulos)' % (caminho, nome, len(tirar), int((~fica).sum()), len(I)))
                 mudou = True
         if mudou:
             gravar_glb(caminho, j, binario)
