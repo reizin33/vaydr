@@ -367,7 +367,7 @@ func _ciclo() -> void:
 	sol.rotation = Vector3(-a, deg_to_rad(-35), 0)
 	var dia_k := clampf(alt * 3.0, 0.0, 1.0)
 	# o sol do jogo antigo (~2 de luz ao meio-dia); no pôr do sol fica laranja e fraco
-	sol.light_energy = 2.0 * dia_k
+	sol.light_energy = 2.0 * dia_k * sol_k
 	sol.visible = dia_k > 0.01
 	var por := clampf(1.0 - absf(alt) * 4.0, 0.0, 1.0) * (1.0 if alt > -0.1 else 0.0)
 	sol.light_color = Color(1.0, 0.96, 0.89).lerp(Color(1.0, 0.62, 0.38), por)
@@ -500,6 +500,8 @@ const QUALIDADE := [
 ## a neblina com volume (gráfico alto, modo completo): bem rala (a de sempre continua cobrindo o longe); o tempo engrossa
 var neblina_vol := 0.0
 const NEBLINA_VOL := 0.0025
+## a força do sol (as fotos do modo completo comparam outras forças com esta)
+var sol_k := 1.0
 
 
 func aplicar_qualidade(q: int) -> void:
@@ -5849,6 +5851,13 @@ func _fotos_desenho() -> void:
 	hora = 9.6
 	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
 	await _foto("01_comeco_na_mata")
+	for v in [["C01_sol130", 1.3, 1.0], ["C01_sol160", 1.6, 1.0]]:
+		sol_k = float(v[1])
+		amb.tonemap_exposure = float(v[2])
+		await _quadros(4)
+		await _foto(str(v[0]))
+	sol_k = 1.0
+	amb.tonemap_exposure = 1.0
 	hora = 9.7
 	await _cam(Vector3(14, 0, 16), Vector3(-6, 2.0, -8))
 	await _foto("03_clareira")
@@ -5871,6 +5880,14 @@ func _fotos_desenho() -> void:
 	jogador.alternar_camera(true)
 	await _quadros(70)
 	await _foto("13b_terceira_pessoa")
+	# acerto da luz do modo completo: o mesmo lugar com o sol 30% e 60% mais forte e com 20% mais de exposição
+	for v in [["C13b_sol130", 1.3, 1.0], ["C13b_sol160", 1.6, 1.0], ["C13b_exposicao120", 1.0, 1.2]]:
+		sol_k = float(v[1])
+		amb.tonemap_exposure = float(v[2])
+		await _quadros(4)
+		await _foto(str(v[0]))
+	sol_k = 1.0
+	amb.tonemap_exposure = 1.0
 	jogador.alternar_camera(false)
 	await _quadros(10)
 	# o machado na mão, de frente para uma árvore (a mão e o item da primeira pessoa com a sombra dos cantos)

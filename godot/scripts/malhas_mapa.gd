@@ -215,7 +215,7 @@ void fragment() {
 	ROUGHNESS = 0.88;
 	// lado de dentro: o céu quase não ilumina (14%%-20%% da luz de fora, como numa sala fechada no jogo antigo)
 	AO = 1.0 - 0.86 * interior;
-	EMISSION = c * brilho * 1.5;
+	EMISSION = c * (OUTPUT_IS_SRGB ? brilho * 1.5 : pow(max(brilho * 1.5, 0.0), 2.2));
 }
 
 // luz: o sol e a lua não entram no lado de dentro (como no jogo antigo); lanterna, fogueira e lâmpadas iluminam igual

@@ -130,6 +130,23 @@ uniform float passo = 0.8;
 uniform float raio = 38.0;
 varying float tom;
 
+// a cor acertada no modo leve (sRGB): no modo completo (Forward+) a conta volta para sRGB e o resultado vai para luz linear
+vec3 em_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+
+vec3 de_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+}
+
 float sorte(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -182,7 +199,7 @@ void vertex() {
 
 void fragment() {
 	vec4 c = texture(folhas, UV);
-	ALBEDO = c.rgb * mix(vec3(0.8, 0.88, 0.72), vec3(1.08, 1.0, 0.78), tom);
+	ALBEDO = de_srgb(em_srgb(c.rgb) * mix(vec3(0.8, 0.88, 0.72), vec3(1.08, 1.0, 0.78), tom));
 	ALPHA = c.a;
 	ALPHA_SCISSOR_THRESHOLD = 0.5;
 	ROUGHNESS = 0.95;

@@ -112,6 +112,23 @@ uniform float corte = 0.45;
 uniform vec3 estacao = vec3(1.0);
 uniform float vento = 1.0;
 
+// a cor acertada no modo leve (sRGB): no modo completo (Forward+) a conta volta para sRGB e o resultado vai para luz linear
+vec3 em_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+
+vec3 de_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+}
+
 void vertex() {
 	vec3 w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float ponta = clamp(VERTEX.y * 0.25, 0.0, 1.0);
@@ -121,7 +138,8 @@ void vertex() {
 
 void fragment() {
 	vec4 c = texture(tex, UV) * cor;
-	c.rgb *= estacao;
+	// a cor da estação é uma tinta em sRGB (no modo completo vai para luz linear, como a textura)
+	c.rgb *= de_srgb(estacao);
 	ALBEDO = c.rgb;
 	ALPHA = c.a;
 	ALPHA_SCISSOR_THRESHOLD = corte;
@@ -485,6 +503,23 @@ uniform float celas = 4.0;
 varying float cela;
 varying float alto;
 
+// a cor acertada no modo leve (sRGB): no modo completo (Forward+) a conta volta para sRGB e o resultado vai para luz linear
+vec3 em_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+
+vec3 de_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+}
+
 void vertex() {
 	vec3 o = MODEL_MATRIX[3].xyz;
 	float sx = length(MODEL_MATRIX[0].xyz);
@@ -505,7 +540,7 @@ void fragment() {
 	vec2 uv = vec2((UV.x + cela) / celas, UV.y);
 	vec4 c = texture(fotos, uv);
 	// a foto é a cor sem luz: de longe a copa tem sombra dentro dela, então fica mais escura; o miolo de baixo mais ainda
-	ALBEDO = c.rgb * 0.62 * mix(1.0, 0.75, alto);
+	ALBEDO = c.rgb * de_srgb(vec3(0.62 * mix(1.0, 0.75, alto)));
 	ALPHA = c.a;
 	ALPHA_SCISSOR_THRESHOLD = 0.4;
 	ROUGHNESS = 0.95;

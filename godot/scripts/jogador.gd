@@ -15,6 +15,8 @@ const AGACHA := 2.0
 const PULO := 6.2
 const GRAV := 21.0
 const ALCANCE := 2.6
+## camada de desenho da mão e do item da primeira pessoa (a lanterna não ilumina eles)
+const CAMADA_MAO := 1 << 11
 
 var main: Node
 var cam: Camera3D
@@ -142,7 +144,9 @@ func _ready() -> void:
 	luz_mao.spot_attenuation = 0.9
 	luz_mao.shadow_enabled = true
 	# no modo completo, com a neblina com volume (gráfico alto), o facho aparece no ar
-	luz_mao.light_volumetric_fog_energy = 2.5
+	luz_mao.light_volumetric_fog_energy = 8.0
+	# a mão e o item da primeira pessoa ficam colados na lanterna: ela não os ilumina (saíam estourados de branco)
+	luz_mao.light_cull_mask = 0xFFFFF & ~CAMADA_MAO
 	luz_mao.position = Vector3(0.25, -0.2, -0.3)
 	luz_mao.visible = false
 	# a lanterna sai de dentro da cabeça: o corpo não pode fazer sombra dela
@@ -263,6 +267,7 @@ func _atualizar_mao() -> void:
 		for no in ferramenta_no.find_children("*", "MeshInstance3D", true, false):
 			var mi := no as MeshInstance3D
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.layers = CAMADA_MAO
 			# na frente de tudo (o jogo antigo limpava a profundidade antes de desenhar a mão): não atravessa parede nem mato
 			if mi.material_override != null:
 				mi.material_override = _mat_na_frente(mi.material_override)
@@ -399,6 +404,7 @@ func _montar_braco() -> void:
 	for mi in braco_fp.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_override = braco_mat
 		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		(mi as MeshInstance3D).layers = CAMADA_MAO
 	_vestir_braco()
 
 

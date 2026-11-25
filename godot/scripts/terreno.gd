@@ -283,8 +283,27 @@ void vertex() {
 	wn = NORMAL;
 }
 
+// as contas de cor deste chão foram acertadas no modo leve, onde a textura chega em sRGB e o ALBEDO é lido em sRGB; no modo
+// completo (Forward+) a textura chega em luz linear e o ALBEDO é lido em luz linear: a textura volta para sRGB antes das
+// contas e o resultado vai para luz linear no fim (sem isso o asfalto e o concreto saíam quase brancos)
+vec3 em_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+
+vec3 de_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+}
+
 vec3 duas(sampler2D t, vec2 uv, float tam) {
-	return mix(texture(t, uv / tam).rgb, texture(t, uv / (tam * 3.7) + 0.37).rgb, 0.35);
+	return mix(em_srgb(texture(t, uv / tam).rgb), em_srgb(texture(t, uv / (tam * 3.7) + 0.37).rgb), 0.35);
 }
 
 float lum(vec3 c) {
@@ -295,6 +314,7 @@ void fragment() {
 	vec2 w = wpos.xz;
 	vec2 um = (w - mapa_ret.xy) / mapa_ret.zw;
 	vec4 base = texture(mapa_cor, um);
+	base.rgb = em_srgb(base.rgb);
 	float mata = texture(mapa_mata, um).r;
 	vec4 pis = vec4(0.0);
 	if (abs(w.x) < pisos_h && abs(w.y) < pisos_h) {
@@ -310,8 +330,8 @@ void fragment() {
 	vec3 tr = duas(t_rocha, w, 1.8);
 	float km = smoothstep(0.35, 0.75, mata);
 	// a cor é a do chão do jogo antigo (grama no aberto, chão de mata dentro da mata); a textura dá só o desenho
-	float dm = lum(tm) / lum(med_mata);
-	float d = mix(lum(tg) / lum(med_grama), dm, km);
+	float dm = lum(tm) / lum(em_srgb(med_mata));
+	float d = mix(lum(tg) / lum(em_srgb(med_grama)), dm, km);
 	vec3 c = base.rgb * clamp(mix(1.0, d, 0.6), 0.7, 1.35);
 	// manchas de folha seca no chão da mata
 	float wf = smoothstep(0.55, 0.75, n2) * mata;
@@ -326,7 +346,7 @@ void fragment() {
 	c = mix(c, tr * 0.6, wr * 0.85);
 	vec3 nm = mix(texture(n_grama, w / 2.0).rgb, texture(n_mata, w / 3.2).rgb, km);
 	nm = mix(nm, texture(n_rocha, w / 1.8).rgb, wr);
-	ALBEDO = c * (0.95 + 0.1 * n1);
+	ALBEDO = de_srgb(c * (0.95 + 0.1 * n1));
 	NORMAL_MAP = nm;
 	NORMAL_MAP_DEPTH = 1.0;
 	ROUGHNESS = mix(0.95, 0.85, wr);
@@ -425,6 +445,21 @@ uniform sampler2D so_mar : filter_nearest, repeat_disable;
 uniform vec4 mapa_ret = vec4(0.0);
 uniform bool e_mar = false;
 varying vec3 wp;
+// a cor acertada no modo leve (sRGB): no modo completo a conta volta para sRGB e o resultado vai para luz linear
+vec3 em_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+vec3 de_srgb(vec3 c) {
+	if (OUTPUT_IS_SRGB) {
+		return c;
+	}
+	c = max(c, vec3(0.0));
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+}
 void vertex() {
 	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	VERTEX.y += sin(wp.x * 0.11 + wp.z * 0.03 - TIME * 1.1) * 0.06 + sin(wp.x * 0.05 - wp.z * 0.07 - TIME * 0.7) * 0.05;
@@ -439,7 +474,7 @@ void fragment() {
 	float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
 	float r = sin(wp.x * 1.7 + TIME * 1.3) * sin(wp.z * 1.9 - TIME * 1.1);
 	NORMAL_MAP = normalize(vec3(0.5 + 0.06 * r, 0.5 + 0.06 * cos(wp.x * 1.3 - TIME), 1.0));
-	ALBEDO = cor + fr * 0.2;
+	ALBEDO = de_srgb(em_srgb(cor) + fr * 0.2);
 	ROUGHNESS = 0.05;
 	METALLIC = 0.0;
 	SPECULAR = 0.65;
