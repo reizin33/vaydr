@@ -581,7 +581,7 @@ func _physics_process(dt: float) -> void:
 		cansado = true
 	elif energia >= 25.0:
 		cansado = false
-	var corre := quer_correr and not cansado and (main.lesoes == null or main.lesoes.pode_correr())
+	var corre: bool = quer_correr and not cansado and (main.lesoes == null or main.lesoes.pode_correr())
 	# energia: correndo gasta (uns 8 s de corrida), parado ou andando volta depois de um instante
 	if corre:
 		energia = maxf(0.0, energia - dt * 12.0)
