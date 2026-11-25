@@ -2708,7 +2708,7 @@ func _teste_veiculos(livre: Vector3) -> void:
 		hora = hora_antes
 		return
 	# a pista: um lugar plano e limpo (sem as árvores e pedras em volta)
-	var c := _lugar_plano(Vector2(-35, 45), 40.0, Vector2(livre.x, livre.z))
+	var c := _lugar_plano(Vector2(-35, 45), 40.0, Vector2(livre.x, livre.z), true)
 	var clar := _clareira_teste(c, 34.0)
 	var Zv := Vector3(0, 0, 1)
 	cv.global_position = c - Zv * 16.0
@@ -3298,7 +3298,7 @@ func _limpar_zumbis() -> void:
 
 
 ## um lugar plano para os testes dos zumbis e das armas (sem casa nem muro no meio; árvore e pedra podem ter: a clareira tira)
-func _lugar_plano(centro: Vector2, lado: float, evita: Vector2) -> Vector3:
+func _lugar_plano(centro: Vector2, lado: float, evita: Vector2, rente := false) -> Vector3:
 	var sp := get_world_3d().direct_space_state
 	var q := PhysicsShapeQueryParameters3D.new()
 	var caixa := BoxShape3D.new()
@@ -3320,6 +3320,12 @@ func _lugar_plano(centro: Vector2, lado: float, evita: Vector2) -> Vector3:
 		if ys.max() - ys.min() > 0.8:
 			continue
 		q.transform = Transform3D(Basis(), Vector3(p.x, terreno.h(p.x, p.y) + 2.3, p.y))
+		# rente: a caixa desce até perto do chão mais baixo do quadrado (pega poste, mureta e cerca baixa onde o chão desce)
+		if rente:
+			var y0: float = ys.min() + 0.05
+			var y1: float = ys.max() + 4.3
+			caixa.size = Vector3(lado, y1 - y0, lado)
+			q.transform = Transform3D(Basis(), Vector3(p.x, (y0 + y1) * 0.5, p.y))
 		var ok := true
 		for hh in sp.intersect_shape(q, 64):
 			if not (hh["collider"] as Object).has_meta("recurso"):

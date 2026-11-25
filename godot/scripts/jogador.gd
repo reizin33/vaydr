@@ -586,8 +586,9 @@ func _physics_process(dt: float) -> void:
 			main.ui.aviso("A pilha da lanterna acabou (pilhas: Trocar pilhas)")
 	# o aperto do C (para o rolamento)
 	var c_agora := Input.is_action_pressed("agachar")
-	if c_agora and not _c_antes:
-		_quer_rolar = 0.2
+	# só correndo (ou logo depois de parar): o C parado é só agachar e não fica guardado para a próxima corrida
+	if c_agora and not _c_antes and _correu_t < 0.2:
+		_quer_rolar = 0.15
 	_c_antes = c_agora
 	_quer_rolar = maxf(0.0, _quer_rolar - dt)
 	# dirigindo (etapa 6j): no assento, quem anda é o veículo

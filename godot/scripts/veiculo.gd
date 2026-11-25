@@ -442,7 +442,10 @@ func _mover(dt: float, dirige: bool, j) -> void:
 		if mov != Vector3.ZERO:
 			var col := move_and_collide(mov)
 			if col != null:
-				ultimo_choque = _nome_choque(col.get_collider())
+				var pc := col.get_position()
+				var fc := col.get_collider_shape()
+				ultimo_choque = "%s em (%.1f, %.1f) a %.2f m do chão%s" % [_nome_choque(col.get_collider()), pc.x, pc.z,
+					pc.y - main.terreno.h(pc.x, pc.z), (" (" + (fc as Object).get_class() + ")") if fc is Object else ""]
 				var nn := col.get_normal()
 				nn.y = 0.0
 				if nn.length() > 0.01:
