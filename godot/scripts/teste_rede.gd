@@ -358,10 +358,10 @@ func _convidado(p0: Vector3) -> void:
 		_confere(veio, "esfolou o bicho de quem abriu: a carne e o couro vieram para cá (%d carnes)" % (main.jogador.inv.conta("carneCrua") - antes_carne))
 	# o Caramelo de quem abriu (etapa 6e): o boneco dele aparece aqui
 	var veio_c := await _esperar(func(): return _sinal("cao"), 120.0)
-	var viu := false
+	var viu_cao := false
 	if veio_c:
-		viu = await _esperar(func(): return main.cao.lan and main.cao.ativo and main.cao.corpo.visible, 20.0)
-	_confere(viu, "o Caramelo de quem abriu aparece aqui (o boneco, a %.0f m de você)" % main.cao.global_position.distance_to(main.jogador.global_position))
+		viu_cao = await _esperar(func(): return main.cao.lan and main.cao.ativo and main.cao.corpo.visible, 20.0)
+	_confere(viu_cao, "o Caramelo de quem abriu aparece aqui (o boneco, a %.0f m de você)" % main.cao.global_position.distance_to(main.jogador.global_position))
 	Rede.mandar_controle("cao_ok")
 	# bate-papo
 	Rede.mandar_chat("Oi! Aqui é o convidado.")
