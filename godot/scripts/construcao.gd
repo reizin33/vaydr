@@ -421,6 +421,8 @@ func colocar(id: String, xf: Transform3D, chave: String) -> void:
 				b2["raio"] = maxf(b2["raio"], Vector2(loc.x, loc.z).length() + M * 0.8)
 	_criar(id, xf, chave, float(ob.get("hp", 200.0)), {})
 	main.sons.tocar("construir", xf.origin, 0.0)
+	# o encaixe levanta um pouco de poeira na base da peça
+	main.efeitos.poeira(xf.origin + Vector3(0, 0.15, 0), Color(0.55, 0.5, 0.42), 6, 0.5)
 	main.ui.aviso("Construiu: " + str(ob.get("nome", id)))
 
 

@@ -202,6 +202,7 @@ func _fechar_grupos() -> void:
 
 
 func esconder(r: Dictionary) -> void:
+	r["escondido"] = true
 	if r.has("inst"):
 		for par in r["inst"]:
 			var g: Dictionary = grupos[par[0]]
@@ -211,6 +212,8 @@ func esconder(r: Dictionary) -> void:
 
 
 func mostrar(r: Dictionary) -> void:
+	r["escondido"] = false
+	r["giro"] = 0.0
 	if r.has("inst"):
 		for par in r["inst"]:
 			var g: Dictionary = grupos[par[0]]
@@ -963,8 +966,9 @@ func _acabou(i: int) -> void:
 		if main_ok():
 			main_no().sons.tocar("arvore_range", r["pos"] + Vector3(0, 2.0, 0), 2.0)
 	elif tipo == "pedra" and r.has("no"):
-		# a pedra quebra: encolhe e afunda num instante, com poeira
-		r["xf_no"] = (r["no"] as Node3D).transform
+		# a pedra quebra: encolhe e afunda num instante, com poeira (a transformação guardada é a de antes de tremer)
+		if not r.has("xf_no"):
+			r["xf_no"] = (r["no"] as Node3D).transform
 		_anims[i] = {"tipo": "racha", "t": 0.0}
 		if main_ok():
 			main_no().efeitos.poeira(r["pos"] + Vector3(0, 0.4, 0), Color(0.55, 0.52, 0.48), 8, 0.8)
@@ -1003,6 +1007,8 @@ func tremer(i: int, de: Vector3) -> void:
 
 ## gira a árvore (as versões de perto e de meia distância) em volta do pé dela; "afunda" desce no chão depois de cair
 func _girar(r: Dictionary, eixo: Vector3, ang: float, afunda := 0.0) -> void:
+	# guarda o giro (sem placa de vídeo, nos testes, a MultiMesh não guarda a transformação para conferir)
+	r["giro"] = ang
 	var base: Vector3 = r["pos"]
 	var rot := Basis(eixo, ang)
 	var t := Transform3D(rot, base - rot * base - Vector3(0, afunda, 0))

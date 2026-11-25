@@ -3248,17 +3248,13 @@ func _teste_acabamento(livre: Vector3) -> void:
 			if mundo._anims.has(i_arv) and bool(mundo._anims[i_arv].get("bateu", false)):
 				bateu = true
 				break
-		# deitada: o "para cima" da árvore de perto aponta para o lado
-		var par0: Array = ra["inst"][0]
-		var g0: Dictionary = mundo.grupos[par0[0]]
-		var xf0: Transform3D = (g0["mmi"] as MultiMeshInstance3D).multimesh.get_instance_transform(par0[1])
-		deitou = xf0.basis.y.normalized().dot(Vector3.UP) < 0.35
+		# deitada (o giro dela passou de uns 75°) e, no fim, escondida
+		deitou = float(ra.get("giro", 0.0)) > 1.3
 		for k in 420:
 			await get_tree().physics_frame
 			if not mundo._anims.has(i_arv):
 				break
-		var xf1: Transform3D = (g0["mmi"] as MultiMeshInstance3D).multimesh.get_instance_transform(par0[1])
-		sumiu = not mundo._anims.has(i_arv) and xf1.basis.get_scale().length() < 0.01
+		sumiu = not mundo._anims.has(i_arv) and bool(ra.get("escondido", false))
 		var n_m := jogador.inv.conta("machado")
 		if n_m > 0:
 			jogador.inv.tirar("machado", n_m)
@@ -3277,6 +3273,7 @@ func _teste_acabamento(livre: Vector3) -> void:
 			melhor = d
 			i_pe = i
 	var quebrou := false
+	var diag_p := "nenhuma pedra"
 	if i_pe >= 0:
 		var rp: Dictionary = mundo.recursos[i_pe]
 		var pp: Vector3 = rp["pos"]
@@ -3300,10 +3297,12 @@ func _teste_acabamento(livre: Vector3) -> void:
 			await _quadros(3)
 		await _quadros(40)
 		quebrou = rachou and not (rp["no"] as Node3D).visible
+		diag_p = "%d golpes, vida %.0f, rachou %s, visível %s, a %.1f m" % [g2, float(rp["vida"]), str(rachou), str((rp["no"] as Node3D).visible),
+			jogador.global_position.distance_to(pp)]
 		var n_p := jogador.inv.conta("picareta")
 		if n_p > 0:
 			jogador.inv.tirar("picareta", n_p)
-	_confere(i_pe >= 0 and quebrou, "acabamento: a picareta quebrou a pedra (ela encolheu e sumiu na poeira)")
+	_confere(i_pe >= 0 and quebrou, "acabamento: a picareta quebrou a pedra (ela encolheu e sumiu na poeira)%s" % ("" if quebrou else " [%s]" % diag_p))
 	_mao_vazia()
 	spawn_t = spawn_antes
 	hora = hora_antes
@@ -5622,39 +5621,33 @@ func _fotos() -> void:
 		await _foto("18a_arvore_caindo")
 		mundo.anims_parados = false
 		await _quadros(30)
-	# as marcas de tiro e a poeira no tronco de uma árvore, de perto
-	var i_mt := -1
-	var melhor_mt := 1e9
-	for i in mundo.recursos.size():
-		var r: Dictionary = mundo.recursos[i]
-		if str(r["tipo"]) != "arvore" or float(r["vida"]) <= 0.0 or i == i_fa:
-			continue
-		var dmt := Vector2(float(r["pos"].x) - base_fa.x, float(r["pos"].z) - base_fa.z).length()
-		if dmt < melhor_mt:
-			melhor_mt = dmt
-			i_mt = i
-	if i_mt >= 0:
-		var pmt: Vector3 = mundo.recursos[i_mt]["pos"]
-		_jogador_em(pmt - X3 * 3.2, pmt + Vector3(0, 1.4, 0))
-		await _quadros(5)
-		jogador.inv.por("pistola", 1)
-		jogador.inv.por("municao9", 12)
-		_na_mao("pistola")
+	# as marcas de tiro e a poeira no chão de terra, de perto (o chão é onde a marca cai certinho na superfície)
+	var pmt := lw + X3 * 6.0 + Zf * 4.0
+	pmt.y = terreno.h(pmt.x, pmt.z)
+	_jogador_em(pmt - Zf * 3.6, pmt + Vector3(0, 0.3, 0))
+	await _quadros(5)
+	jogador.inv.por("pistola", 1)
+	jogador.inv.por("municao9", 12)
+	if _na_mao("pistola"):
 		var sp_f = jogador.item_mao()
 		sp_f["mun"] = 12
+		await _quadros(4)
 		for k in 6:
-			_olhar(pmt + Vector3(0, 1.1 + 0.12 * float(k % 3), 0) + Vector3(0, 0, 0.06 * float(k - 3)))
+			var alvo_t := pmt + X3 * (0.18 * float(k - 3)) + Zf * (0.12 * float(k % 2))
+			alvo_t.y = terreno.h(alvo_t.x, alvo_t.z)
+			_olhar(alvo_t)
 			jogador.cd = 0.0
+			jogador.acao = {}
 			jogador.atacar()
-			await _quadros(4)
-		_olhar(pmt + Vector3(0, 1.25, 0))
-		await _quadros(8)
+			await _quadros(3)
+		_olhar(pmt + Vector3(0, 0.25, 0))
+		await _quadros(4)
 		await _foto("18b_marcas_de_tiro")
-		for it in ["pistola", "municao9"]:
-			var n := jogador.inv.conta(it)
-			if n > 0:
-				jogador.inv.tirar(it, n)
-		_mao_vazia()
+	for it in ["pistola", "municao9"]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	_mao_vazia()
 	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()

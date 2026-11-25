@@ -78,6 +78,9 @@ var _soco := Vector3.ZERO   # o tranco da câmera no impacto (x sobe/desce, z in
 var _pulo_buf := 0.0        # o Espaço apertado há pouco (pula assim que tocar o chão)
 var _chao_t := 0.0          # há quanto tempo saiu do chão (logo depois de sair da beirada ainda dá para pular)
 var _corre_k := 0.0         # o quanto está correndo (o campo de visão abre um pouco)
+var _giro_mouse := Vector2.ZERO    # quanto o mouse girou a vista desde o último quadro (o item na mão fica um pouco para trás)
+var _balanco_arma := Vector2.ZERO  # o atraso do item na mão quando a vista gira
+var _inclina := 0.0                # andando de lado, a vista inclina um pouquinho
 var uso_t := -1.0        # comendo ou bebendo: a mão vai à boca
 var _roupa_t := 0.0
 var _dobra_a := 0.0      # o pulso da mão da primeira pessoa (para o lado do mindinho ou do polegar)
@@ -211,6 +214,7 @@ func _input(ev: InputEvent) -> void:
 		var r: Vector2 = ev.screen_relative
 		rotate_y(-r.x * sens)
 		cabeca.rotation.x = clampf(cabeca.rotation.x - r.y * sens * (-1.0 if inverter_y else 1.0), -1.45, 1.45)
+		_giro_mouse += Vector2(r.x, r.y * (-1.0 if inverter_y else 1.0)) * sens
 		if r.length() > 0.5:
 			_olhar_t = 0.0
 
@@ -480,6 +484,14 @@ func _view_model() -> void:
 	var a := minf(1.0, Vector2(velocity.x, velocity.z).length() / 4.0) if is_on_floor() else 0.0
 	var bob := sin(balanco * 2.0) * 0.012 * a
 	var bobx := cos(balanco) * 0.012 * a
+	# girando a vista, o item na mão fica um pouco para trás e volta (pela velocidade do giro, igual em qualquer FPS)
+	var dtv := maxf(get_process_delta_time(), 0.001)
+	var giro_v := _giro_mouse / dtv
+	_giro_mouse = Vector2.ZERO
+	var alvo_b := Vector2(clampf(-giro_v.x * 0.012, -0.045, 0.045), clampf(giro_v.y * 0.01, -0.035, 0.035)) * (1.0 - 0.8 * mira_k)
+	_balanco_arma = _balanco_arma.lerp(alvo_b, 1.0 - exp(-dtv * 10.0))
+	bobx += _balanco_arma.x
+	bob += _balanco_arma.y
 	var soco := str(d.get("tipo", "")) != "arma"
 	var s := clampf(golpe_t / golpe_dur, 0.0, 1.0) if golpe_t >= 0.0 else -1.0
 	if s >= 0.0:
@@ -736,8 +748,10 @@ func _process(dt: float) -> void:
 		fov_alvo = 16.0
 	cam.fov = fov_alvo if absf(cam.fov - fov_alvo) < 0.5 or mira_k <= 0.0 else lerpf(cam.fov, fov_alvo, 1.0 - exp(-dt * 18.0))
 	_soco = _soco.lerp(Vector3.ZERO, 1.0 - exp(-dt * 16.0))
+	var lado_mv := Input.get_axis("esquerda", "direita") if not preso else 0.0
+	_inclina = lerpf(_inclina, -lado_mv * 0.011 if is_on_floor() and not terceira and mira_k < 0.5 else 0.0, 1.0 - exp(-dt * 7.0))
 	cam.rotation.x = recuo + _soco.x
-	cam.rotation.z = _soco.z
+	cam.rotation.z = _soco.z + _inclina
 	_animar_corpo(dt)
 	_view_model()
 	_dobrar_braco(dt)
@@ -1191,7 +1205,9 @@ func atacar() -> void:
 	golpe_t = 0.0
 	golpe_dur = maxf(0.3, cd * 0.85)
 	golpe_n += 1
-	main.sons.tocar("golpe", global_position, -8.0)
+	# o vento do golpe: arma pesada, mais grave e mais forte
+	var peso := clampf(float(st.get("dano", 9.0)) / 30.0, 0.25, 1.0)
+	main.sons.tocar("golpe", global_position, -9.0 + 4.0 * peso, lerpf(1.18, 0.82, peso))
 	# o golpe pega quando a arma (ou o punho) chega na frente, não no clique: até lá o alvo pode sair e o golpe passa no ar
 	golpe_pend = {"em": golpe_dur * IMPACTO_GOLPE, "st": st, "d": d, "arma": arma, "id": id, "sel": sel}
 
@@ -1222,6 +1238,9 @@ func _resolver_golpe() -> void:
 		var max_hits := 1 if bool(d.get("vertical", false)) else 2
 		for i in mini(max_hits, alvos.size()):
 			_bater_zumbi(alvos[i], st, d, arma, h if alvos[i] == direto else {})
+		# a pancada das armas pesadas tem um baque grave por baixo
+		if float(st.get("dano", 9.0)) >= 24.0:
+			main.sons.tocar("impacto", (alvos[0] as Node3D).global_position + Vector3(0, 1.2, 0), -7.0, 1.15)
 		main.ui.acerto()
 		main.barulho(global_position, 6.0)
 		_impacto(float(st.get("dano", 9.0)), bool(d.get("vertical", false)))
