@@ -634,7 +634,9 @@ func interagir(i: int, j) -> void:
 		"cama", "camaMadeira":
 			sacos.erase((pe["xf"] as Transform3D).origin)
 			sacos.append((pe["xf"] as Transform3D).origin)
-			main.ui.aviso("Se morrer, você renasce nesta cama")
+			# dormir na cama (etapa 6c); se não der, ela fica sendo o lugar de renascer
+			if not main.sono.dormir({"cama": true}):
+				main.ui.aviso("Se morrer, você renasce nesta cama")
 		"armadilhaUrso":
 			if not pe.get("armada", true):
 				pe["armada"] = true
@@ -1217,6 +1219,18 @@ func _saco_no(p: Vector3, yaw: float) -> void:
 	no.add_child(trav)
 	sacos.append(p)
 	no.set_meta("saco", [[p.x, p.y, p.z], yaw])
+	# E no saco: dormir (etapa 6c)
+	var cs_b := StaticBody3D.new()
+	cs_b.collision_layer = 2
+	cs_b.collision_mask = 0
+	var cs := CollisionShape3D.new()
+	var bx := BoxShape3D.new()
+	bx.size = Vector3(0.8, 0.3, 2.0)
+	cs.shape = bx
+	cs.position.y = 0.15
+	cs_b.add_child(cs)
+	cs_b.set_meta("saco_dormir", p)
+	no.add_child(cs_b)
 
 
 ## mochila caída (quando o jogador morre, tudo o que ele tinha fica nela) e coisas soltas no chão: E abre e pega

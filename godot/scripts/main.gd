@@ -19,6 +19,7 @@ var projeteis: Projeteis
 var noites: Noites          # as noites: as ondas da horda, a lua de sangue e o Colosso (etapa 5c)
 var fauna: Fauna            # os bichos do mato: as regiões, a caça e as carcaças (etapa 6a)
 var clima: Clima            # o tempo, as estações e a lua (etapa 6b)
+var sono: Sono              # o sono e o dormir (etapa 6c)
 var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
@@ -113,6 +114,8 @@ func _ready() -> void:
 	add_child(fauna)
 	clima = Clima.new(self)
 	add_child(clima)
+	sono = Sono.new(self)
+	add_child(sono)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -286,6 +289,11 @@ func _ambiente() -> void:
 	add_child(lua)
 
 
+## quantos segundos dura uma hora de jogo agora (de noite passa mais rápido)
+func seg_hora() -> float:
+	return SEG_POR_HORA * (0.5 if noite() else 1.0)
+
+
 func noite() -> bool:
 	return hora >= 19.0 or hora < 5.5
 
@@ -352,7 +360,7 @@ func _process(dt: float) -> void:
 			ui.hud.mostrar_comandos(bool(Ajustes.v["comandos"]))
 	# o dia passa devagar (50 s por hora) e a noite mais rápido (25 s por hora): ~11 min de dia e ~5 de noite
 	var antes := hora
-	hora += dt / (SEG_POR_HORA * (0.5 if noite() else 1.0))
+	hora += dt / seg_hora() * (sono.turbo() if sono != null else 1.0)
 	if hora >= 24.0:
 		hora -= 24.0
 		dia += 1
@@ -362,6 +370,7 @@ func _process(dt: float) -> void:
 		if antes < 6.0 and hora >= 6.0:
 			ui.aviso("Amanheceu: dia %d" % dia, 5.0)
 		clima.passo(dt)
+	sono.passo(dt)
 	_ciclo()
 	terreno.mare(hora)
 	# zumbis: os de cada lugar (vila, posto, fazenda, sítios...) aparecem quando alguém chega perto; fora isso, alguns
@@ -538,6 +547,9 @@ func barulho(p: Vector3, r: float, alvo := Vector3.INF) -> void:
 		return
 	if clima != null:
 		r *= clima.ruido()
+	# quem dorme acorda com barulho forte perto
+	if sono != null and not sono.dormindo.is_empty() and jogador.global_position.distance_to(p) < r * 0.5 and r >= 30.0:
+		sono.acordar("Um barulho forte te acordou.")
 	if fauna != null:
 		fauna.ouvir(p, r)
 	var para := p if alvo == Vector3.INF else alvo
@@ -858,6 +870,8 @@ func texto_mira() -> String:
 		return fauna.texto(c.get_meta("bicho"), jogador)
 	if c.has_meta("laco"):
 		return fauna.texto_laco(c.get_meta("laco"))
+	if c.has_meta("saco_dormir"):
+		return "E  Dormir no saco de dormir"
 	if c.has_meta("caixa"):
 		var cx: Dictionary = mundo.caixas[c.get_meta("caixa")]
 		return ("E  " + str(cx["nome"])) if cx["cheia"] else "Vazio (volta a ter coisa depois)"
@@ -877,7 +891,7 @@ func texto_mira() -> String:
 		elif str(po["id"]) == "fogueira":
 			acao = "E  Cozinhar na "
 		elif str(po["id"]) in ["cama", "camaMadeira"]:
-			acao = "E  Renascer nesta "
+			acao = "E  Dormir (e renascer) nesta "
 		elif o.has("estacao") or str(po["id"]) == "bancadaTrab":
 			acao = "E  Fabricar na "
 		elif str(po["id"]) == "armadilhaUrso":
@@ -947,7 +961,7 @@ func salvar_jogo() -> bool:
 		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
-		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar()}
+		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -1003,6 +1017,9 @@ func carregar_jogo() -> bool:
 	var cd = d.get("clima", {})
 	if cd is Dictionary:
 		clima.carregar(cd)
+	var sd = d.get("sono", {})
+	if sd is Dictionary:
+		sono.carregar(sd)
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -1994,6 +2011,98 @@ func _teste_clima(livre: Vector3) -> void:
 	hora = hora_antes
 	_ciclo()
 	jogador.energia = 100.0
+
+
+## o sono (etapa 6c): cai acordado, com sono a energia enche devagar, exausto anda devagar e cochila de pé; o saco de dormir
+## (E): descansado e de dia não dá, de noite dorme com o relógio correndo e acorda descansado; dano e zumbi perto acordam; o
+## café espanta o sono; o HUD com a temperatura e o sono; o jogo salvo
+func _teste_sono(livre: Vector3) -> void:
+	var hora_antes := hora
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	_limpar_zumbis()
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	_jogador_em(c, c + Vector3(0, 1.5, -10))
+	await _quadros(3)
+	jogador.sono = 50.0
+	sono.passo(10.0)
+	var caiu := 50.0 - jogador.sono
+	jogador.sono = 20.0
+	var rg := sono.regen()
+	jogador.sono = 10.0
+	var vl := sono.vel()
+	sono._micro_t = 0.0
+	sono.passo(0.016)
+	var cochilou := sono._apagao > 0.0
+	_confere(absf(caiu - 0.68) < 0.05 and rg < 0.9 and vl < 1.0 and cochilou,
+		"sono: cai acordado (%.2f em 10 s); com sono a energia enche a %.0f%%; exausto anda mais devagar e cochilou de pé" % [caiu, rg * 100.0])
+	sono._apagao = 0.0
+	# o saco de dormir: E nele; descansado e de dia não dá
+	jogador.sono = 95.0
+	hora = 12.0
+	var ps := c + Vector3(1.6, 0, 0)
+	ps.y = terreno.h(ps.x, ps.z)
+	construcao._saco_no(ps, 0.0)
+	_olhar(ps + Vector3(0, 0.1, 0))
+	await _quadros(3)
+	var txt := texto_mira()
+	jogador.usar()
+	var nao_dia := sono.dormindo.is_empty()
+	# de noite dorme: o relógio corre e ele acorda descansado
+	hora = 22.0
+	jogador.sono = 40.0
+	jogador.vida = 80.0
+	await _quadros(60)
+	jogador.usar()
+	var dormiu := not sono.dormindo.is_empty() and jogador.preso
+	var turbo := sono.turbo()
+	if dormiu:
+		sono.dormindo["fim"] = sono._minutos() + 40.0
+	var h0 := hora
+	for i in 300:
+		await get_tree().physics_frame
+		if sono.dormindo.is_empty():
+			break
+	_confere(txt == "E  Dormir no saco de dormir" and nao_dia and dormiu and turbo > 5.0 and sono.dormindo.is_empty() and not jogador.preso
+		and jogador.sono > 40.0 and jogador.vida > 80.0,
+		"saco de dormir: de dia descansado não dá; de noite dormiu com o relógio %.0fx mais rápido (%.1fh em pouco tempo) e acordou descansado (sono %.0f, vida %.0f)" % [
+			turbo, fposmod(hora - h0, 24.0), jogador.sono, jogador.vida])
+	# o dano acorda; o zumbi chegando perto acorda
+	hora = 23.0
+	await _quadros(60)
+	sono.dormir({"saco": true})
+	await _quadros(5)
+	jogador.ferir(3.0, false)
+	await _quadros(3)
+	var acordou_dano := sono.dormindo.is_empty()
+	await _quadros(60)
+	sono.dormir({"saco": true})
+	await _quadros(5)
+	var z := _z_teste(c + Vector3(0, 0, 5.0), "walker", c)
+	await _quadros(5)
+	var acordou_z := sono.dormindo.is_empty()
+	_limpar_zumbis()
+	_confere(acordou_dano and acordou_z, "dormindo: o dano te acorda (%s) e o zumbi chegando perto também (%s)" % [acordou_dano, acordou_z])
+	sono.acordar("__manual")
+	jogador.preso = false
+	# o café espanta o sono
+	jogador.sono = 30.0
+	jogador.inv.por("cafe", 1)
+	_na_mao("cafe")
+	jogador.cd = 0.0
+	jogador.atacar()
+	_confere(jogador.sono > 45.0, "café: espantou o sono (%.0f)" % jogador.sono)
+	_mao_vazia()
+	# o HUD: sede, fome, temperatura | sono, vida
+	_confere(ui.hud.vitais.custom_minimum_size.x > 200.0, "HUD: a temperatura e o sono junto da sede, da fome e da vida")
+	var sv := sono.salvar()
+	jogador.sono = 5.0
+	sono.carregar(sv)
+	_confere(absf(jogador.sono - 30.0) < 20.0 and absf(jogador.sono - float(sv["sono"])) < 0.2, "jogo salvo: o sono volta como estava (%.0f)" % jogador.sono)
+	jogador.sono = 100.0
+	jogador.vida = 100.0
+	hora = hora_antes
+	spawn_t = spawn_antes
 
 
 ## o HUD com a arma de fogo na mão: as balas no pente / na mochila
@@ -3272,6 +3381,7 @@ func _teste() -> void:
 	await _teste_noites(livre)
 	await _teste_fauna(livre)
 	await _teste_clima(livre)
+	await _teste_sono(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")

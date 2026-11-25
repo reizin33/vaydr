@@ -62,6 +62,7 @@ var _cam_dentro := 0.0
 var _bob := Vector3.ZERO
 var _corre := false
 var _dica_frio := false
+var sono := 100.0         # o sono (etapa 6c): cai acordado, enche dormindo
 var golpe_t := -1.0      # o golpe no corpo (terceira pessoa): tempo desde o clique
 var golpe_dur := 0.4
 var golpe_parado := false   # para a foto: o golpe fica parado onde está
@@ -588,7 +589,7 @@ func _physics_process(dt: float) -> void:
 	else:
 		_folego_t += dt
 		if _folego_t > 0.8:
-			energia = minf(100.0, energia + dt * (14.0 if dir.length() < 0.1 else 9.0))
+			energia = minf(100.0, energia + dt * (14.0 if dir.length() < 0.1 else 9.0) * (main.sono.regen() if main.sono != null else 1.0))
 	# com frio (de noite sem roupa quente, molhado, na frente fria, no inverno) a energia não enche (etapa 6b)
 	if main.clima != null and main.clima.com_frio_rapido():
 		var lim: float = 100.0 - 50.0 * (1.0 - main.clima.calor_roupa())
@@ -598,7 +599,7 @@ func _physics_process(dt: float) -> void:
 			_dica_frio = true
 			main.ui.aviso("Está frio: sem roupa quente a sua energia não enche. Fique perto do fogo ou faça um casaco e um gorro de pele.", 7.0)
 	_corre = corre and dir.length() > 0.1
-	var vel := AGACHA if agachado else (CORRE if corre else ANDA)
+	var vel: float = (AGACHA if agachado else (CORRE if corre else ANDA)) * (main.sono.vel() if main.sono != null else 1.0)
 	var alvo := dir * vel
 	var k := 12.0 if is_on_floor() else 2.5
 	velocity.x = lerpf(velocity.x, alvo.x, 1.0 - exp(-k * dt))
@@ -1221,6 +1222,9 @@ func usar() -> void:
 		if c.has_meta("laco"):
 			main.fauna.usar_laco(c.get_meta("laco"), self)
 			return
+		if c.has_meta("saco_dormir"):
+			main.sono.dormir({"saco": true})
+			return
 		if c.has_meta("caixa"):
 			var L: Array = main.mundo.revistar(c.get_meta("caixa"))
 			if L.is_empty():
@@ -1339,6 +1343,8 @@ func consumir_slot(i: int) -> void:
 	fome = clampf(fome + float(d.get("fome", 0.0)), 0.0, 100.0)
 	sede = clampf(sede + float(d.get("sede", 0.0)), 0.0, 100.0)
 	vida = clampf(vida + float(d.get("vida", 0.0)), 0.0, 100.0)
+	sono = clampf(sono + float(d.get("sono", 0.0)), 0.0, 100.0)
+	energia = clampf(energia + float(d.get("energia", 0.0)), 0.0, 100.0)
 	inv.usar_um(i)
 	if d.has("vira"):
 		_ganhar(str(d["vira"]), 1)

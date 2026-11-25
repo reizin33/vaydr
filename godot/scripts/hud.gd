@@ -1059,6 +1059,8 @@ class Vitais extends Control:
 		"sede": "M10 2.5h4v2.2l1.6 2.6c.3.5.4 1 .4 1.5V20a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 20V8.8c0-.5.1-1 .4-1.5L10 4.7z",
 		"fome": "M12 7.6c-1.2-1.1-2.6-1.6-3.9-1.3C5.6 6.8 4.6 9.1 5 12c.6 4.4 3.3 8.6 5.5 8.6.6 0 1-.3 1.5-.3s.9.3 1.5.3c2.2 0 4.9-4.2 5.5-8.6.4-2.9-.6-5.2-3.1-5.7-1.3-.3-2.7.2-3.9 1.3zM12 7.4c0-1.9.9-3.6 2.6-4.6",
 		"vida": "M9.2 3h5.6v6.2H21v5.6h-6.2V21H9.2v-6.2H3V9.2h6.2z",
+		"temp": "M10 4.2a2 2 0 0 1 4 0v9.6a4.2 4.2 0 1 1-4 0z",
+		"sono": "M16.8 3.4a8.4 8.4 0 1 0 3.8 14.1A7 7 0 0 1 16.8 3.4z",
 	}
 	var tex := {}
 	var ult := {}
@@ -1068,7 +1070,7 @@ class Vitais extends Control:
 	func _init(h) -> void:
 		hud = h
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		custom_minimum_size = Vector2(3.0 * T + 2.0 * 17.0 + 12.0, T + 14.0)
+		custom_minimum_size = Vector2(5.0 * T + 4.0 * 17.0 + 12.0, T + 14.0)
 		for k in DESENHOS:
 			var d: String = DESENHOS[k]
 			var corpo := "M" + d.split("M", false)[0]
@@ -1090,17 +1092,27 @@ class Vitais extends Control:
 		var agora: float = hud._t
 		var dt := clampf(agora - _t0, 0.0, 1.0) if _t0 >= 0.0 else 0.0
 		_t0 = agora
-		var vals := {"sede": float(j.sede), "fome": float(j.fome), "vida": float(j.vida)}
+		# a temperatura (etapa 6b): o termômetro enche com o calor; azul com frio, laranja no calorão
+		var cl = hud.main.get("clima")
+		var tc: float = cl.temperatura() if cl != null else 22.0
+		var com_frio: bool = cl != null and bool(cl.com_frio_rapido())
+		var vals := {"sede": float(j.sede), "fome": float(j.fome), "temp": clampf((tc + 5.0) / 45.0, 0.08, 1.0) * 100.0,
+			"sono": float(j.get("sono") if j.get("sono") != null else 100.0), "vida": float(j.vida)}
 		var x := 0.0
-		for k in ["sede", "fome", "vida"]:
-			if k == "vida":
-				# o tracinho que separa (no jogo antigo: sede, fome, temperatura | sono, vida)
+		for k in ["sede", "fome", "temp", "sono", "vida"]:
+			if k == "sono":
+				# o tracinho que separa (como no jogo antigo: sede, fome, temperatura | sono, vida)
 				draw_rect(Rect2(x - 2.0, 2.0, 2.0, 28.0), Color(0.949, 0.937, 0.91, 0.8))
 				x += 10.0
 			var v: float = vals[k]
 			var f := clampf(v / 100.0, 0.0, 1.0)
 			var cor := Color(0.949, 0.937, 0.91)
-			if f < 0.15:
+			if k == "temp":
+				if com_frio:
+					cor = Color(0.55, 0.76, 1.0)
+				elif tc >= 33.0:
+					cor = Color(0.98, 0.62, 0.28)
+			elif f < 0.15:
 				cor = Color(0.886, 0.286, 0.227, 0.6 + 0.4 * sin(agora * 7.0))
 			elif f < 0.35:
 				cor = Color(0.914, 0.773, 0.29)
@@ -1116,6 +1128,9 @@ class Vitais extends Control:
 			if contorno:
 				draw_texture_rect(contorno, Rect2(x, 0, T, T), false, cor)
 			# tendência: setas quando sobe ou cai mais rápido que o normal (comendo, sarando, apanhando, passando fome)
+			if k == "temp":
+				x += T + 17.0
+				continue
 			if dt > 0.0:
 				if ult.has(k):
 					var tx := clampf((v - float(ult[k])) / dt, -12.0, 12.0)
