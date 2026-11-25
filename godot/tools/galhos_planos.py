@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tira os "losangos escuros" das árvores: os pedaços chatos da malha dos galhos.
 
-Na malha dos galhos (o material "..._branches", casca opaca) há pedaços que não são galho de verdade: placas chatas (um
+Na malha da casca (os galhos e o tronco, opacos) há pedaços que não são galho de verdade: placas chatas (um
 plano só, em geral um losango) e fitas chatas torcidas (uma tira de losangos ao longo do galho), que no modelo original
 levavam uma textura de raminho com recorte. Aqui a textura dos galhos é a casca inteira, sem recorte, então cada placa
 aparecia como um losango marrom-escuro flutuando ao longo dos galhos (o jacarandá tinha 214 placas, algumas de 2 m, e 161
@@ -106,8 +106,9 @@ def fitas(V, I):
     for c in np.unique(comp):
         sel = comp == c
         vs = pos[np.unique(T[sel].reshape(-1))]
-        # sem aresta dividida com outro triângulo (um triângulo solto, ou dois encostados só pela ponta) também é chato
-        if float(np.ptp(vs, axis=0).max()) > TAM_MIN and (cont.get(c, 0) == 0 or soma[c] / cont[c] < DOBRA_MAX):
+        # sem aresta dividida com outro triângulo (um triângulo solto, ou dois encostados só pela ponta) também é chato; e
+        # um quadrado só (dois triângulos, mesmo dobrado) não é galho: é o losango
+        if float(np.ptp(vs, axis=0).max()) > TAM_MIN and (cont.get(c, 0) == 0 or int(sel.sum()) <= 2 or soma[c] / cont[c] < DOBRA_MAX):
             tirar |= sel
     return tirar
 
@@ -135,7 +136,8 @@ def main():
         for me in j['meshes']:
             for pr in me['primitives']:
                 nome = j['materials'][pr['material']].get('name', '') if 'material' in pr else ''
-                if 'branches' not in nome:
+                # a casca: os galhos e o tronco (as folhas ficam como estão)
+                if nome == 'folhas' or j['materials'][pr['material']].get('alphaMode', 'OPAQUE') != 'OPAQUE':
                     continue
                 V = acessor(j, binario, pr['attributes']['POSITION'])
                 ia = pr['indices']

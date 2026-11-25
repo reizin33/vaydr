@@ -5867,6 +5867,13 @@ func _fotos_desenho() -> void:
 	hora = 9.6
 	await _cam(Vector3(SPAWN.x, 0, SPAWN.z), Vector3(4, 2.5, 10))
 	await _foto("01_comeco_na_mata")
+	# as árvores mais perto da câmera nesta foto (a espécie de cada uma: para achar de que malha vem o que aparece nela)
+	var perto_cam: Array = []
+	for r in mundo.recursos:
+		if str(r["tipo"]) == "arvore" and r.has("inst") and not (r["inst"] as Array).is_empty():
+			perto_cam.append([jogador.cam.global_position.distance_to(r["pos"]), str(r["inst"][0][0]).get_slice("|", 0), float(r.get("s", 1.0))])
+	perto_cam.sort_custom(func(a, b): return float(a[0]) < float(b[0]))
+	print("árvores perto da câmera na foto 01: ", perto_cam.slice(0, 5))
 	if completo:
 		# acerto do sol do completo: 15% mais fraco e 15% mais forte que o escolhido
 		for v in [["C01_sol085", 0.85], ["C01_sol115", 1.15]]:
