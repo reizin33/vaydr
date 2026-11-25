@@ -26,6 +26,7 @@ var correndo := false
 var chao := true
 var ferido := false
 var lanterna := false
+var sentado := ""            # dirigindo (etapa 6j): "carro" (caminhonete, carro) ou "moto" (moto, triciclo)
 var energia := 100.0
 var item := ""
 var golpe_t := -1.0
@@ -111,6 +112,7 @@ func estado(d: PackedFloat32Array, it: String) -> void:
 	chao = (fl & 8) != 0
 	ferido = (fl & 16) != 0
 	lanterna = (fl & 32) != 0
+	sentado = "carro" if (fl & 64) != 0 else ("moto" if (fl & 128) != 0 else "")
 	var gn := int(d[9])
 	if _gn >= 0 and gn != _gn:
 		golpe_t = 0.0
@@ -196,9 +198,17 @@ func _process(dt: float) -> void:
 			uso_t = -1.0
 			uk = 0.0
 	var dd := Dados.item(item) if item != "" else {}
-	corpo.animar(dt, {"vel": vel, "chao": chao, "agachado": agachado, "correndo": correndo, "ferido": ferido, "energia": energia,
+	var ent := {"vel": vel, "chao": chao, "agachado": agachado, "correndo": correndo, "ferido": ferido, "energia": energia,
 		"item": item, "golpe": gs, "vertical": bool(dd.get("vertical", false)), "usar": maxf(0.0, uk), "mira": 0.0, "vivo": vivo,
-		"primeira": false, "yaw_corpo": yaw_s, "acao": acao, "acao_k": acao_k})
+		"primeira": false, "yaw_corpo": yaw_s, "acao": acao, "acao_k": acao_k}
+	# dirigindo (etapa 6j): sentado; dentro da caminhonete ou do carro o boneco fica escondido pela lataria
+	if sentado != "":
+		ent["sentado"] = sentado
+		ent["vel"] = Vector3.ZERO
+		ent["item"] = ""
+	if corpo.visible != (sentado != "carro"):
+		corpo.visible = sentado != "carro"
+	corpo.animar(dt, ent)
 	# o nome em cima da cabeça, mais apagado de longe
 	etiqueta.position.y = (corpo.altura_total() * (0.78 if agachado else 1.0) + 0.28) if deitado < 0.5 else 0.7
 	etiqueta.modulate.a = clampf(1.25 - dc / 90.0, 0.35, 1.0)

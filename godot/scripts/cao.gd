@@ -288,6 +288,10 @@ func _physics_process(dt: float) -> void:
 	if j == null or not main.pronto:
 		return
 	_t += dt
+	# na caçamba da caminhonete (etapa 6j): sentado, indo junto
+	if st == "carro":
+		_na_cacamba(j)
+		return
 	lat_t -= dt
 	mord_t -= dt
 	medo_t -= dt
@@ -452,6 +456,50 @@ func _physics_process(dt: float) -> void:
 	var ve := dp < 100.0
 	if corpo.visible != ve:
 		corpo.visible = ve
+
+
+## você entrou num veículo: na caminhonete, o Caramelo (seguindo você, até 30 m) pula na caçamba, como no jogo antigo
+func entrou_veiculo(v) -> void:
+	if not ativo or lan or not bool(v.T.get("cacamba", false)):
+		return
+	if not (st == "segue" or (st == "ataca" and modo == "segue")):
+		return
+	if global_position.distance_to(v.global_position) > 30.0:
+		return
+	st = "carro"
+	alvo = null
+	main.sons.tocar("latido", global_position, -2.0)
+	if main.em_jogo and not main.modo_teste and not _dica.has("cacamba"):
+		_dica["cacamba"] = true
+		main.ui.aviso("O Caramelo pulou na caçamba. Ele desce quando você descer.", 6.0)
+
+
+## você desceu: ele pula da caçamba do lado e volta a seguir
+func saiu_veiculo(v) -> void:
+	if st != "carro":
+		return
+	st = "segue"
+	modo = "segue"
+	var p: Vector3 = v.global_transform * Vector3(-1.7, 0, -1.6)
+	_no_chao(p)
+
+
+func _na_cacamba(j) -> void:
+	var v = j.veiculo
+	if v == null or not is_instance_valid(v):
+		st = "segue"
+		modo = "segue"
+		_no_chao(j.global_position + Vector3(1.0, 0, 1.0))
+		return
+	global_position = (v.corpo as Node3D).global_transform * Vector3(-0.42, 1.0, -1.55)
+	velocity = Vector3.ZERO
+	yaw = v.rotation.y + 0.35 * sin(_t * 0.45)
+	rotation.y = yaw
+	_hy = lerpf(_hy, 0.0, 0.1)
+	_pose("senta", 0.8)
+	_pose_atual = "senta"
+	if not corpo.visible:
+		corpo.visible = true
 
 
 ## o passo: vai até o ponto (desviando quando trava), não entra em água funda, cai com a gravidade
@@ -629,8 +677,9 @@ func salvar() -> Dictionary:
 	if lan:
 		return _antes_rede.duplicate(true)
 	var p := global_position
-	return {"ativo": ativo, "st": st, "modo": modo, "hp": snappedf(hp, 0.1), "p": [p.x, p.y, p.z], "fica": [fica.x, fica.y, fica.z],
-		"dica": _dica.keys(), "mordidas": mordidas}
+	# na caçamba: no jogo salvo ele está seguindo (você carrega fora do veículo)
+	return {"ativo": ativo, "st": "segue" if st == "carro" else st, "modo": modo, "hp": snappedf(hp, 0.1), "p": [p.x, p.y, p.z],
+		"fica": [fica.x, fica.y, fica.z], "dica": _dica.keys(), "mordidas": mordidas}
 
 
 ## como no jogo antigo: atacando volta ao que fazia; machucado volta descansando na clareira

@@ -588,7 +588,12 @@ func animar(dt: float, ent: Dictionary) -> void:
 	var usar_k: float = ent.get("usar", 0.0)
 	var mira_k: float = ent.get("mira", 0.0)
 	var acao := golpe_s >= 0.0 or usar_k > 0.01
-	_virar(dt, ent, sp_real, correndo, acao or mira_k > 0.3)
+	# dirigindo (etapa 6j): sentado, virado para a frente do veículo
+	if ent.has("sentado") and not ent.has("yaw_corpo"):
+		yaw = float(ent.get("yaw_sentado", yaw))
+		global_rotation = Vector3(0, yaw, 0)
+	else:
+		_virar(dt, ent, sp_real, correndo, acao or mira_k > 0.3)
 	# pulo e pouso (o pouso forte vira a queda com as mãos no chão)
 	var vy: float = vel.y
 	if chao and not _chao_antes:
@@ -645,6 +650,9 @@ func animar(dt: float, ent: Dictionary) -> void:
 		o[24] += 1.55 * k
 		o[27] -= 1.0 * k
 		o[30] += 1.55 * k
+	var sentado := str(ent.get("sentado", ""))
+	if sentado != "":
+		_pose_sentado(sentado == "moto")
 	var d := Dados.item(item) if item != "" else {}
 	if MAO2.has(item) and not (acao and golpe_s < 0.0):
 		_s3(o, 5, -0.3, 0, -0.18)
@@ -745,7 +753,8 @@ func _virar(dt: float, ent: Dictionary, sp: float, correndo: bool, agindo: bool)
 
 ## a locomoção do sobrevivente (survLoco): parado e passos misturados pela velocidade e pela direção
 func _loco(dt: float, ent: Dictionary, vel: Vector3, chao: bool, agachado: bool) -> void:
-	var livre: bool = ent.get("vivo", true)
+	# sentado no veículo a pose vem toda do jogo (_pose_sentado), sem os passos das animações
+	var livre: bool = bool(ent.get("vivo", true)) and not ent.has("sentado")
 	lw = _chegar(lw, 1.0 if livre else 0.0, dt * (5.0 if livre else 9.0))
 	ln = 0.0
 	lh = Vector3.ZERO
@@ -858,6 +867,26 @@ static func _ease_io(x: float) -> float:
 
 static func _ease_out(x: float) -> float:
 	return 1.0 - pow(1.0 - x, 3.0)
+
+
+## sentado no veículo (etapa 6j): as coxas para a frente, os joelhos dobrados, o tronco reto e as mãos no volante; na moto e no
+## triciclo as pernas mais abertas e as mãos mais afastadas, no guidão
+func _pose_sentado(moto: bool) -> void:
+	for i in 36:
+		o[i] = 0.0
+	_s3(o, 1, -0.06, 0, 0)
+	_s3(o, 2, 0.04, 0, 0)
+	var coxa := -1.25 if moto else -1.42
+	var joelho := 1.15 if moto else 1.45
+	var abre := 0.16 if moto else 0.05
+	_s3(o, 7, coxa, 0, abre)
+	_s3(o, 8, joelho, 0, 0)
+	_s3(o, 9, coxa, 0, -abre)
+	_s3(o, 10, joelho, 0, 0)
+	_s3(o, 3, -0.95, 0, 0.2 if moto else 0.12)
+	_s3(o, 4, -0.45, 0, 0)
+	_s3(o, 5, -0.95, 0, -0.2 if moto else -0.12)
+	_s3(o, 6, -0.45, 0, 0)
 
 
 ## o empurrão: os dois braços para a frente (posePush do jogo antigo)

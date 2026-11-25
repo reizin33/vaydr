@@ -128,7 +128,8 @@ func _process(dt: float) -> void:
 	if _t_arm <= 0.0:
 		_t_arm = 0.25
 		_armadilhas(0.25)
-	if not ativo or not main.jogador.vivo or main.jogador.preso:
+	# dirigindo (etapa 6j) não constrói (o clique é a buzina)
+	if not ativo or not main.jogador.vivo or main.jogador.preso or main.jogador.veiculo != null:
 		fantasma.visible = false
 		return
 	var t: Array = Dados.ABAS_OBRA[aba]["t"]

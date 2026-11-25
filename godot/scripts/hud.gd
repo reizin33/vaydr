@@ -90,6 +90,7 @@ func _ready() -> void:
 	_minimapa()
 	_topo()
 	_chefe()
+	_veiculo_painel()
 	_teclas()
 	_barra()
 	_vitais()
@@ -471,6 +472,83 @@ class BarraChefe extends Control:
 		draw_rect(r, Color(Estilo.SANGUE, 0.7), false, 1.0)
 
 
+# ---------------------------------------------------------------- o veículo (etapa 6j): dirigindo, em cima da barra rápida
+var veic_painel: PanelContainer
+var veic_nome: Label
+var veic_estado: Label
+var veic_comb: Control
+var veic_k := 0.0
+
+
+func _veiculo_painel() -> void:
+	var centro := CenterContainer.new()
+	add_child(centro)
+	Estilo.prender(centro, 0.5, 1.0, 0, -186, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+	veic_painel = PanelContainer.new()
+	veic_painel.add_theme_stylebox_override("panel", Estilo.caixa_hud(14, 9))
+	centro.add_child(veic_painel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 5)
+	veic_painel.add_child(v)
+	veic_nome = Estilo.rotulo_hud("", 14, Estilo.OSSO, "titulo", 700, 2)
+	veic_nome.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(veic_nome)
+	veic_comb = BarraComb.new(self)
+	veic_comb.custom_minimum_size = Vector2(360, 9)
+	v.add_child(veic_comb)
+	veic_estado = Estilo.rotulo_hud("", 11, Color(0.925, 0.894, 0.824, 0.88), "ui", 700, 1)
+	veic_estado.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(veic_estado)
+	var dica := Estilo.rotulo_hud("W ACELERA · S FREIA E DÁ RÉ · A D VIRAM · ESPAÇO FREIO DE MÃO · CLIQUE BUZINA · F FARÓIS · E DESCE", 9,
+		Color(0.925, 0.894, 0.824, 0.55), "ui", 700, 1)
+	dica.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(dica)
+	veic_painel.visible = false
+
+
+## dirigindo: o nome, a velocidade, a gasolina e o estado das peças
+func _veiculo_ver(j) -> void:
+	var vc = j.get("veiculo")
+	var ver: bool = vc != null and is_instance_valid(vc) and bool(j.vivo)
+	if veic_painel.visible != ver:
+		veic_painel.visible = ver
+	if not ver:
+		return
+	var vel := float(vc.v)
+	veic_nome.text = "%s · %d KM/H%s" % [str(vc.nome()).to_upper(), roundi(absf(vel) * 3.6), " · RÉ" if vel < -0.3 else ""]
+	var b: Array = ["Gasolina " + Veiculo.pct(float(vc.comb)), "Lataria " + Veiculo.pct(float(vc.hp)), "Motor " + Veiculo.pct(float(vc.pecas["motor"]))]
+	var f: int = vc.furados()
+	b.append(("%d pneu%s furado%s" % [f, "s" if f > 1 else "", "s" if f > 1 else ""]) if f > 0 else "Pneus ok")
+	b.append("Óleo " + Veiculo.pct(float(vc.pecas["oleo"])))
+	b.append("Carga %d/%d" % [int(vc.T["cap"]) - int(vc.porta.livres()), int(vc.T["cap"])])
+	if not bool(vc.luz):
+		b.append("faróis apagados")
+	veic_estado.text = " · ".join(PackedStringArray(b))
+	var k: float = clampf(float(vc.comb) / 100.0, 0.0, 1.0)
+	if absf(k - veic_k) > 0.001:
+		veic_k = k
+		veic_comb.queue_redraw()
+
+
+class BarraComb extends Control:
+	var hud
+
+	func _init(h) -> void:
+		hud = h
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(0.05, 0.05, 0.04, 0.85))
+		var k: float = hud.veic_k
+		var cor := Color(0.86, 0.62, 0.22) if k > 0.15 else Estilo.SANGUE
+		draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2.0) * k, size.y - 2.0)), cor)
+		draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2.0) * k, (size.y - 2.0) * 0.4)), Color(1.0, 0.85, 0.6, 0.3))
+		for i in range(1, 4):
+			var x := size.x * i / 4.0
+			draw_line(Vector2(x, 1), Vector2(x, size.y - 1), Color(0, 0, 0, 0.4), 1.0)
+		draw_rect(r, Color(1, 1, 1, 0.12), false, 1.0)
+
+
 # ---------------------------------------------------------------- comandos (embaixo à esquerda)
 const COMANDOS := [
 	["W A S D", "Andar · Shift corre"],
@@ -831,7 +909,7 @@ func _process(dt: float) -> void:
 		luneta.visible = lun
 	if lun:
 		luneta.queue_redraw()
-	mira.visible = not lun
+	mira.visible = not lun and main.jogador.get("veiculo") == null
 	if dano_t > 0.0 or seta_dano.visible:
 		seta_dano.visible = dano_t > 0.0
 		seta_dano.queue_redraw()
@@ -848,6 +926,7 @@ func _process(dt: float) -> void:
 	if _chefe_t <= 0.0:
 		_chefe_t = 0.1
 		_chefe_ver(j)
+		_veiculo_ver(j)
 	_lento -= dt
 	if _lento <= 0.0:
 		_lento = 0.25
@@ -1260,7 +1339,7 @@ class Mira extends Control:
 		draw_circle(c, r, Estilo.SANGUE if acerto else cor_m, true, -1.0, true)
 		# segurando E (esfolar, plantar, colher): o anel enche
 		var ac: Dictionary = j.acao
-		if not ac.is_empty() and str(ac.get("tipo", "")) in ["esfolar", "plantio"] and float(ac.get("dur", 0.0)) > 0.0 and bool(ac.get("fazer", true)):
+		if not ac.is_empty() and str(ac.get("tipo", "")) in ["esfolar", "plantio", "veiculo"] and float(ac.get("dur", 0.0)) > 0.0 and bool(ac.get("fazer", true)):
 			var k := clampf(float(ac["t"]) / float(ac["dur"]), 0.0, 1.0)
 			if k > 0.02:
 				draw_arc(c, 14.0, -PI * 0.5, -PI * 0.5 + TAU * k, 48, escuro, 5.0, true)

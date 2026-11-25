@@ -106,7 +106,60 @@ func _ready() -> void:
 	bancos["mordida"] = [_mistura(_ruido(0.12, 1800.0, 0.6, 30.0), _tom(0.1, 240.0, 140.0, 0.4, 30.0))]
 	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
 	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]
+	# os veículos (etapa 6j): a buzina (dois tons juntos, rachados), a partida do motor (o arranque e o ronco subindo)
+	bancos["buzina"] = [_buzina()]
+	bancos["partida"] = [_mistura(_ruido(0.7, 520.0, 0.5, 3.6), _tom(0.65, 34.0, 58.0, 0.75, 2.2))]
 	_gravacoes()
+
+
+var _motor: AudioStreamWAV = null
+
+
+## o ronco do motor, 1 s em loop (o veículo toca e muda o tom com a velocidade): a nota de 46 Hz com os harmônicos, pulsando
+## como os cilindros, e o chiado do escapamento (sem estalo na emenda do loop)
+func motor_loop() -> AudioStreamWAV:
+	if _motor != null:
+		return _motor
+	var n := HZ
+	var m := 2000
+	var r := RandomNumberGenerator.new()
+	r.seed = 46
+	var ru := PackedFloat32Array()
+	ru.resize(n + m)
+	var y := 0.0
+	for i in n + m:
+		y += (r.randf_range(-1.0, 1.0) - y) * 0.12
+		ru[i] = y
+	var a := PackedFloat32Array()
+	a.resize(n)
+	for i in n:
+		var t := float(i) / HZ
+		var fase := TAU * 46.0 * t
+		var base := sin(fase) * 0.45 + sin(fase * 2.0) * 0.25 + sin(fase * 3.0) * 0.14 + sin(fase * 4.0 + 0.5) * 0.08
+		var puls := 0.65 + 0.35 * sin(fase * 0.5)
+		var nz: float = ru[i]
+		if i < m:
+			var k := float(i) / m
+			nz = ru[i] * k + ru[n + i] * (1.0 - k)
+		a[i] = (base * puls + nz * 0.35) * 0.55
+	_motor = _wav(a)
+	_motor.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	_motor.loop_begin = 0
+	_motor.loop_end = n
+	return _motor
+
+
+func _buzina() -> AudioStreamWAV:
+	var dur := 0.55
+	var n := int(dur * HZ)
+	var a := PackedFloat32Array()
+	a.resize(n)
+	for i in n:
+		var t := float(i) / HZ
+		var env := minf(1.0, t * 60.0) * minf(1.0, (dur - t) * 30.0)
+		var q := clampf((sin(TAU * 415.0 * t) + sin(TAU * 520.0 * t)) * 1.6, -1.0, 1.0)
+		a[i] = q * 0.42 * env
+	return _wav(a)
 
 
 ## as gravações de verdade: onde carregam, ficam no lugar do som por código (se faltar alguma, fica o som por código)

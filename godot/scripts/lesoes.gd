@@ -117,6 +117,10 @@ func mordida(tipo: String) -> bool:
 	var j = main.jogador
 	if not j.vivo or imune_h > 0.0:
 		return false
+	# dentro da caminhonete ou do carro o golpe pega na lataria: não morde (etapa 6j)
+	var vc = j.get("veiculo")
+	if vc != null and is_instance_valid(vc) and not bool(vc.T.get("exposto", false)):
+		return false
 	var p: float = float(MORDIDA.get(tipo, 0.25)) * maxf(0.0, 1.0 - float(j.inv.protecao()) * 1.4)
 	if randf() >= p:
 		return false

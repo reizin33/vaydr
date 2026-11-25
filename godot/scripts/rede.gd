@@ -606,6 +606,16 @@ func _cao(L: PackedFloat32Array) -> void:
 	main.cao.rede(L)
 
 
+## de quem abriu: os veículos (etapa 6j); aqui eles viram os bonecos dos veículos de quem abriu
+@rpc("authority", "call_remote", "unreliable_ordered", 2)
+func _veics(L: PackedFloat32Array) -> void:
+	if papel != "convidado" or not on:
+		return
+	if main == null or not is_instance_valid(main) or not main.pronto or not main.em_jogo or main.get("veiculos") == null:
+		return
+	main.veiculos.rede(L)
+
+
 ## de quem abriu: o tempo (etapa 6b)
 func mandar_clima(tipo: int, k: float, dia_c: int) -> void:
 	if papel == "anfitriao" and on and _peer != null:
@@ -809,6 +819,10 @@ func _mandar_eu(j) -> void:
 	var v: Vector3 = j.velocity
 	var fl := (1 if j.vivo else 0) | (2 if j.agachado else 0) | (4 if j._corre else 0) | (8 if j.is_on_floor() else 0) \
 		| (16 if j.vida < 28.0 else 0) | (32 if j.luz_mao.visible else 0)
+	# dirigindo (etapa 6j): 64 na caminhonete ou no carro (o boneco some lá dentro), 128 na moto ou no triciclo (sentado)
+	var vc = j.get("veiculo")
+	if vc != null and is_instance_valid(vc):
+		fl |= 128 if bool(vc.T.get("exposto", false)) else 64
 	var ac := 0
 	var ak := 0.0
 	if not j.acao.is_empty():
@@ -864,6 +878,9 @@ func _mandar_mundo(j) -> void:
 	# o Caramelo (etapa 6e)
 	if main.get("cao") != null:
 		_cao.rpc(main.cao.para_rede())
+	# os veículos (etapa 6j)
+	if main.get("veiculos") != null:
+		_veics.rpc(main.veiculos.para_rede())
 
 
 ## o zumbi de quem abriu bateu num convidado (o boneco dele aqui): o golpe vai para o jogo dele

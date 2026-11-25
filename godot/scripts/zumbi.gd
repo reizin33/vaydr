@@ -268,8 +268,18 @@ func _bloqueio(j) -> Dictionary:
 	var fora: Array[RID] = [get_rid()]
 	if j is CollisionObject3D:
 		fora.append((j as CollisionObject3D).get_rid())
+	_fora_veiculo(j, fora)
 	var q := PhysicsRayQueryParameters3D.create(a, b, 1, fora)
 	return get_world_3d().direct_space_state.intersect_ray(q)
+
+
+## dirigindo: o veículo de quem ele persegue não tapa a vista nem o golpe (ele bate na lataria; etapa 6j)
+func _fora_veiculo(j, fora: Array[RID]) -> void:
+	if j != main.jogador or main.jogador.get("veiculo") == null:
+		return
+	var vc = main.jogador.veiculo
+	if is_instance_valid(vc):
+		fora.append((vc as CollisionObject3D).get_rid())
 
 
 ## enxerga o alvo (nenhuma parede, árvore ou pedra no meio; outro zumbi não tapa)
@@ -280,6 +290,7 @@ func _enxerga(j) -> bool:
 	var fora: Array[RID] = [get_rid()]
 	if j is CollisionObject3D:
 		fora.append((j as CollisionObject3D).get_rid())
+	_fora_veiculo(j, fora)
 	for k in 3:
 		var h := sp.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, 1, fora))
 		if h.is_empty():

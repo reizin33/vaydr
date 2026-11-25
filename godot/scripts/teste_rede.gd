@@ -216,6 +216,15 @@ func _anfitriao(p0: Vector3) -> void:
 	var viu_c := await _esperar(func(): return _sinal("cao_ok"), 60.0)
 	_confere(viu_c, "o Caramelo daqui apareceu para quem entrou")
 	main.cao.iniciar()
+	# os veículos de quem abriu (etapa 6j): a caminhonete perto do convidado, o boneco dela aparece lá
+	var cam_v: Veiculo = main.veiculos.por_id("caminhonete")
+	if cam_v != null:
+		cam_v.global_position = Vector3(pb.x + 6.0, main.terreno.h(pb.x + 6.0, pb.z), pb.z)
+		cam_v.assentar()
+	Rede.mandar_controle("veic")
+	var viu_v := await _esperar(func(): return _sinal("veic_ok"), 60.0)
+	_confere(viu_v, "a caminhonete daqui apareceu para quem entrou")
+	main.veiculos.novo()
 	# bate-papo
 	var msg_conv := func():
 		for c in Rede.chat:
@@ -363,6 +372,19 @@ func _convidado(p0: Vector3) -> void:
 		viu_cao = await _esperar(func(): return main.cao.lan and main.cao.ativo and main.cao.corpo.visible, 20.0)
 	_confere(viu_cao, "o Caramelo de quem abriu aparece aqui (o boneco, a %.0f m de você)" % main.cao.global_position.distance_to(main.jogador.global_position))
 	Rede.mandar_controle("cao_ok")
+	# a caminhonete de quem abriu (etapa 6j): o boneco dela aparece aqui; o convidado ainda não dirige
+	var veio_v := await _esperar(func(): return _sinal("veic"), 90.0)
+	var cv: Veiculo = main.veiculos.por_id("caminhonete")
+	var viu_veic := false
+	if veio_v and cv != null:
+		viu_veic = await _esperar(func(): return cv.lan and cv.global_position.distance_to(main.jogador.global_position) < 12.0, 20.0)
+	var nao_dirige := false
+	if cv != null:
+		main.veiculos.usar(cv, main.jogador, false)
+		nao_dirige = main.jogador.veiculo == null
+	_confere(viu_veic and nao_dirige, "a caminhonete de quem abriu aparece aqui (o boneco, a %.0f m de você); por enquanto o convidado não dirige" % (
+		cv.global_position.distance_to(main.jogador.global_position) if cv != null else -1.0))
+	Rede.mandar_controle("veic_ok")
 	# bate-papo
 	Rede.mandar_chat("Oi! Aqui é o convidado.")
 	var msg_anf := func():

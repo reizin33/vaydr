@@ -32,6 +32,12 @@ var obra_icones: HBoxContainer
 var obra_txt: Label
 var obra_aba: Label
 var aberto := false
+var col_veic: VBoxContainer      # a oficina do veículo (etapa 6j): no lugar da fabricação, com a mochila do lado
+var veic_aberto = null
+var veic_titulo: Label
+var veic_linhas: VBoxContainer
+var veic_botoes: VBoxContainer
+var veic_msg: Label
 const TAM := 56
 const NOMES_ROUPA := {"cabeca": "Cabeça", "rosto": "Rosto", "camiseta": "Camiseta", "tronco": "Tronco", "maos": "Mãos",
 	"cintura": "Cintura", "pernas": "Pernas", "pes": "Pés", "costas": "Costas"}
@@ -308,6 +314,24 @@ func _montar_mochila(raiz: Control) -> void:
 	guardar.text = "Guardar os materiais"
 	guardar.pressed.connect(_guardar_recursos)
 	hbb.add_child(guardar)
+	# a oficina do veículo (aparece no lugar da fabricação: o estado das peças e os consertos com o que está na mochila)
+	col_veic = VBoxContainer.new()
+	col_veic.custom_minimum_size = Vector2(420, 0)
+	col_veic.add_theme_constant_override("separation", 8)
+	col_veic.visible = false
+	lados.add_child(col_veic)
+	veic_titulo = _lbl("Veículo", 19)
+	col_veic.add_child(veic_titulo)
+	veic_linhas = VBoxContainer.new()
+	veic_linhas.add_theme_constant_override("separation", 2)
+	col_veic.add_child(veic_linhas)
+	veic_msg = _lbl("", 14, Color(1.0, 0.86, 0.55))
+	veic_msg.autowrap_mode = TextServer.AUTOWRAP_WORD
+	veic_msg.custom_minimum_size = Vector2(400, 0)
+	col_veic.add_child(veic_msg)
+	veic_botoes = VBoxContainer.new()
+	veic_botoes.add_theme_constant_override("separation", 4)
+	col_veic.add_child(veic_botoes)
 
 
 func _so_da(on: bool) -> void:
@@ -520,8 +544,66 @@ func abrir_bau(inv: Inventario, titulo := "Baú") -> void:
 	if not inv.mudou.is_connected(atualizar):
 		inv.mudou.connect(atualizar)
 	col_fab.visible = false
+	col_veic.visible = false
+	veic_aberto = null
 	col_bau.visible = true
 	abrir(true)
+
+
+# ---------------------------------------------------------------- a oficina do veículo (segure E perto dele; etapa 6j)
+func abrir_veiculo(v) -> void:
+	if bau_inv != null:
+		abrir(false)
+	veic_aberto = v
+	veic_msg.text = ""
+	col_fab.visible = false
+	col_bau.visible = false
+	col_veic.visible = true
+	abrir(true)
+	_veic_render()
+
+
+func _veic_render() -> void:
+	var v = veic_aberto
+	if v == null or not is_instance_valid(v):
+		return
+	veic_titulo.text = "%s · oficina" % str(v.nome())
+	for c in veic_linhas.get_children():
+		c.queue_free()
+	for e in v.estado():
+		var h := HBoxContainer.new()
+		var a := _lbl(str(e[0]), 14, Color(0.72, 0.72, 0.68))
+		a.custom_minimum_size = Vector2(130, 0)
+		h.add_child(a)
+		h.add_child(_lbl(str(e[1]), 14, Color(1.0, 0.55, 0.45) if bool(e[2]) else Color(0.92, 0.9, 0.84)))
+		veic_linhas.add_child(h)
+	for c in veic_botoes.get_children():
+		c.queue_free()
+	for ac in v.acoes(main.jogador):
+		var b := Button.new()
+		b.text = "%s  ·  %s" % [str(ac["t"]), str(ac["s"])]
+		b.disabled = not bool(ac["ok"])
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(400, 34)
+		b.pressed.connect(_veic_acao.bind(str(ac["id"])))
+		veic_botoes.add_child(b)
+
+
+func _veic_acao(id: String) -> void:
+	var v = veic_aberto
+	if v == null or not is_instance_valid(v):
+		return
+	main.sons.tocar("clique", v.global_position, -8.0)
+	if id == "carga":
+		abrir_bau(v.porta, "Porta-malas · " + str(v.nome()))
+		return
+	if id == "dirigir":
+		abrir(false)
+		main.veiculos.entrar(v, main.jogador)
+		return
+	veic_msg.text = v.fazer(id, main.jogador)
+	main.jogador.inv.mudou.emit()
+	_veic_render()
 
 
 # ---------------------------------------------------------------- detalhe do item
@@ -769,8 +851,10 @@ func abrir(on: bool) -> void:
 		if bau_inv != null:
 			main.construcao.fechou_bau(bau_inv)
 		bau_inv = null
+		veic_aberto = null
 		col_fab.visible = true
 		col_bau.visible = false
+		col_veic.visible = false
 	else:
 		_detalhe("jog", -1)
 	main.jogador.preso = on or main.telas.atual != ""
@@ -807,3 +891,7 @@ func _process(_dt: float) -> void:
 		return
 	if main.construcao.ativo and obra_painel.visible:
 		_texto_obra()
+	# a oficina fecha se você se afastar do veículo
+	if aberto and veic_aberto != null:
+		if not is_instance_valid(veic_aberto) or main.jogador.global_position.distance_to(veic_aberto.global_position) > 7.0:
+			abrir(false)

@@ -86,6 +86,9 @@ var queima := 0.0        # pegando fogo: segundos que faltam
 var _queima_t := 0.0
 var _besta_t := -1.0     # a besta arma sozinha um instante depois do tiro
 var fov_base := 75.0     # o campo de visão das configurações (mirando fecha um pouco)
+var veiculo: Veiculo = null   # dirigindo (etapa 6j): o jogador fica no assento, sem colisão, e a câmera vai com o veículo
+var _olhar_t := 9.0      # dirigindo: quanto tempo faz que o mouse mexeu (sem mexer, a câmera volta para a frente do veículo)
+var _cam_veic := Vector3.INF
 ## a lanterna acesa no escuro ajuda os zumbis a te ver
 var lanterna_acesa: bool:
 	get:
@@ -157,7 +160,7 @@ func aparencia(ap: Dictionary) -> void:
 func alternar_camera(on = null) -> void:
 	terceira = (not terceira) if on == null else bool(on)
 	corpo.primeira_pessoa(not terceira)
-	mao.visible = not terceira
+	mao.visible = not terceira and veiculo == null
 	cam_dist = 1.0
 	_cam_livre = 0.0
 	if not terceira:
@@ -195,6 +198,8 @@ func _input(ev: InputEvent) -> void:
 		var r: Vector2 = ev.screen_relative
 		rotate_y(-r.x * sens)
 		cabeca.rotation.x = clampf(cabeca.rotation.x - r.y * sens * (-1.0 if inverter_y else 1.0), -1.45, 1.45)
+		if r.length() > 0.5:
+			_olhar_t = 0.0
 
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -515,7 +520,8 @@ func _luz() -> void:
 	var na_mao: bool = str(item_mao().get("id", "")) == "lanterna"
 	if lanterna_ligada and inv.conta("lanterna") <= 0:
 		lanterna_ligada = false
-	luz_mao.visible = (na_mao or lanterna_ligada) and bateria > 0.0
+	# dirigindo, a lanterna fica guardada (quem ilumina são os faróis)
+	luz_mao.visible = (na_mao or lanterna_ligada) and bateria > 0.0 and veiculo == null
 
 
 ## F: liga e desliga a lanterna da mochila
@@ -572,6 +578,10 @@ func _physics_process(dt: float) -> void:
 		if bateria <= 0.0:
 			luz_mao.visible = false
 			main.ui.aviso("A pilha da lanterna acabou (pilhas: Trocar pilhas)")
+	# dirigindo (etapa 6j): no assento, quem anda é o veículo
+	if veiculo != null:
+		_no_veiculo(dt)
+		return
 	# movimento
 	var dir := Vector3.ZERO
 	if not preso:
@@ -660,6 +670,21 @@ func _physics_process(dt: float) -> void:
 
 func _process(dt: float) -> void:
 	_camera(dt)
+	# dirigindo: clique buzina, E desce, V troca a câmera (o resto das teclas do veículo ele mesmo lê)
+	if veiculo != null:
+		_animar_corpo(dt)
+		if not vivo or preso:
+			return
+		if Input.is_action_just_pressed("camera"):
+			alternar_camera()
+		for i in Inventario.BARRA:
+			if Input.is_action_just_pressed("barra%d" % (i + 1)):
+				selecionar(i)
+		if Input.is_action_just_pressed("atacar") and is_instance_valid(veiculo):
+			veiculo.buzinar()
+		if Input.is_action_just_pressed("usar"):
+			main.veiculos.sair(self)
+		return
 	# mirando, o campo de visão fecha um pouco (a luneta do rifle, bem mais); o coice levanta a câmera e volta
 	var id_m := str(item_mao().get("id", ""))
 	var fov_alvo := fov_base * lerpf(1.0, 0.8, mira_k)
@@ -781,6 +806,108 @@ func _sair_nado() -> void:
 	queda_v = 0.0
 
 
+# ---------------------------------------------------------------- dirigindo (etapa 6j), como no jogo antigo (47_carro.js)
+## entra no veículo: o corpo vai para o assento, sem colisão (quem bate nas coisas é o veículo); a câmera olha para a frente dele
+func entrar_veiculo(v) -> void:
+	veiculo = v
+	acao = {}
+	agachado = false
+	if nadando:
+		_sair_nado()
+	velocity = Vector3.ZERO
+	collision_layer = 0
+	collision_mask = 0
+	mira_k = 0.0
+	mao.visible = false
+	rotation.y = v.rotation.y + PI
+	cabeca.rotation.x = -0.12
+	cabeca.position.y = 1.62
+	_olhar_t = 9.0
+	_cam_veic = Vector3.INF
+	global_position = v.olho() - Vector3(0, 1.62, 0)
+	_luz()
+
+
+## desce em p (um lugar livre do lado do veículo): a colisão e a câmera de sempre voltam
+func sair_veiculo(p: Vector3) -> void:
+	var v = veiculo
+	veiculo = null
+	collision_layer = 1
+	collision_mask = 1
+	global_position = p + Vector3(0, 0.05, 0)
+	velocity = Vector3.ZERO
+	queda_v = 0.0
+	if v != null and is_instance_valid(v):
+		rotation.y = v.rotation.y + PI
+		v.mostrar_cabine(true)
+	cam.transform = Transform3D.IDENTITY
+	cam.fov = fov_base
+	mao.visible = not terceira
+	_cam_veic = Vector3.INF
+	cam_dist = 1.0
+	corpo.primeira_pessoa(not terceira)
+	_luz()
+
+
+## no assento: a energia volta (como sentado), a fome e a sede continuam; sem mexer o mouse a câmera volta para a frente
+func _no_veiculo(dt: float) -> void:
+	if not is_instance_valid(veiculo):
+		veiculo = null
+		collision_layer = 1
+		collision_mask = 1
+		return
+	energia = minf(100.0, energia + 15.0 * dt)
+	cansado = false
+	_corre = false
+	velocity = Vector3.ZERO
+	queda_v = 0.0
+	cabeca.position.y = 1.62
+	global_position = veiculo.olho() - Vector3(0, 1.62, 0)
+	_olhar_t += dt
+	if _olhar_t > 1.2:
+		rotation.y = lerp_angle(rotation.y, veiculo.rotation.y + PI, 1.0 - exp(-dt * 2.2))
+	tremor = maxf(0.0, tremor - dt)
+	golpe = maxf(0.0, golpe - dt * 3.2)
+
+
+## a câmera dirigindo: na primeira pessoa, no assento (a cabine some e você vê o capô e a estrada); na terceira, atrás e
+## acima do veículo, mais longe quanto mais rápido (sem atravessar parede nem entrar no chão)
+func _camera_veiculo(dt: float) -> void:
+	var vc = veiculo
+	if not is_instance_valid(vc):
+		return
+	cam.fov = fov_base * (0.92 + absf(float(vc.v)) * 0.006)
+	if not terceira:
+		vc.mostrar_cabine(false)
+		cabeca.rotation.x = clampf(cabeca.rotation.x, -0.7, 0.5)
+		cam.transform = Transform3D(Basis.IDENTITY, Vector3(randf() - 0.5, randf() - 0.5, 0) * tremor * 0.08)
+		corpo.primeira_pessoa(true)
+		_cam_veic = Vector3.INF
+		return
+	vc.mostrar_cabine(true)
+	corpo.primeira_pessoa(false)
+	var pt := clampf(cabeca.rotation.x, -0.6, 0.35) - 0.1
+	var yw := rotation.y
+	var d := Vector3(-sin(yw) * cos(pt), sin(pt), -cos(yw) * cos(pt))
+	var piv: Vector3 = vc.global_position + Vector3(0, float(vc.T["camH"]), 0)
+	var dist: float = float(vc.T["camD"]) + absf(float(vc.v)) * 0.09
+	var cp := piv - d * dist + Vector3(0, 0.7, 0)
+	var gy: float = main.terreno.h(cp.x, cp.z) + 0.6
+	if cp.y < gy:
+		cp.y = gy
+	var fora: Array[RID] = [get_rid(), (vc as CollisionObject3D).get_rid()]
+	var h := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(piv, cp, 1, fora))
+	if not h.is_empty():
+		cp = (h["position"] as Vector3) + (piv - cp).normalized() * 0.3
+	if _cam_veic == Vector3.INF:
+		_cam_veic = cp
+	_cam_veic = _cam_veic.lerp(cp, 1.0 - exp(-dt * 14.0))
+	var alvo := piv + d * 6.0
+	var olhar := alvo - _cam_veic
+	if olhar.length() > 0.01:
+		cam.global_transform = Transform3D(Basis.looking_at(olhar, Vector3.UP), _cam_veic)
+
+
 ## o som do passo pelo chão: na água rasa, no chão duro (piso, rua, laje, ponte) ou na terra e na grama
 func _som_passo() -> String:
 	var p := global_position
@@ -803,6 +930,9 @@ func mira(alcance: float, mascara := 3) -> Dictionary:
 ## a câmera da terceira pessoa (como a do jogo antigo, v10.3.2): atrás do ombro direito, 3,1 m; dentro de casa chega mais perto
 ## e mais para trás do ombro; batendo em parede chega na hora e só volta a afastar depois de um tempinho livre (sem vai e vem)
 func _camera(dt: float) -> void:
+	if veiculo != null:
+		_camera_veiculo(dt)
+		return
 	if not terceira:
 		return
 	var sp := get_world_3d().direct_space_state
@@ -862,10 +992,18 @@ func _animar_corpo(dt: float) -> void:
 		if uso_t >= 0.9:
 			uso_t = -1.0
 			uk = 0.0
-	corpo.animar(dt, {"vel": velocity, "chao": is_on_floor() or nadando, "agachado": agachado, "correndo": _corre, "ferido": vida < 28.0,
+	var ent := {"vel": velocity, "chao": is_on_floor() or nadando, "agachado": agachado, "correndo": _corre, "ferido": vida < 28.0,
 		"energia": energia, "item": id, "golpe": gs, "vertical": bool(d.get("vertical", false)), "usar": maxf(0.0, uk), "mira": mira_k,
 		"vivo": vivo, "primeira": not terceira, "yaw": rotation.y, "vira_anda": bool(Ajustes.v.get("corpo_anda", false)),
-		"acao": str(acao.get("tipo", "")), "acao_k": (float(acao["t"]) / float(acao["dur"])) if not acao.is_empty() else 0.0})
+		"acao": str(acao.get("tipo", "")), "acao_k": (float(acao["t"]) / float(acao["dur"])) if not acao.is_empty() else 0.0}
+	# dirigindo: sentado, virado para a frente do veículo, as mãos no volante (na moto e no triciclo, no guidão)
+	if veiculo != null and is_instance_valid(veiculo):
+		ent["vel"] = Vector3.ZERO
+		ent["chao"] = true
+		ent["item"] = ""
+		ent["sentado"] = "moto" if bool(veiculo.T.get("exposto", false)) else "carro"
+		ent["yaw_sentado"] = veiculo.rotation.y + PI
+	corpo.animar(dt, ent)
 	# a roupa no corpo (muda pela mochila, rasga com os golpes)
 	_roupa_t -= dt
 	if _roupa_t <= 0.0:
@@ -1160,6 +1298,19 @@ func _passo_acao(dt: float) -> void:
 				else:
 					main.plantio.toque(ap, self)
 				return
+		"veiculo":
+			var vv = acao["v"]
+			var longe_v: bool = not is_instance_valid(vv) or global_position.distance_to(vv.global_position) > 6.0
+			if longe_v or not Input.is_action_pressed("usar"):
+				var curto_v: bool = t < 0.3 and not longe_v
+				acao = {}
+				if curto_v:
+					main.veiculos.usar(vv, self, false)
+				return
+			if t >= float(acao["dur"]):
+				acao = {}
+				main.veiculos.usar(vv, self, true)
+				return
 		"recarga":
 			if sel != int(acao.get("slot", sel)):
 				acao = {}
@@ -1370,6 +1521,12 @@ func usar() -> void:
 		var c: Object = h["collider"]
 		if c.has_meta("cao") and main.cao != null:
 			main.cao.interagir(self)
+			return
+		# o veículo (etapa 6j): toque E entra, segure E abre a oficina
+		if c.has_meta("veiculo") and acao.is_empty():
+			var vv = c.get_meta("veiculo")
+			if is_instance_valid(vv):
+				acao = {"tipo": "veiculo", "t": 0.0, "dur": 0.6, "v": vv, "fazer": true}
 			return
 		if c.has_meta("bicho"):
 			var b = c.get_meta("bicho")
@@ -1615,6 +1772,10 @@ func vida_max() -> float:
 func ferir(dano: float, tremer := true, de := Vector3.INF) -> void:
 	if not vivo:
 		return
+	# dentro da caminhonete e do carro o golpe pega na lataria (você leva só um pouco), como no jogo antigo
+	if tremer and veiculo != null and is_instance_valid(veiculo) and not bool(veiculo.T.get("exposto", false)):
+		veiculo.hp = maxf(0.0, float(veiculo.hp) - dano * 0.7)
+		dano *= 0.3
 	# a roupa segura parte do golpe (não da fome, da sede ou da queda) e gasta com isso
 	if tremer:
 		dano *= 1.0 - inv.protecao()
@@ -1637,6 +1798,13 @@ func ferir(dano: float, tremer := true, de := Vector3.INF) -> void:
 
 
 func renascer(p: Vector3) -> void:
+	if veiculo != null:
+		veiculo = null
+		cam.transform = Transform3D.IDENTITY
+		cam.fov = fov_base
+		mao.visible = not terceira
+	collision_layer = 1
+	collision_mask = 1
 	global_position = p
 	velocity = Vector3.ZERO
 	acao = {}

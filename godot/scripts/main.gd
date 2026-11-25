@@ -25,6 +25,7 @@ var cao: Cao                # o Caramelo, o cachorro (etapa 6e)
 var lesoes: Lesoes          # os ferimentos: sangramento, perna quebrada, vírus e ferida grave (etapa 6f)
 var plantio: Plantio        # os canteiros e as árvores de fruta (etapa 6g)
 var curtume: Curtume        # o couro curtindo no varal da estação de couro (etapa 6h)
+var veiculos: Veiculos      # a caminhonete, o carro, a moto e o triciclo do jogo antigo (etapa 6j)
 var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
@@ -133,6 +134,8 @@ func _ready() -> void:
 	add_child(plantio)
 	curtume = Curtume.new(self)
 	add_child(curtume)
+	veiculos = Veiculos.new(self)
+	add_child(veiculos)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -368,10 +371,16 @@ func _process(dt: float) -> void:
 	var digitando: bool = Rede.digitando or Rede.chat_acabou_de_fechar()
 	# teclas do jogo: B constrói, F lanterna, H esconde os comandos
 	if jogador.vivo and not ui.aberto and telas.atual == "" and not digitando:
-		if Input.is_action_just_pressed("construir"):
+		if Input.is_action_just_pressed("construir") and jogador.veiculo == null:
 			jogador.construir()
 		if Input.is_action_just_pressed("lanterna"):
-			jogador.alternar_lanterna()
+			# dirigindo, o F acende e apaga os faróis
+			if jogador.veiculo != null and is_instance_valid(jogador.veiculo):
+				jogador.veiculo.luz = not jogador.veiculo.luz
+				ui.aviso("Faróis acesos" if jogador.veiculo.luz else "Faróis apagados", 1.6)
+				sons.tocar("clique", jogador.global_position, -10.0)
+			else:
+				jogador.alternar_lanterna()
 		if Input.is_action_just_pressed("comandos"):
 			Ajustes.mudar("comandos", not bool(Ajustes.v["comandos"]))
 			ui.hud.mostrar_comandos(bool(Ajustes.v["comandos"]))
@@ -791,6 +800,7 @@ func rede_desligou() -> void:
 	lugares_z.clear()
 	fauna.limpar()
 	cao.soltar_rede()
+	veiculos.soltar_rede()
 	spawn_t = 3.0
 	if em_jogo and telas.atual in ["pausa", "mapa"]:
 		get_tree().paused = true
@@ -889,6 +899,12 @@ func fabricar(r: Dictionary) -> void:
 func texto_mira() -> String:
 	if not jogador.vivo or ui.aberto:
 		return ""
+	# dirigindo (etapa 6j): E desce
+	if jogador.veiculo != null and is_instance_valid(jogador.veiculo):
+		var vc := jogador.veiculo
+		if absf(vc.v) > 4.0:
+			return "Diminua a velocidade para descer"
+		return "E  Descer %s %s" % ["da" if vc.o_a() == "a" else "do", vc.nome().to_lower()]
 	if pesca != null and pesca.ativa():
 		return pesca.texto()
 	if pesca != null and str(jogador.item_mao().get("id", "")) == "vara" and pesca.agua_na_frente(jogador) != Vector3.INF:
@@ -909,6 +925,8 @@ func texto_mira() -> String:
 	var c: Object = h["collider"]
 	if c.has_meta("cao") and cao != null:
 		return cao.texto(jogador)
+	if c.has_meta("veiculo") and is_instance_valid(c.get_meta("veiculo")):
+		return c.get_meta("veiculo").texto()
 	if c.has_meta("bicho") and is_instance_valid(c.get_meta("bicho")):
 		return fauna.texto(c.get_meta("bicho"), jogador)
 	if c.has_meta("laco"):
@@ -969,6 +987,8 @@ func texto_mira() -> String:
 
 
 func _morreu() -> void:
+	if jogador.veiculo != null:
+		veiculos.expulsar(jogador)
 	if lesoes.causa == "virus":
 		ui.aviso("O vírus te venceu.", 5.0)
 	lesoes.morreu(jogador.global_position)
@@ -1007,13 +1027,18 @@ var _auto_t := 120.0
 ## nos baús, o que já foi colhido e revistado)
 func salvar_jogo() -> bool:
 	var j := jogador
+	# dirigindo: o jogo salvo guarda você do lado de fora do veículo (senão você carregaria dentro da lataria)
+	var jp := j.global_position
+	if j.veiculo != null and is_instance_valid(j.veiculo):
+		var sv: Vector3 = j.veiculo.saida()
+		jp = sv if sv != Vector3.INF else j.veiculo.global_position + Vector3(0, float(j.veiculo.T["alt"]) + 0.3, 0)
 	var d := {"versao": 1, "dia": dia, "hora": hora,
-		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
+		"jogador": {"pos": [jp.x, jp.y, jp.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
 		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar(), "pesca": pesca.salvar(),
 		"cao": cao.salvar(), "lesoes": lesoes.salvar(), "plantio": plantio.salvar(),
-		"curtume": curtume.salvar()}
+		"curtume": curtume.salvar(), "veiculos": veiculos.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -1041,6 +1066,8 @@ func carregar_jogo() -> bool:
 		stats = {"zumbis": int(st.get("zumbis", 0)), "fabricados": int(st.get("fabricados", 0)), "cacados": int(st.get("cacados", 0))}
 	var jd: Dictionary = d.get("jogador", {})
 	var j := jogador
+	if j.veiculo != null:
+		veiculos.expulsar(j)
 	if jd.has("pos"):
 		j.global_position = Vector3(float(jd["pos"][0]), float(jd["pos"][1]) + 0.2, float(jd["pos"][2]))
 		j.rotation.y = float(jd.get("giro", 0.0))
@@ -1083,6 +1110,7 @@ func carregar_jogo() -> bool:
 	plantio.carregar(pld if pld is Dictionary else {})
 	var ctd = d.get("curtume", {})
 	curtume.carregar(ctd if ctd is Dictionary else {})
+	veiculos.carregar(d.get("veiculos", null))
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -2644,6 +2672,282 @@ func _teste_nado() -> void:
 	hora = hora_antes
 
 
+## os veículos (etapa 6j): os quatro do jogo antigo perto dos lugares de lá e no estado de lá, a mira, abastecer, entrar,
+## acelerar, virar, frear, dar ré, o freio de mão, descer, a oficina (pneu, bateria, óleo, lataria, motor) e o porta-malas, bater
+## no muro, atropelar o zumbi, o zumbi batendo na lataria (dentro da caminhonete você leva pouco), a moto (o golpe pega em você),
+## o Caramelo na caçamba, os faróis de noite e o jogo salvo
+func _teste_veiculos(livre: Vector3) -> void:
+	var hora_antes := hora
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	hora = 12.0
+	_limpar_zumbis()
+	veiculos.novo()
+	await _quadros(3)
+	var ok_lugar := veiculos.lista.size() == 4
+	var dists: Array = []
+	for i in veiculos.lista.size():
+		var vi: Veiculo = veiculos.lista[i]
+		var d0: Array = Veiculos.PADRAO[i]
+		var dd := Vector2(vi.global_position.x - float(d0[2]), vi.global_position.z - float(d0[3])).length()
+		dists.append("%s %.1f m" % [vi.uid, dd])
+		if dd > 10.5 or absf(vi.global_position.y - terreno.h(vi.global_position.x, vi.global_position.z)) > 1.5:
+			ok_lugar = false
+	var cv := veiculos.por_id("caminhonete")
+	var sd := veiculos.por_id("sedanVila")
+	var mt := veiculos.por_id("motoCidade")
+	var tc := veiculos.por_id("triFazenda")
+	_confere(ok_lugar and cv != null and sd != null and mt != null and tc != null and cv.pode() == "Sem combustível"
+		and sd.pode().begins_with("Sem bateria") and mt.pode() == "O motor está quebrado" and tc.pode() == "" and sd.furados() == 1,
+		"veículos: a caminhonete (sem gasolina), o carro (sem bateria, um pneu furado), a moto (motor quebrado) e o triciclo (pronto) perto dos lugares do jogo antigo (%s)" % ", ".join(PackedStringArray(dists)))
+	if cv == null or sd == null or mt == null or tc == null:
+		spawn_t = spawn_antes
+		hora = hora_antes
+		return
+	# a pista: um lugar plano e limpo (sem as árvores e pedras em volta)
+	var c := _lugar_plano(Vector2(-35, 45), 40.0, Vector2(livre.x, livre.z))
+	var clar := _clareira_teste(c, 34.0)
+	var Zv := Vector3(0, 0, 1)
+	cv.global_position = c - Zv * 16.0
+	cv.rotation.y = 0.0
+	cv.assentar()
+	await _quadros(3)
+	# a mira e o galão
+	_jogador_em(cv.global_position + Vector3(2.7, 0, 0), cv.global_position + Vector3(0, 1.0, 0))
+	await _quadros(3)
+	var tm := texto_mira()
+	for it in ["gasolina", "kitFerramentas", "pneu", "bateriaVeic", "oleoMotor", "pecaVeiculo"]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	jogador.inv.por("gasolina", 2)
+	var m_ab := cv.fazer("abastecer", jogador)
+	_confere(tm.begins_with("Caminhonete: sem combustível") and m_ab.begins_with("Abasteceu") and absf(cv.comb - 50.0) < 0.01 and jogador.inv.conta("gasolina") == 1,
+		"veículos: a mira mostra o que falta (%s); o galão enche metade do tanque da caminhonete (%s)" % [tm.left(44), m_ab])
+	# o Caramelo seguindo: pula na caçamba
+	cao.iniciar()
+	cao.ativo = true
+	cao.st = "segue"
+	cao.modo = "segue"
+	cao._no_chao(cv.global_position + Vector3(3.5, 0, -2.0))
+	# entra
+	var entrou := veiculos.entrar(cv, jogador)
+	await _quadros(6)
+	var no_assento: bool = jogador.veiculo == cv and jogador.collision_layer == 0 and jogador.cabeca.global_position.distance_to(cv.olho()) < 0.25
+	_confere(entrou and no_assento and texto_mira().begins_with("E  Descer da caminhonete") and cao.st == "carro",
+		"veículos: E entra (no assento, sem colisão; a mira diz como descer); o Caramelo pulou na caçamba (%s)" % cao.st)
+	# acelera para a frente
+	var p0 := cv.global_position
+	var c0 := cv.comb
+	Input.action_press("frente")
+	await _quadros(150)
+	var v1 := cv.v
+	var andou := Vector2(cv.global_position.x - p0.x, cv.global_position.z - p0.z)
+	await _quadros(8)
+	var painel: bool = ui.hud.veic_painel.visible
+	var cacamba: Vector3 = cv.corpo.global_transform * Vector3(-0.42, 1.0, -1.55)
+	var cao_junto := cao.global_position.distance_to(cacamba) < 0.4
+	# vira para a direita (a frente vai para o lado do -x)
+	var y0 := cv.rotation.y
+	Input.action_press("direita")
+	await _quadros(50)
+	Input.action_release("direita")
+	Input.action_release("frente")
+	var dy := angle_difference(y0, cv.rotation.y)
+	var fx := cv.frente().x
+	_confere(v1 > 4.0 and andou.length() > 6.0 and absf(andou.normalized().y) > 0.9 and cv.comb < c0 and painel and cao_junto and dy < -0.15 and fx < -0.1,
+		"veículos: W acelera (%.1f m/s em 2,5 s, andou %.1f m para a frente), gasta gasolina (%.2f%%), o painel aparece, o Caramelo vai na caçamba; D vira para a direita (%.2f rad)" % [
+			v1, andou.length(), c0 - cv.comb, dy])
+	# freia e dá ré; o freio de mão para
+	Input.action_press("tras")
+	await _quadros(50)
+	var freou := cv.v
+	await _quadros(70)
+	var re := cv.v
+	Input.action_release("tras")
+	Input.action_press("pular")
+	await _quadros(110)
+	Input.action_release("pular")
+	var parou := absf(cv.v) < 0.4
+	_confere(freou < 1.0 and re < -0.5 and parou, "veículos: S freia (%.1f m/s) e dá ré (%.1f m/s); o freio de mão para (%.2f m/s)" % [freou, re, cv.v])
+	# desce
+	await _quadros(5)
+	var desceu := veiculos.sair(jogador)
+	await _quadros(10)
+	var lado := jogador.global_position.distance_to(cv.global_position)
+	_confere(desceu and jogador.veiculo == null and jogador.collision_layer == 1 and cv.v == 0.0 and lado < 4.5 and not ui.hud.veic_painel.visible
+		and cao.st == "segue" and cao.global_position.distance_to(cv.global_position) < 5.0,
+		"veículos: E desce do lado (%.1f m do meio); o veículo fica parado; o Caramelo desce da caçamba e volta a seguir" % lado)
+	# bate no muro: a lataria e o motor amassam
+	var muro := StaticBody3D.new()
+	var ms := CollisionShape3D.new()
+	var mb := BoxShape3D.new()
+	mb.size = Vector3(8.0, 3.0, 0.8)
+	ms.shape = mb
+	muro.add_child(ms)
+	add_child(muro)
+	muro.global_position = Vector3(c.x, terreno.h(c.x, c.z + 17.0) + 1.4, c.z + 17.0)
+	cv.global_position = c - Zv * 17.0
+	cv.rotation.y = 0.0
+	cv.assentar()
+	var hp0 := cv.hp
+	var mot0 := float(cv.pecas["motor"])
+	veiculos.entrar(cv, jogador)
+	Input.action_press("frente")
+	var bateu_v := 0.0
+	for k in 420:
+		await get_tree().physics_frame
+		if cv.v > bateu_v:
+			bateu_v = cv.v
+		if cv.v < -0.5:
+			break
+	Input.action_release("frente")
+	var amassou := cv.hp < hp0 and float(cv.pecas["motor"]) < mot0 and cv.v < 0.0
+	_confere(amassou and cv.global_position.z < muro.global_position.z, "veículos: bateu no muro a %.1f m/s: a lataria (%.0f%%) e o motor (%.0f%%) amassaram e ele voltou" % [
+		bateu_v, cv.hp, float(cv.pecas["motor"])])
+	muro.queue_free()
+	Input.action_press("pular")
+	await _quadros(60)
+	Input.action_release("pular")
+	# atropela o zumbi parado na frente
+	veiculos.sair(jogador)
+	await _quadros(3)
+	cv.global_position = c - Zv * 15.0
+	cv.rotation.y = 0.0
+	cv.assentar()
+	veiculos.entrar(cv, jogador)
+	var z := _z_teste(c + Zv * 2.0, "walker", c - Zv * 15.0)
+	await _quadros(2)
+	var zv0: float = z.vida
+	var hp1 := cv.hp
+	Input.action_press("frente")
+	for k in 300:
+		await get_tree().physics_frame
+		if not is_instance_valid(z) or z.estado in ["derrubado", "morto"] or z.vida < zv0:
+			break
+	Input.action_release("frente")
+	var pegou: bool = not is_instance_valid(z) or z.estado in ["derrubado", "morto"] or z.vida < zv0 * 0.7
+	_confere(pegou and cv.hp < hp1, "veículos: atropelou o zumbi (%s, vida %.0f de %.0f) e a lataria sentiu (%.1f%%)" % [
+		z.estado if is_instance_valid(z) else "sumiu", z.vida if is_instance_valid(z) else 0.0, zv0, hp1 - cv.hp])
+	Input.action_press("pular")
+	await _quadros(90)
+	Input.action_release("pular")
+	_limpar_zumbis()
+	# o golpe dentro da caminhonete pega na lataria (você leva só um pouco e não pega o vírus)
+	jogador.vida = 100.0
+	var hp2 := cv.hp
+	jogador.ferir(10.0, true, cv.global_position + Vector3(2, 1, 0))
+	var levou := 100.0 - jogador.vida
+	var mordeu := lesoes.mordida("walker")
+	_confere(absf((hp2 - cv.hp) - 7.0) < 0.01 and levou > 0.5 and levou <= 3.01 and not mordeu,
+		"veículos: dentro da caminhonete o golpe pega na lataria (%.1f) e você leva %.1f; não morde" % [hp2 - cv.hp, levou])
+	# um zumbi de verdade do lado: bate na lataria
+	var hp3 := cv.hp
+	var zl := _z_teste(cv.global_position + Vector3(2.6, 0, 0.3), "walker", cv.global_position, false)
+	zl.estado = "caca"
+	zl.visto_em = jogador.global_position
+	for k in 360:
+		await get_tree().physics_frame
+		if cv.hp < hp3:
+			break
+	_confere(cv.hp < hp3 and jogador.vida > 90.0, "veículos: o zumbi do lado bate na lataria (%.0f%% → %.0f%%) e você quase não sente (vida %.0f)" % [hp3, cv.hp, jogador.vida])
+	_limpar_zumbis()
+	# os faróis de noite
+	hora = 22.0
+	await _quadros(4)
+	var acesos: bool = (cv.farois[0] as SpotLight3D).visible and cv.mat_farol.emission_energy_multiplier > 1.0
+	cv.luz = false
+	await _quadros(3)
+	var apagados: bool = not (cv.farois[0] as SpotLight3D).visible
+	cv.luz = true
+	hora = 12.0
+	await _quadros(3)
+	var de_dia: bool = not (cv.farois[0] as SpotLight3D).visible
+	_confere(acesos and apagados and de_dia, "veículos: de noite os faróis acendem (F apaga); de dia ficam apagados")
+	veiculos.sair(jogador)
+	await _quadros(3)
+	# a oficina do carro: pneu, bateria, óleo, lataria e motor (com o kit de ferramentas), e o porta-malas
+	_jogador_em(sd.global_position + sd.frente() * 3.6, sd.global_position + Vector3(0, 0.8, 0))
+	await _quadros(3)
+	for it in [["kitFerramentas", 1], ["pneu", 1], ["bateriaVeic", 1], ["oleoMotor", 1], ["sucata", 3], ["pregos", 2], ["pecaVeiculo", 1]]:
+		jogador.inv.por(str(it[0]), int(it[1]))
+	var acs: Array = sd.acoes(jogador)
+	var prontas := 0
+	for a in acs:
+		if str(a["id"]) in ["pneu", "bateria", "oleo", "lataria", "motor"] and bool(a["ok"]):
+			prontas += 1
+	var kit0 := 0.0
+	for s in jogador.inv.slots:
+		if s != null and str(s["id"]) == "kitFerramentas":
+			kit0 = float(s.get("dur", 0.0))
+	var msgs: Array = []
+	for id in ["pneu", "bateria", "oleo", "lataria", "motor"]:
+		msgs.append(sd.fazer(id, jogador))
+	var kit1 := 0.0
+	for s in jogador.inv.slots:
+		if s != null and str(s["id"]) == "kitFerramentas":
+			kit1 = float(s.get("dur", 0.0))
+	_confere(prontas == 5 and sd.furados() == 0 and bool(sd.pecas["bateria"]) and absf(float(sd.pecas["oleo"]) - 80.0) < 0.01 and absf(sd.hp - 100.0) < 0.01
+		and absf(float(sd.pecas["motor"]) - 100.0) < 0.01 and sd.pode() == "Sem combustível" and absf((kit0 - kit1) - 6.0) < 0.01,
+		"veículos: na oficina do carro trocou o pneu, pôs a bateria e o óleo, consertou a lataria e o motor (o kit gastou %.0f): %s" % [kit0 - kit1, " · ".join(PackedStringArray(msgs))])
+	ui.abrir_veiculo(sd)
+	await _quadros(3)
+	var tela_ok: bool = ui.aberto and ui.col_veic.visible and ui.veic_botoes.get_child_count() >= 3
+	ui._veic_acao("carga")
+	await _quadros(2)
+	var porta_ok: bool = ui.col_bau.visible and ui.bau_inv == sd.porta and not ui.col_veic.visible
+	ui.abrir(false)
+	_confere(tela_ok and porta_ok, "veículos: segure E abre a oficina na mochila (o estado e os consertos); o porta-malas abre como um baú")
+	# a moto: exposta (o golpe pega em você), deita na curva
+	for it in [["kitFerramentas", 1], ["pecaVeiculo", 1], ["gasolina", 1]]:
+		jogador.inv.por(str(it[0]), int(it[1]))
+	mt.global_position = c + Vector3(6.0, 0, -10.0)
+	mt.rotation.y = 0.0
+	mt.assentar()
+	mt.fazer("motor", jogador)
+	mt.fazer("abastecer", jogador)
+	var entrou_m := veiculos.entrar(mt, jogador)
+	jogador.vida = 100.0
+	jogador.ferir(10.0, true, mt.global_position + Vector3(2, 1, 0))
+	var levou_m := 100.0 - jogador.vida
+	Input.action_press("frente")
+	await _quadros(90)
+	Input.action_press("direita")
+	await _quadros(30)
+	var deitou := mt.roll
+	Input.action_release("direita")
+	Input.action_release("frente")
+	Input.action_press("pular")
+	await _quadros(120)
+	Input.action_release("pular")
+	_confere(entrou_m and levou_m > levou * 2.5 and levou_m > 1.0 and deitou > 0.05 and absf(mt.comb - 100.0) < 0.5,
+		"veículos: a moto consertada e com o tanque cheio (um galão enche); nela o golpe pega em você (%.1f); deita na curva (%.2f)" % [levou_m, deitou])
+	veiculos.sair(jogador)
+	await _quadros(3)
+	# o jogo salvo
+	cv.comb = 33.0
+	cv.pecas["oleo"] = 44.0
+	cv.porta.por("madeira", 5)
+	var pcv := cv.global_position
+	var sv := veiculos.salvar()
+	veiculos.novo()
+	var zerou: bool = absf(veiculos.por_id("caminhonete").comb) < 0.01
+	veiculos.carregar(sv)
+	var cv2 := veiculos.por_id("caminhonete")
+	_confere(zerou and cv2 != null and absf(cv2.comb - 33.0) < 0.01 and absf(float(cv2.pecas["oleo"]) - 44.0) < 0.01 and cv2.porta.conta("madeira") == 5
+		and Vector2(cv2.global_position.x - pcv.x, cv2.global_position.z - pcv.z).length() < 0.1,
+		"veículos: o jogo salvo guarda onde cada um ficou, o tanque, as peças e o porta-malas")
+	for it in ["gasolina", "kitFerramentas", "pneu", "bateriaVeic", "oleoMotor", "pecaVeiculo", "sucata", "pregos"]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	cao.iniciar()
+	veiculos.novo()
+	_devolver_clareira(clar)
+	spawn_t = spawn_antes
+	hora = hora_antes
+
+
 ## o espaço da mochila com o item (para os testes)
 func _slot_de(id: String) -> int:
 	for i in jogador.inv.slots.size():
@@ -2898,6 +3202,8 @@ func _z_teste(p: Vector3, tipo: String, olha: Vector3, parado := true, dorme := 
 
 ## põe o jogador no chão em p olhando para o peito de z (ou para um ponto)
 func _jogador_em(p: Vector3, olha: Vector3) -> void:
+	if jogador.veiculo != null:
+		veiculos.expulsar(jogador)
 	_por_em(Vector3(p.x, terreno.h(p.x, p.z) + 0.15, p.z))
 	# os ferimentos dos testes anteriores (a mordida do lobo, o vírus do zumbi) não atrapalham o próximo
 	if lesoes != null:
@@ -4086,6 +4392,7 @@ func _teste() -> void:
 	await _teste_plantio()
 	await _teste_curtume(livre)
 	await _teste_nado()
+	await _teste_veiculos(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -4804,6 +5111,56 @@ func _fotos() -> void:
 	await _quadros(15)
 	await _foto("17j_pe_de_manga")
 	plantio.novo()
+	# os veículos (etapa 6j): a caminhonete perto da fazenda; de noite com os faróis acesos (terceira pessoa); o volante na
+	# primeira pessoa (a cabine some e aparece o capô); a oficina do carro da vila; o triciclo com você sentado
+	veiculos.novo()
+	var cvf := veiculos.por_id("caminhonete")
+	if cvf != null:
+		hora = 15.2
+		var frv := cvf.frente()
+		var esqv := Vector3(frv.z, 0, -frv.x)
+		await _cam(cvf.global_position + frv * 5.2 + esqv * 3.8, cvf.global_position + Vector3(0, 0.9, 0), false)
+		await _quadros(20)
+		await _foto("17k_caminhonete")
+		cvf.comb = 60.0
+		hora = 20.8
+		jogador.alternar_camera(true)
+		veiculos.entrar(cvf, jogador)
+		await _quadros(45)
+		await _foto("17l_farois_de_noite")
+		hora = 10.5
+		jogador.alternar_camera(false)
+		await _quadros(30)
+		await _foto("17m_volante_primeira_pessoa")
+		veiculos.expulsar(jogador)
+	var sdf := veiculos.por_id("sedanVila")
+	if sdf != null:
+		hora = 11.0
+		_jogador_em(sdf.global_position + sdf.frente() * 3.8, sdf.global_position + Vector3(0, 0.8, 0))
+		jogador.inv.por("kitFerramentas", 1)
+		jogador.inv.por("pneu", 1)
+		jogador.inv.por("gasolina", 1)
+		await _quadros(15)
+		ui.abrir_veiculo(sdf)
+		await _quadros(10)
+		await _foto("17n_oficina_do_carro")
+		ui.abrir(false)
+		for it in ["kitFerramentas", "pneu", "gasolina"]:
+			var nv := jogador.inv.conta(it)
+			if nv > 0:
+				jogador.inv.tirar(it, nv)
+	var tcf := veiculos.por_id("triFazenda")
+	if tcf != null:
+		hora = 16.4
+		jogador.alternar_camera(true)
+		veiculos.entrar(tcf, jogador)
+		jogador.rotation.y = tcf.rotation.y + PI - 0.9
+		jogador._olhar_t = -30.0
+		await _quadros(40)
+		await _foto("17o_triciclo")
+		veiculos.expulsar(jogador)
+		jogador.alternar_camera(false)
+	veiculos.novo()
 	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()
