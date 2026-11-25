@@ -650,6 +650,9 @@ func interagir(i: int, j) -> void:
 		"marcoBase":
 			main.ui.aviso("Marco da base: %d construções a até 34 m" % _pecas_perto((pe["xf"] as Transform3D).origin, 34.0), 4.0)
 		_:
+			# a estação de couro: E recolhe o couro curtido que ficou pronto no varal (etapa 6h)
+			if id == "estacaoCouro" and main.get("curtume") != null:
+				main.curtume.recolher(i, j)
 			if ob.has("estacao") or id == "bancadaTrab":
 				main.ui.abrir(true)
 			else:

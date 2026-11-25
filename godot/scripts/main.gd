@@ -24,6 +24,7 @@ var pesca: Pesca            # a pesca (etapa 6d)
 var cao: Cao                # o Caramelo, o cachorro (etapa 6e)
 var lesoes: Lesoes          # os ferimentos: sangramento, perna quebrada, vírus e ferida grave (etapa 6f)
 var plantio: Plantio        # os canteiros e as árvores de fruta (etapa 6g)
+var curtume: Curtume        # o couro curtindo no varal da estação de couro (etapa 6h)
 var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
@@ -130,6 +131,8 @@ func _ready() -> void:
 	add_child(lesoes)
 	plantio = Plantio.new(self)
 	add_child(plantio)
+	curtume = Curtume.new(self)
+	add_child(curtume)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -869,6 +872,11 @@ func _exit_tree() -> void:
 
 
 func fabricar(r: Dictionary) -> void:
+	# curtir o couro (etapa 6h): vai para o varal da estação e fica pronto depois de umas horas
+	if r.has("varal"):
+		ui.aviso(curtume.pendurar(r, jogador), 5.0)
+		ui.atualizar()
+		return
 	var m := Fabricacao.fazer(r, jogador)
 	if m != "":
 		ui.aviso(m)
@@ -932,6 +940,10 @@ func texto_mira() -> String:
 		elif str(po["id"]) == "armadilhaUrso":
 			acao = "E  Armar a " if not po.get("armada", true) else ""
 		var nv := " (nível %d)" % int(po.get("nivel", 1)) if str(po["id"]) == "bancadaTrab" else ""
+		if str(po["id"]) == "estacaoCouro" and curtume != null:
+			var rs := curtume.resumo(int(c.get_meta("obra")))
+			if rs != "":
+				nv = " (%s)" % rs
 		var nm := str(o.get("nome", po["id"]))
 		return "%s%s%s  %d/%d" % [acao, nm.to_lower() if acao != "" else nm, nv, int(po["vida"]), int(po["max"])]
 	if c.has_meta("recurso"):
@@ -1000,7 +1012,8 @@ func salvar_jogo() -> bool:
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
 		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar(), "pesca": pesca.salvar(),
-		"cao": cao.salvar(), "lesoes": lesoes.salvar(), "plantio": plantio.salvar()}
+		"cao": cao.salvar(), "lesoes": lesoes.salvar(), "plantio": plantio.salvar(),
+		"curtume": curtume.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -1068,6 +1081,8 @@ func carregar_jogo() -> bool:
 	lesoes.carregar(ld if ld is Dictionary else {})
 	var pld = d.get("plantio", {})
 	plantio.carregar(pld if pld is Dictionary else {})
+	var ctd = d.get("curtume", {})
+	curtume.carregar(ctd if ctd is Dictionary else {})
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -2447,6 +2462,70 @@ func _teste_plantio() -> void:
 	plantio.novo()
 	hora = hora_antes
 	dia = dia_antes
+
+
+## o curtume (etapa 6h): as receitas de curtir na estação de couro, o couro no varal com gordura ou sal, as horas, E na
+## estação recolhe (guarda a qualidade), a jaqueta de couro libera, o varal cheio e o jogo salvo
+func _teste_curtume(livre: Vector3) -> void:
+	var hora_antes := hora
+	hora = 10.0
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clareira := _clareira_teste(c, 30.0)
+	_jogador_em(c, c + Vector3(0, 1, -6))
+	await _quadros(3)
+	var ie := await _obra_em("estacaoCouro", c + Vector3(0, 0.3, 0), c + Vector3(0, 0, -3.0))
+	var rec := {}
+	for r in Dados.RECEITAS:
+		if str(r["faz"]) == "couroCurtido" and r.has("varal"):
+			rec = r
+	for it in ["couro", "gordura", "sal", "couroCurtido", "linha", "pano"]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	_jogador_em(c, c + Vector3(0, 1, -6))
+	jogador.inv.por("couro", 2, {"q": 2})
+	jogador.inv.por("gordura", 1)
+	jogador.inv.por("sal", 1)
+	var m1 := curtume.pendurar(rec, jogador)
+	var m2 := curtume.pendurar(rec, jogador)
+	var m3 := curtume.pendurar(rec, jogador)
+	var rs0 := curtume.resumo(ie) if ie >= 0 else ""
+	var n0 := curtume.recolher(ie, jogador) if ie >= 0 else -1
+	_confere(ie >= 0 and not rec.is_empty() and m1.contains("no varal") and m2.contains("no varal") and m3 == "Falta material"
+		and jogador.inv.conta("gordura") == 0 and jogador.inv.conta("sal") == 0 and rs0.begins_with("varal: 2 de 4") and n0 == 0,
+		"curtume: a estação de couro; o couro foi para o varal com gordura e com sal (%s); sem material não vai; antes da hora nada pronto (%s)" % [m1, rs0])
+	hora += 4.1
+	var rs1 := curtume.resumo(ie) if ie >= 0 else ""
+	if ie >= 0:
+		construcao.interagir(ie, jogador)
+	ui.abrir(false)
+	var q_ok := false
+	for s in jogador.inv.slots:
+		if s != null and str(s["id"]) == "couroCurtido" and int(s.get("q", -1)) == 2:
+			q_ok = true
+	var camisa := _receita("camisaCouro")
+	var liberou := Fabricacao.motivo_trancada(camisa, jogador) == ""
+	_confere(rs1.contains("2 prontos") and jogador.inv.conta("couroCurtido") == 2 and q_ok and liberou,
+		"curtume: depois de 4 horas de jogo (%s), E na estação recolheu 2 couros curtidos (a qualidade boa ficou); a jaqueta de couro liberou" % rs1)
+	# o varal cheio e o jogo salvo
+	jogador.inv.por("couro", 5)
+	jogador.inv.por("gordura", 5)
+	for i in 4:
+		curtume.pendurar(rec, jogador)
+	var m_cheio := curtume.pendurar(rec, jogador)
+	var sv := curtume.salvar()
+	curtume.carregar({})
+	var zerou := curtume.resumo(ie) == "" if ie >= 0 else false
+	curtume.carregar(sv)
+	_confere(m_cheio.begins_with("O varal está cheio") and zerou and (curtume.resumo(ie) if ie >= 0 else "").begins_with("varal: 4 de 4"),
+		"curtume: o varal cheio não aceita mais (%s); o jogo salvo guarda o que está curtindo" % m_cheio.left(30))
+	for it in ["couro", "gordura", "couroCurtido"]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	curtume.carregar({})
+	_devolver_clareira(clareira)
+	hora = hora_antes
 
 
 ## o espaço da mochila com o item (para os testes)
@@ -3886,6 +3965,7 @@ func _teste() -> void:
 	await _teste_cao(livre)
 	await _teste_lesoes(livre)
 	await _teste_plantio()
+	await _teste_curtume(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
