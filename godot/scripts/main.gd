@@ -3873,10 +3873,15 @@ func _fotos() -> void:
 	zz.estado = "vaga"
 	await _cam(Vector3(livre2.x, 0, livre2.z + 3.0), Vector3(livre2.x, 1.2, livre2.z - 1.5))
 	await _foto("16_zumbi")
-	# o HUD apanhando: a seta vermelha mostra de que lado veio o golpe, e as bordas ficam vermelhas
+	# o HUD apanhando: a seta vermelha mostra de que lado veio o golpe, e as bordas ficam vermelhas (o zumbi fica parado: com
+	# 30 de vida, os golpes de verdade dele durante a foto matavam e as fotos seguintes saíam com a tela de morte)
+	if is_instance_valid(zz):
+		zz.set_physics_process(false)
 	jogador.vida = 30.0
 	ui.dano(zz.global_position + Vector3(4, 0, 0))
 	await _foto("16b_apanhando")
+	if not jogador.vivo:
+		renascer(false)
 	jogador.vida = 100.0
 	# os tipos de zumbi lado a lado: o comum, o corredor, o brutamontes, o gritador, o policial (farda, colete e capacete), o
 	# inchado e a emboscada (os de rua com trapos de cores diferentes)
