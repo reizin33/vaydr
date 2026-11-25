@@ -1148,6 +1148,16 @@ func _quadros(n: int) -> void:
 		await get_tree().physics_frame
 
 
+## bate com o que está na mão e espera o golpe pegar (o dano sai quando a arma encosta, não no clique)
+func _golpear() -> void:
+	jogador.cd = 0.0
+	jogador.atacar()
+	for i in 90:
+		if jogador.golpe_pend.is_empty():
+			return
+		await get_tree().physics_frame
+
+
 func _olhar(p: Vector3) -> void:
 	var o := jogador.cam.global_position
 	var d := p - o
@@ -2557,6 +2567,9 @@ func _teste_curtume(livre: Vector3) -> void:
 		if n > 0:
 			jogador.inv.tirar(it, n)
 	curtume.carregar({})
+	# a estação sai do caminho (ela ficava no meio da pista do teste dos veículos, que é no mesmo lugar)
+	if ie >= 0 and construcao.peca_viva(ie):
+		construcao._cair(ie)
 	_devolver_clareira(clareira)
 	hora = hora_antes
 
@@ -2691,8 +2704,12 @@ func _teste_veiculos(livre: Vector3) -> void:
 		var d0: Array = Veiculos.PADRAO[i]
 		var dd := Vector2(vi.global_position.x - float(d0[2]), vi.global_position.z - float(d0[3])).length()
 		var dyh := vi.global_position.y - terreno.h(vi.global_position.x, vi.global_position.z)
+		# o barco bóia: a altura dele vale em relação à água (uns 22 cm abaixo, subindo e descendo com a água)
+		if vi.na_agua():
+			var nva: float = terreno.nivel_agua(vi.global_position.x, vi.global_position.z)
+			dyh = vi.global_position.y - (nva - 0.22) if nva > -900.0 else 9.0
 		dists.append("%s %.1f m%s" % [vi.uid, dd, "" if absf(dyh) <= 1.5 else " (%.1f m acima do chão)" % dyh])
-		if dd > 10.5 or absf(dyh) > 1.5:
+		if dd > 10.5 or absf(dyh) > (0.35 if vi.na_agua() else 1.5):
 			ok_lugar = false
 	var cv := veiculos.por_id("caminhonete")
 	var sd := veiculos.por_id("sedanVila")
@@ -2710,9 +2727,12 @@ func _teste_veiculos(livre: Vector3) -> void:
 	# a pista: um lugar plano e limpo (sem as árvores e pedras em volta)
 	var c := _lugar_plano(Vector2(-35, 45), 40.0, Vector2(livre.x, livre.z), true)
 	var clar := _clareira_teste(c, 34.0)
-	var Zv := Vector3(0, 0, 1)
+	# a pista: a direção em que os 38 m (e o lado da curva à direita) estão livres de poste, mureta e cerca
+	var Zv := _pista_livre(c)
+	var yaw_p := atan2(Zv.x, Zv.z)
+	var dir_d := Vector3(-Zv.z, 0, Zv.x)
 	cv.global_position = c - Zv * 16.0
-	cv.rotation.y = 0.0
+	cv.rotation.y = yaw_p
 	cv.assentar()
 	await _quadros(3)
 	# a mira e o galão
@@ -2761,8 +2781,8 @@ func _teste_veiculos(livre: Vector3) -> void:
 	Input.action_release("direita")
 	Input.action_release("frente")
 	var dy := angle_difference(y0, cv.rotation.y)
-	var fx := cv.frente().x
-	_confere(v1 > 4.0 and andou.length() > 6.0 and absf(andou.normalized().y) > 0.9 and cv.comb < c0 and painel and cao_junto and dy < -0.15 and fx < -0.1,
+	var fx := cv.frente().dot(dir_d)
+	_confere(v1 > 4.0 and andou.length() > 6.0 and andou.normalized().dot(Vector2(Zv.x, Zv.z)) > 0.9 and cv.comb < c0 and painel and cao_junto and dy < -0.15 and fx > 0.1,
 		"veículos: W acelera (%.1f m/s em 2,5 s, andou %.1f m para a frente), gasta gasolina (%.2f%%), o painel aparece, o Caramelo vai na caçamba; D vira para a direita (%.2f rad%s)" % [
 			v1, andou.length(), c0 - cv.comb, dy, "" if dy < -0.15 else "; na curva a menor velocidade foi %.1f m/s; bateu em: %s" % [v_min, cv.ultimo_choque if cv.ultimo_choque != "" else "nada"]])
 	# freia e dá ré; o freio de mão para
@@ -2793,9 +2813,11 @@ func _teste_veiculos(livre: Vector3) -> void:
 	ms.shape = mb
 	muro.add_child(ms)
 	add_child(muro)
-	muro.global_position = Vector3(c.x, terreno.h(c.x, c.z + 17.0) + 1.4, c.z + 17.0)
+	var pm := c + Zv * 17.0
+	muro.global_position = Vector3(pm.x, terreno.h(pm.x, pm.z) + 1.4, pm.z)
+	muro.rotation.y = yaw_p
 	cv.global_position = c - Zv * 17.0
-	cv.rotation.y = 0.0
+	cv.rotation.y = yaw_p
 	cv.assentar()
 	var hp0 := cv.hp
 	var mot0 := float(cv.pecas["motor"])
@@ -2810,7 +2832,7 @@ func _teste_veiculos(livre: Vector3) -> void:
 			break
 	Input.action_release("frente")
 	var amassou := cv.hp < hp0 and float(cv.pecas["motor"]) < mot0 and cv.v < 0.0
-	_confere(amassou and cv.global_position.z < muro.global_position.z, "veículos: bateu no muro a %.1f m/s: a lataria (%.0f%%) e o motor (%.0f%%) amassaram e ele voltou" % [
+	_confere(amassou and (cv.global_position - muro.global_position).dot(Zv) < 0.0, "veículos: bateu no muro a %.1f m/s: a lataria (%.0f%%) e o motor (%.0f%%) amassaram e ele voltou" % [
 		bateu_v, cv.hp, float(cv.pecas["motor"])])
 	muro.queue_free()
 	Input.action_press("pular")
@@ -2820,7 +2842,7 @@ func _teste_veiculos(livre: Vector3) -> void:
 	veiculos.sair(jogador)
 	await _quadros(3)
 	cv.global_position = c - Zv * 15.0
-	cv.rotation.y = 0.0
+	cv.rotation.y = yaw_p
 	cv.assentar()
 	veiculos.entrar(cv, jogador)
 	var z := _z_teste(c + Zv * 2.0, "walker", c - Zv * 15.0)
@@ -3126,6 +3148,167 @@ func _teste_rolamento(livre: Vector3) -> void:
 	_devolver_clareira(clar)
 
 
+## o acabamento do básico: o golpe pega quando a arma encosta (no clique o zumbi ainda não sentiu; se ele sai da frente, o
+## golpe passa no ar) e dá o tranco; a árvore treme a cada machadada, cai para o lado de lá, bate no chão e some; a pedra
+## quebra; o tiro deixa a marca e solta a poeira do que pegou
+func _teste_acabamento(livre: Vector3) -> void:
+	var hora_antes := hora
+	var spawn_antes := spawn_t
+	spawn_t = 9999.0
+	hora = 11.0
+	_limpar_zumbis()
+	var c := _lugar_plano(Vector2(-35, 45), 30.0, Vector2(livre.x, livre.z))
+	var clar := _clareira_teste(c, 26.0)
+	var X := Vector3(1, 0, 0)
+	_mao_vazia()
+	var z := _z_teste(c + X * 1.4, "walker", c)
+	_jogador_em(c, c + X * 1.4 + Vector3(0, 1.3, 0))
+	await _quadros(4)
+	jogador.cd = 0.0
+	jogador.atacar()
+	var no_clique: bool = is_equal_approx(z.vida, z.vida_max) and not jogador.golpe_pend.is_empty()
+	var tranco := false
+	for i in 90:
+		await get_tree().physics_frame
+		if jogador.golpe_pend.is_empty():
+			tranco = jogador._pausa_golpe > 0.0 or jogador._soco.length() > 0.001
+			break
+	var pegou := z.vida < z.vida_max
+	await _quadros(40)
+	var v_antes := z.vida
+	jogador.cd = 0.0
+	jogador.atacar()
+	z.global_position += X * 6.0
+	for i in 90:
+		await get_tree().physics_frame
+		if jogador.golpe_pend.is_empty():
+			break
+	var errou := is_equal_approx(z.vida, v_antes)
+	_confere(no_clique and pegou and tranco and errou, "acabamento: o golpe pega quando o punho chega (no clique o zumbi ainda tinha %.0f de %.0f; depois %s e a tela deu o tranco: %s); se ele sai da frente, o golpe passa no ar (%s)" % [
+		z.vida_max if no_clique else -1.0, z.vida_max, "sentiu" if pegou else "não sentiu", str(tranco), "passou" if errou else "pegou assim mesmo"])
+	_limpar_zumbis()
+	# o tiro na terra: a poeira e a marca
+	jogador.inv.por("pistola", 1)
+	jogador.inv.por("municao9", 8)
+	_na_mao("pistola")
+	var sp_p = jogador.item_mao()
+	sp_p["mun"] = 8
+	await _quadros(3)
+	_olhar(c + X * 5.0 + Vector3(0, -1.2, 0))
+	var marcas0: int = efeitos._marcas.size()
+	jogador.cd = 0.0
+	jogador.atacar()
+	await _quadros(5)
+	var marcou: bool = efeitos._marcas.size() == marcas0 + 1
+	_confere(marcou, "acabamento: o tiro no chão deixou a marca (%d marcas) e levantou a poeira" % efeitos._marcas.size())
+	for it in ["pistola", "municao9"]:
+		var n := jogador.inv.conta(it)
+		if n > 0:
+			jogador.inv.tirar(it, n)
+	_devolver_clareira(clar)
+	# a árvore: treme a cada machadada, cai para o lado de lá, bate no chão e some
+	var i_arv := -1
+	var melhor := 1e9
+	for i in mundo.recursos.size():
+		var r: Dictionary = mundo.recursos[i]
+		if str(r["tipo"]) != "arvore" or float(r["vida"]) <= 0.0 or not r.has("inst"):
+			continue
+		var d := Vector2(float(r["pos"].x) - c.x, float(r["pos"].z) - c.z).length()
+		if d < melhor and d > 6.0 and (r["corpo"] as CollisionObject3D).collision_layer != 0:
+			melhor = d
+			i_arv = i
+	var tremeu := false
+	var caindo := false
+	var bateu := false
+	var deitou := false
+	var sumiu := false
+	var lado_ok := false
+	if i_arv >= 0:
+		var ra: Dictionary = mundo.recursos[i_arv]
+		var pa: Vector3 = ra["pos"]
+		jogador.inv.por("machado", 1)
+		_na_mao("machado")
+		var de := pa - X * 1.3
+		_por_em(Vector3(de.x, terreno.h(de.x, de.z) + 0.2, de.z))
+		await _quadros(8)
+		_olhar(pa + Vector3(0, 1.3, 0))
+		await _quadros(3)
+		var golpes := 0
+		while float(ra["vida"]) > 0.0 and golpes < 10:
+			await _golpear()
+			if mundo._anims.has(i_arv) and str(mundo._anims[i_arv]["tipo"]) == "treme":
+				tremeu = true
+			golpes += 1
+			await _quadros(4)
+		caindo = mundo._anims.has(i_arv) and str(mundo._anims[i_arv]["tipo"]) == "cai"
+		if caindo:
+			lado_ok = (mundo._anims[i_arv]["dir"] as Vector3).dot(X) > 0.7
+		for k in 240:
+			await get_tree().physics_frame
+			if mundo._anims.has(i_arv) and bool(mundo._anims[i_arv].get("bateu", false)):
+				bateu = true
+				break
+		# deitada: o "para cima" da árvore de perto aponta para o lado
+		var par0: Array = ra["inst"][0]
+		var g0: Dictionary = mundo.grupos[par0[0]]
+		var xf0: Transform3D = (g0["mmi"] as MultiMeshInstance3D).multimesh.get_instance_transform(par0[1])
+		deitou = xf0.basis.y.normalized().dot(Vector3.UP) < 0.35
+		for k in 420:
+			await get_tree().physics_frame
+			if not mundo._anims.has(i_arv):
+				break
+		var xf1: Transform3D = (g0["mmi"] as MultiMeshInstance3D).multimesh.get_instance_transform(par0[1])
+		sumiu = not mundo._anims.has(i_arv) and xf1.basis.get_scale().length() < 0.01
+		var n_m := jogador.inv.conta("machado")
+		if n_m > 0:
+			jogador.inv.tirar("machado", n_m)
+	_confere(i_arv >= 0 and tremeu and caindo and lado_ok and bateu and deitou and sumiu,
+		"acabamento: a árvore tremeu com a machadada (%s), caiu para o lado de lá (%s), bateu no chão (%s), ficou deitada (%s) e depois sumiu (%s)" % [
+		str(tremeu), str(caindo and lado_ok), str(bateu), str(deitou), str(sumiu)])
+	# a pedra: a picareta quebra e ela encolhe e some na poeira
+	var i_pe := -1
+	melhor = 1e9
+	for i in mundo.recursos.size():
+		var r: Dictionary = mundo.recursos[i]
+		if str(r["tipo"]) != "pedra" or float(r["vida"]) <= 0.0 or not r.has("no"):
+			continue
+		var d := Vector2(float(r["pos"].x) - c.x, float(r["pos"].z) - c.z).length()
+		if d < melhor:
+			melhor = d
+			i_pe = i
+	var quebrou := false
+	if i_pe >= 0:
+		var rp: Dictionary = mundo.recursos[i_pe]
+		var pp: Vector3 = rp["pos"]
+		jogador.inv.por("picareta", 1)
+		_na_mao("picareta")
+		var ab: AABB = (rp["no"] as MeshInstance3D).get_aabb()
+		var sc: Vector3 = (rp["no"] as Node3D).transform.basis.get_scale()
+		var raio_p := maxf(ab.size.x * sc.x, ab.size.z * sc.z) * 0.5
+		var dp := pp - X * (raio_p + 1.0)
+		_por_em(Vector3(dp.x, terreno.h(dp.x, dp.z) + 0.2, dp.z))
+		await _quadros(8)
+		_olhar(pp + Vector3(0, ab.size.y * sc.y * 0.4, 0))
+		await _quadros(3)
+		var g2 := 0
+		var rachou := false
+		while float(rp["vida"]) > 0.0 and g2 < 8:
+			await _golpear()
+			g2 += 1
+			if mundo._anims.has(i_pe) and str(mundo._anims[i_pe]["tipo"]) == "racha":
+				rachou = true
+			await _quadros(3)
+		await _quadros(40)
+		quebrou = rachou and not (rp["no"] as Node3D).visible
+		var n_p := jogador.inv.conta("picareta")
+		if n_p > 0:
+			jogador.inv.tirar("picareta", n_p)
+	_confere(i_pe >= 0 and quebrou, "acabamento: a picareta quebrou a pedra (ela encolheu e sumiu na poeira)")
+	_mao_vazia()
+	spawn_t = spawn_antes
+	hora = hora_antes
+
+
 ## o espaço da mochila com o item (para os testes)
 func _slot_de(id: String) -> int:
 	for i in jogador.inv.slots.size():
@@ -3298,6 +3481,38 @@ func _limpar_zumbis() -> void:
 
 
 ## um lugar plano para os testes dos zumbis e das armas (sem casa nem muro no meio; árvore e pedra podem ter: a clareira tira)
+## a direção da pista dos testes dos veículos: a primeira (de 16 em volta) em que os 38 m e a faixa da curva à direita não têm
+## nada da altura da lataria (de 15 cm a 2,5 m do chão; o chão, as árvores e as pedras da clareira não contam)
+func _pista_livre(c: Vector3) -> Vector3:
+	var sp := get_world_3d().direct_space_state
+	var q := PhysicsShapeQueryParameters3D.new()
+	var caixa := BoxShape3D.new()
+	caixa.size = Vector3(7.0, 2.35, 8.0)
+	q.shape = caixa
+	q.collision_mask = 1
+	var fora: Array[RID] = [terreno.corpo_chao.get_rid()]
+	q.exclude = fora
+	for k in 16:
+		var a := k * TAU / 16.0
+		var d := Vector3(sin(a), 0, cos(a))
+		var lado := Vector3(-d.z, 0, d.x)
+		var ok := true
+		for s0 in [-19.0, -11.0, -3.0, 5.0, 13.0]:
+			var m: Vector3 = c + d * (float(s0) + 4.0) + lado * 1.6
+			q.transform = Transform3D(Basis(Vector3.UP, a), Vector3(m.x, terreno.h(m.x, m.z) + 0.15 + 1.175, m.z))
+			for hh in sp.intersect_shape(q, 1024):
+				var col: Object = hh["collider"]
+				if not col.has_meta("recurso") and not col.has_meta("veiculo") and not (col is CharacterBody3D):
+					ok = false
+					break
+			if not ok:
+				break
+		if ok:
+			return d
+	print("      (nenhuma direção com a pista toda livre: vai para +z)")
+	return Vector3(0, 0, 1)
+
+
 func _lugar_plano(centro: Vector2, lado: float, evita: Vector2, rente := false) -> Vector3:
 	var sp := get_world_3d().direct_space_state
 	var q := PhysicsShapeQueryParameters3D.new()
@@ -3535,7 +3750,7 @@ func _teste_zumbis(livre: Vector3) -> void:
 	var recuou := Vector2(z.global_position.x - p_antes.x, z.global_position.z - p_antes.z).length()
 	await _quadros(8)
 	_jogador_em(z.global_position - X * 1.3, z.global_position + Vector3(0, 1.1, 0))
-	jogador.atacar()
+	await _golpear()
 	await _quadros(3)
 	var e_comb := z.estado
 	_confere(e_emp == "atordoado" and recuou > 0.3 and e_comb == "derrubado",
@@ -3576,7 +3791,7 @@ func _teste_zumbis(livre: Vector3) -> void:
 	await _quadros(12)
 	_olhar(z.global_position + Vector3(0, 1.0, 0))
 	var e_f := z.estado
-	jogador.atacar()
+	await _golpear()
 	var d_furtivo := z.vida_max - z.vida
 	Input.action_release("agachar")
 	_limpar_zumbis()
@@ -3584,7 +3799,7 @@ func _teste_zumbis(livre: Vector3) -> void:
 	z = _z_teste(c + X * 3.0, "walker", c)
 	_jogador_em(c + X * 1.5, c + X * 3.0 + Vector3(0, 1.2, 0))
 	await _quadros(4)
-	jogador.atacar()
+	await _golpear()
 	var d_normal := z.vida_max - z.vida
 	_confere(e_f == "vaga" and d_normal > 0.0 and d_furtivo >= d_normal * 1.6,
 		"golpe furtivo (agachado, pelas costas): %.0f de dano contra %.0f de frente" % [d_furtivo, d_normal])
@@ -3596,7 +3811,7 @@ func _teste_zumbis(livre: Vector3) -> void:
 	z = _z_teste(c + X * 1.6, "brute", c)
 	await _quadros(3)
 	var no_arco_b: int = jogador._zumbis_no_golpe(1.9).size()
-	jogador.atacar()
+	await _golpear()
 	await _quadros(2)
 	_confere(z.vida < z.vida_max and z.estado != "atordoado", "brutamontes: o soco não faz ele cambalear (%s, vida %.0f/%.0f, no arco %d) · %s"
 		% [z.estado, z.vida, z.vida_max, no_arco_b, _diag_z(z)])
@@ -4129,8 +4344,7 @@ func _teste() -> void:
 	await _quadros(3)
 	var md0 := jogador.inv.conta("madeira")
 	for i in 6:
-		jogador.cd = 0.0
-		jogador.atacar()
+		await _golpear()
 		await _quadros(2)
 	var com_mao := jogador.inv.conta("madeira") - md0
 	_confere(com_mao == 2, "coleta: 6 socos na árvore deram %d madeira (1 a cada 3, como no jogo antigo)" % com_mao)
@@ -4153,8 +4367,7 @@ func _teste() -> void:
 	_olhar(pc_w + Vector3(0, 0.3, 0))
 	await _quadros(3)
 	var s0 := jogador.inv.conta("pedra")
-	jogador.cd = 0.0
-	jogador.atacar()
+	await _golpear()
 	_confere(jogador.inv.conta("pedra") == s0, "rocha na mão não dá pedra (precisa de picareta)")
 	# pegar coisa do chão (E): pedra solta, galho (gravetos), fibra, cogumelo
 	var solto: Dictionary = {}
@@ -4210,8 +4423,7 @@ func _teste() -> void:
 	await _quadros(2)
 	var s1 := jogador.inv.conta("pedra")
 	var dur0 := float(jogador.item_mao().get("dur", 0.0))
-	jogador.cd = 0.0
-	jogador.atacar()
+	await _golpear()
 	_confere(jogador.inv.conta("pedra") - s1 == 2, "picareta na rocha: +%d pedra" % (jogador.inv.conta("pedra") - s1))
 	_confere(float(jogador.item_mao().get("dur", 0.0)) < dur0, "a picareta gastou (%d -> %d)" % [int(dur0), int(jogador.item_mao().get("dur", 0.0))])
 	# machado na árvore: 1 ou 2 por golpe; com 5 golpes ela cai e dá mais
@@ -4230,8 +4442,7 @@ func _teste() -> void:
 		var m1 := jogador.inv.conta("madeira")
 		var golpes := 0
 		while float(mundo.recursos[i_arv]["vida"]) > 0.0 and golpes < 8:
-			jogador.cd = 0.0
-			jogador.atacar()
+			await _golpear()
 			golpes += 1
 			await _quadros(2)
 		var mad := jogador.inv.conta("madeira") - m1
@@ -4376,8 +4587,7 @@ func _teste() -> void:
 		_na_mao("martelo")
 		_olhar(b0["xf"] * Vector3(-1.5, F + 1.2, 0.0))
 		var tb0 := jogador.inv.conta("tabuas")
-		jogador.cd = 0.0
-		jogador.atacar()
+		await _golpear()
 		_confere(float(construcao.pecas[ip_porta]["vida"]) >= float(construcao.pecas[ip_porta]["max"]) and jogador.inv.conta("tabuas") < tb0,
 			"martelo consertou a porta (%d) gastando tábuas" % int(construcao.pecas[ip_porta]["vida"]))
 		# móveis e defesa: baú (guarda coisas), cama (renasce nela) e estacas (ferem zumbi)
@@ -4581,6 +4791,7 @@ func _teste() -> void:
 	await _teste_veiculos(livre)
 	await _teste_barcos()
 	await _teste_rolamento(livre)
+	await _teste_acabamento(livre)
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")
@@ -5382,6 +5593,68 @@ func _fotos() -> void:
 	jogador.rola_parado = false
 	await _quadros(60)
 	jogador.alternar_camera(false)
+	# o acabamento: a árvore cortada caindo (parada no meio da queda) e as marcas de tiro num tronco
+	var i_fa := -1
+	var melhor_fa := 1e9
+	var base_fa := lw + X3 * 6.0
+	for i in mundo.recursos.size():
+		var r: Dictionary = mundo.recursos[i]
+		if str(r["tipo"]) != "arvore" or float(r["vida"]) <= 0.0 or not r.has("inst"):
+			continue
+		var dfa := Vector2(float(r["pos"].x) - base_fa.x, float(r["pos"].z) - base_fa.z).length()
+		if dfa > 7.0 and dfa < melhor_fa:
+			melhor_fa = dfa
+			i_fa = i
+	if i_fa >= 0:
+		var pfa: Vector3 = mundo.recursos[i_fa]["pos"]
+		var lado_fa := Vector3(pfa.x - base_fa.x, 0, pfa.z - base_fa.z).normalized()
+		var de_fa := pfa - Vector3(-lado_fa.z, 0, lado_fa.x) * 1.5
+		hora = 10.5
+		_jogador_em(pfa - lado_fa * 9.0, pfa + Vector3(0, 3.5, 0))
+		await _quadros(5)
+		mundo.tremer(i_fa, de_fa)
+		mundo.recursos[i_fa]["vida"] = 1.0
+		mundo.golpe(i_fa)
+		mundo._anims[i_fa]["t"] = 1.3
+		mundo.anims_parados = true
+		mundo._passo_anims(0.0)
+		await _quadros(6)
+		await _foto("18a_arvore_caindo")
+		mundo.anims_parados = false
+		await _quadros(30)
+	# as marcas de tiro e a poeira no tronco de uma árvore, de perto
+	var i_mt := -1
+	var melhor_mt := 1e9
+	for i in mundo.recursos.size():
+		var r: Dictionary = mundo.recursos[i]
+		if str(r["tipo"]) != "arvore" or float(r["vida"]) <= 0.0 or i == i_fa:
+			continue
+		var dmt := Vector2(float(r["pos"].x) - base_fa.x, float(r["pos"].z) - base_fa.z).length()
+		if dmt < melhor_mt:
+			melhor_mt = dmt
+			i_mt = i
+	if i_mt >= 0:
+		var pmt: Vector3 = mundo.recursos[i_mt]["pos"]
+		_jogador_em(pmt - X3 * 3.2, pmt + Vector3(0, 1.4, 0))
+		await _quadros(5)
+		jogador.inv.por("pistola", 1)
+		jogador.inv.por("municao9", 12)
+		_na_mao("pistola")
+		var sp_f = jogador.item_mao()
+		sp_f["mun"] = 12
+		for k in 6:
+			_olhar(pmt + Vector3(0, 1.1 + 0.12 * float(k % 3), 0) + Vector3(0, 0, 0.06 * float(k - 3)))
+			jogador.cd = 0.0
+			jogador.atacar()
+			await _quadros(4)
+		_olhar(pmt + Vector3(0, 1.25, 0))
+		await _quadros(8)
+		await _foto("18b_marcas_de_tiro")
+		for it in ["pistola", "municao9"]:
+			var n := jogador.inv.conta(it)
+			if n > 0:
+				jogador.inv.tirar(it, n)
+		_mao_vazia()
 	_devolver_clareira(clar)
 	# a pausa (Esc), o mapa grande (M) e a tela de morte
 	telas.pausa()

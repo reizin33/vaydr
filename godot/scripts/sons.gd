@@ -111,6 +111,10 @@ func _ready() -> void:
 	bancos["partida"] = [_mistura(_ruido(0.7, 520.0, 0.5, 3.6), _tom(0.65, 34.0, 58.0, 0.75, 2.2))]
 	# a hélice do helicóptero (o "tuc-tuc" das pás: ruído grave e uma nota baixa, curtos)
 	bancos["helice"] = [_mistura(_ruido(0.34, 380.0, 0.8, 7.0), _tom(0.3, 38.0, 34.0, 0.35, 8.0))]
+	# a árvore cortada: o estalo do tronco rachando (notas graves que descem, com o ranger da madeira) e o baque no chão com
+	# o farfalhar da copa
+	bancos["arvore_range"] = [_mistura(_mistura(_tom(1.1, 210.0, 120.0, 0.32, 1.8), _tom(0.9, 330.0, 190.0, 0.18, 2.4)), _ruido(0.6, 900.0, 0.3, 5.0))]
+	bancos["arvore_cai"] = [_mistura(_mistura(_tom(0.9, 62.0, 34.0, 1.0, 4.5), _ruido(1.5, 2600.0, 0.75, 2.6)), _ruido(0.35, 380.0, 0.9, 9.0))]
 	_gravacoes()
 
 

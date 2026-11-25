@@ -42,6 +42,8 @@ var mat_placa: ShaderMaterial
 var fotos_prontas := false
 var _folha_orig := {}     # material de folha novo -> o material do modelo (para a foto da espécie)
 var _voltando := []       # recursos que acabaram e esperam voltar (índices)
+var _anims := {}          # golpes que se veem: índice do recurso -> {tipo: treme/cai/racha, t, eixo...}
+var anims_parados := false  # para a foto: a árvore fica parada no meio da queda
 var _vazias := []         # móveis já revistados (índices)
 var serra := {"paredoes": 0, "soltas": 0, "folhagem": 0, "colisoes": 0, "teste": Vector3.ZERO}
 
@@ -214,6 +216,8 @@ func mostrar(r: Dictionary) -> void:
 			var g: Dictionary = grupos[par[0]]
 			(g["mmi"] as MultiMeshInstance3D).multimesh.set_instance_transform(par[1], g["xfs"][par[1]])
 	elif r.has("no"):
+		if r.has("xf_no"):
+			(r["no"] as Node3D).transform = r["xf_no"]
 		(r["no"] as Node3D).visible = true
 
 
@@ -943,8 +947,135 @@ func _acabou(i: int) -> void:
 	corpo.process_mode = Node.PROCESS_MODE_DISABLED
 	for c in corpo.get_children():
 		(c as CollisionShape3D).disabled = true
-	esconder(r)
+	var tipo := str(r["tipo"])
+	if tipo == "arvore" and r.has("inst"):
+		# a árvore cortada cai para o lado de lá de quem cortou (a placa de longe some na hora: ela não deita)
+		var de: Vector3 = r.get("de", r["pos"] + Vector3(-1, 0, 0))
+		var dir := Vector3(float(r["pos"].x) - de.x, 0.0, float(r["pos"].z) - de.z)
+		if dir.length() < 0.05:
+			dir = Vector3(1, 0, 0)
+		dir = dir.normalized()
+		_anims[i] = {"tipo": "cai", "t": 0.0, "eixo": Vector3.UP.cross(dir).normalized(), "dir": dir, "bateu": false}
+		for par in r["inst"]:
+			if str(par[0]).begins_with("placa"):
+				var g: Dictionary = grupos[par[0]]
+				(g["mmi"] as MultiMeshInstance3D).multimesh.set_instance_transform(par[1], Transform3D(Basis().scaled(Vector3.ZERO), g["xfs"][par[1]].origin))
+		if main_ok():
+			main_no().sons.tocar("arvore_range", r["pos"] + Vector3(0, 2.0, 0), 2.0)
+	elif tipo == "pedra" and r.has("no"):
+		# a pedra quebra: encolhe e afunda num instante, com poeira
+		r["xf_no"] = (r["no"] as Node3D).transform
+		_anims[i] = {"tipo": "racha", "t": 0.0}
+		if main_ok():
+			main_no().efeitos.poeira(r["pos"] + Vector3(0, 0.4, 0), Color(0.55, 0.52, 0.48), 8, 0.8)
+	else:
+		_anims.erase(i)
+		esconder(r)
 	_voltando.append(i)
+
+
+# ---------------------------------------------------------------- golpes que se veem (o acabamento da coleta)
+func main_ok() -> bool:
+	return is_inside_tree() and get_parent() != null and get_parent().get("sons") != null and get_parent().get("efeitos") != null
+
+
+func main_no() -> Node:
+	return get_parent()
+
+
+## o golpe numa árvore, num tronco ou numa pedra: ela treme para o lado de lá de quem bateu (e guarda de onde veio o golpe,
+## para a árvore cair para lá quando acabar)
+func tremer(i: int, de: Vector3) -> void:
+	if i < 0 or i >= recursos.size():
+		return
+	var r: Dictionary = recursos[i]
+	r["de"] = de
+	if _anims.has(i) and str(_anims[i]["tipo"]) != "treme":
+		return
+	if float(r["vida"]) <= 0.0:
+		return
+	var dir := Vector3(float(r["pos"].x) - de.x, 0.0, float(r["pos"].z) - de.z)
+	if dir.length() < 0.05:
+		dir = Vector3(1, 0, 0)
+	_anims[i] = {"tipo": "treme", "t": 0.0, "eixo": Vector3.UP.cross(dir.normalized()).normalized(),
+		"forte": 1.0 if str(r["tipo"]) == "arvore" else 0.35}
+
+
+## gira a árvore (as versões de perto e de meia distância) em volta do pé dela; "afunda" desce no chão depois de cair
+func _girar(r: Dictionary, eixo: Vector3, ang: float, afunda := 0.0) -> void:
+	var base: Vector3 = r["pos"]
+	var rot := Basis(eixo, ang)
+	var t := Transform3D(rot, base - rot * base - Vector3(0, afunda, 0))
+	if r.has("inst"):
+		for par in r["inst"]:
+			if str(par[0]).begins_with("placa"):
+				continue
+			var g: Dictionary = grupos[par[0]]
+			(g["mmi"] as MultiMeshInstance3D).multimesh.set_instance_transform(par[1], t * (g["xfs"][par[1]] as Transform3D))
+	elif r.has("no"):
+		var no := r["no"] as Node3D
+		if not r.has("xf_no"):
+			r["xf_no"] = no.transform
+		no.transform = t * (r["xf_no"] as Transform3D)
+
+
+## a árvore bateu no chão: o baque, a poeira e as folhas, e a tela de quem está perto treme
+func _tombou(r: Dictionary, a: Dictionary) -> void:
+	if not main_ok():
+		return
+	var m := main_no()
+	var alto := float(r.get("s", 1.0)) * 7.0
+	var topo: Vector3 = r["pos"] + (a["dir"] as Vector3) * alto * 0.6
+	topo.y = terreno.h(topo.x, topo.z) + 0.5
+	m.sons.tocar("arvore_cai", topo, 4.0)
+	m.efeitos.poeira(topo, Color(0.5, 0.46, 0.36), 10, alto * 0.25)
+	m.efeitos.lascas(topo + Vector3(0, 0.6, 0), Vector3.UP, "fibra")
+	m.efeitos.lascas(r["pos"] + Vector3(0, 0.4, 0), Vector3.UP, "madeira")
+	var j = m.get("jogador")
+	if j != null and is_instance_valid(j):
+		var d: float = (j as Node3D).global_position.distance_to(topo)
+		if d < 18.0:
+			j.tremor = maxf(float(j.tremor), 0.45 * (1.0 - d / 18.0))
+
+
+func _passo_anims(dt: float) -> void:
+	for i in _anims.keys():
+		var a: Dictionary = _anims[i]
+		var r: Dictionary = recursos[i]
+		a["t"] = float(a["t"]) + dt
+		var t: float = a["t"]
+		match str(a["tipo"]):
+			"treme":
+				var ang := sin(t * 26.0) * exp(-t * 7.0) * 0.045 * float(a["forte"])
+				if t > 0.7:
+					ang = 0.0
+					_anims.erase(i)
+				_girar(r, a["eixo"], ang)
+			"cai":
+				# cai devagar no começo e cada vez mais rápido, quica um pouco no chão e assenta; depois afunda e some
+				var T := 1.7
+				var deitada := PI * 0.5 - 0.07
+				var ang := deitada * (t / T) * (t / T) if t < T else deitada
+				if t >= T:
+					if not bool(a["bateu"]):
+						a["bateu"] = true
+						_tombou(r, a)
+					var q := t - T
+					ang = deitada - sin(q * 13.0) * exp(-q * 5.0) * 0.06
+				var afunda := clampf((t - T - 2.2) / 1.6, 0.0, 1.0)
+				_girar(r, a["eixo"], ang, afunda * afunda * 2.2)
+				if afunda >= 1.0:
+					_anims.erase(i)
+					esconder(r)
+			"racha":
+				var k := clampf(t / 0.35, 0.0, 1.0)
+				var no := r["no"] as Node3D
+				var xf: Transform3D = r["xf_no"]
+				no.transform = Transform3D(xf.basis.scaled(Vector3.ONE * lerpf(1.0, 0.12, k * k)), xf.origin - Vector3(0, k * 0.35, 0))
+				if k >= 1.0:
+					no.transform = xf
+					_anims.erase(i)
+					esconder(r)
 
 
 ## revista um móvel: o que tem dentro sai da tabela de saque dele no jogo antigo ([item, quantidade, extra]; ferramenta e
@@ -1029,6 +1160,8 @@ func carregar(d: Dictionary) -> void:
 
 ## o que acabou volta depois de um tempo (árvore e pedra em 10 min, planta e coisa do chão em 5, móvel revistado em 15)
 func _process(dt: float) -> void:
+	if not _anims.is_empty() and not anims_parados:
+		_passo_anims(dt)
 	if not _voltando.is_empty():
 		var fica := []
 		for i in _voltando:
@@ -1042,6 +1175,7 @@ func _process(dt: float) -> void:
 			for c in corpo.get_children():
 				(c as CollisionShape3D).disabled = false
 			corpo.process_mode = Node.PROCESS_MODE_INHERIT
+			_anims.erase(i)
 			mostrar(r)
 		_voltando = fica
 	if not _vazias.is_empty():

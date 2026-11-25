@@ -71,6 +71,13 @@ var sono := 100.0         # o sono (etapa 6c): cai acordado, enche dormindo
 var golpe_t := -1.0      # o golpe no corpo (terceira pessoa): tempo desde o clique
 var golpe_dur := 0.4
 var golpe_parado := false   # para a foto: o golpe fica parado onde está
+var golpe_pend := {}        # o golpe a caminho: pega quando a arma chega na frente (não no clique)
+const IMPACTO_GOLPE := 0.45 # em que parte do golpe a arma encosta (o preparo vai até 0,4 e a descida até 0,65)
+var _pausa_golpe := 0.0     # o golpe "agarra" um instante no impacto (a mão para e a câmera dá um tranco)
+var _soco := Vector3.ZERO   # o tranco da câmera no impacto (x sobe/desce, z inclina)
+var _pulo_buf := 0.0        # o Espaço apertado há pouco (pula assim que tocar o chão)
+var _chao_t := 0.0          # há quanto tempo saiu do chão (logo depois de sair da beirada ainda dá para pular)
+var _corre_k := 0.0         # o quanto está correndo (o campo de visão abre um pouco)
 var uso_t := -1.0        # comendo ou bebendo: a mão vai à boca
 var _roupa_t := 0.0
 var _dobra_a := 0.0      # o pulso da mão da primeira pessoa (para o lado do mindinho ou do polegar)
@@ -646,21 +653,33 @@ func _physics_process(dt: float) -> void:
 	var k := 12.0 if is_on_floor() else 2.5
 	velocity.x = lerpf(velocity.x, alvo.x, 1.0 - exp(-k * dt))
 	velocity.z = lerpf(velocity.z, alvo.z, 1.0 - exp(-k * dt))
+	# o pulo perdoa um pouco: o Espaço apertado um instante antes de tocar o chão vale, e logo depois de sair da beirada também
+	if Input.is_action_just_pressed("pular"):
+		_pulo_buf = 0.14
+	_pulo_buf = maxf(0.0, _pulo_buf - dt)
 	if is_on_floor():
+		_chao_t = 0.0
 		if queda_v < -11.0:
 			ferir((-queda_v - 11.0) * 6.0, false)
 			tremor = 0.35
 			# a queda alta quebra a perna (etapa 6f)
 			if main.lesoes != null and vivo:
 				main.lesoes.queda(-queda_v - 11.0)
+		# o pouso: a cabeça desce um pouco (mais quanto maior a queda) e o pé bate no chão
+		if queda_v < -4.0:
+			cabeca.position.y -= minf(0.22, (-queda_v - 3.0) * 0.022)
+			main.sons.tocar(_som_passo(), global_position, minf(4.0, -6.0 + (-queda_v - 4.0) * 1.2))
 		queda_v = 0.0
-		if Input.is_action_just_pressed("pular") and not preso and energia >= 6.0 and (main.lesoes == null or main.lesoes.pode_pular()):
-			velocity.y = PULO
-			energia -= 6.0
-			_folego_t = 0.0
 	else:
+		_chao_t += dt
 		velocity.y -= GRAV * dt
 		queda_v = minf(queda_v, velocity.y)
+	if _pulo_buf > 0.0 and _chao_t < 0.12 and velocity.y <= 0.5 and not preso and energia >= 6.0 and (main.lesoes == null or main.lesoes.pode_pular()):
+		velocity.y = PULO
+		energia -= 6.0
+		_folego_t = 0.0
+		_pulo_buf = 0.0
+		_chao_t = 1.0
 	move_and_slide()
 	# meio-fio, soleira e degrau (até 55 cm, como no jogo antigo): sobe andando
 	if is_on_wall() and is_on_floor() and Vector2(alvo.x, alvo.z).length() > 0.5:
@@ -709,11 +728,16 @@ func _process(dt: float) -> void:
 		return
 	# mirando, o campo de visão fecha um pouco (a luneta do rifle, bem mais); o coice levanta a câmera e volta
 	var id_m := str(item_mao().get("id", ""))
-	var fov_alvo := fov_base * lerpf(1.0, 0.8, mira_k)
+	# correndo, o campo de visão abre um pouco (a sensação de velocidade); mirando, fecha
+	var corre_agora := _corre and Vector2(velocity.x, velocity.z).length() > ANDA + 0.5 and veiculo == null
+	_corre_k = lerpf(_corre_k, 1.0 if corre_agora else 0.0, 1.0 - exp(-dt * 6.0))
+	var fov_alvo := fov_base * lerpf(1.0, 0.8, mira_k) * (1.0 + 0.06 * _corre_k * (1.0 - mira_k))
 	if id_m == "rifle" and mira_k > 0.6:
 		fov_alvo = 16.0
 	cam.fov = fov_alvo if absf(cam.fov - fov_alvo) < 0.5 or mira_k <= 0.0 else lerpf(cam.fov, fov_alvo, 1.0 - exp(-dt * 18.0))
-	cam.rotation.x = recuo
+	_soco = _soco.lerp(Vector3.ZERO, 1.0 - exp(-dt * 16.0))
+	cam.rotation.x = recuo + _soco.x
+	cam.rotation.z = _soco.z
 	_animar_corpo(dt)
 	_view_model()
 	_dobrar_braco(dt)
@@ -1069,9 +1093,14 @@ func _animar_corpo(dt: float) -> void:
 	var id := str(item_mao().get("id", ""))
 	var d := Dados.item(id) if id != "" else {}
 	var gs := -1.0
+	if _pausa_golpe > 0.0:
+		_pausa_golpe = maxf(0.0, _pausa_golpe - dt)
+	elif golpe_t >= 0.0 and not golpe_parado:
+		golpe_t += dt
+	# a arma chegou na frente: o golpe pega agora
+	if not golpe_pend.is_empty() and (golpe_t < 0.0 or golpe_t >= float(golpe_pend["em"])):
+		_resolver_golpe()
 	if golpe_t >= 0.0:
-		if not golpe_parado:
-			golpe_t += dt
 		gs = golpe_t / golpe_dur
 		if gs >= 1.0:
 			golpe_t = -1.0
@@ -1163,6 +1192,19 @@ func atacar() -> void:
 	golpe_dur = maxf(0.3, cd * 0.85)
 	golpe_n += 1
 	main.sons.tocar("golpe", global_position, -8.0)
+	# o golpe pega quando a arma (ou o punho) chega na frente, não no clique: até lá o alvo pode sair e o golpe passa no ar
+	golpe_pend = {"em": golpe_dur * IMPACTO_GOLPE, "st": st, "d": d, "arma": arma, "id": id, "sel": sel}
+
+
+## o instante em que a arma encosta: o que estiver na frente leva o golpe (se a arma ainda é a mesma e você está vivo)
+func _resolver_golpe() -> void:
+	var g := golpe_pend
+	golpe_pend = {}
+	if not vivo or veiculo != null or sel != int(g["sel"]) or str(item_mao().get("id", "")) != str(g["id"]):
+		return
+	var st: Dictionary = g["st"]
+	var d: Dictionary = g["d"]
+	var arma: bool = g["arma"]
 	var alc := float(st.get("alcance", 1.9))
 	var h := mira(alc + 0.7)
 	# os zumbis: o da mira primeiro, depois os do arco do golpe (o golpe de lado pega até dois; o de cima, um)
@@ -1182,6 +1224,7 @@ func atacar() -> void:
 			_bater_zumbi(alvos[i], st, d, arma, h if alvos[i] == direto else {})
 		main.ui.acerto()
 		main.barulho(global_position, 6.0)
+		_impacto(float(st.get("dano", 9.0)), bool(d.get("vertical", false)))
 		if arma:
 			_gastar()
 		return
@@ -1192,12 +1235,15 @@ func atacar() -> void:
 		_bater_bicho(c.get_meta("bicho"), st, d, arma, h)
 		main.ui.acerto()
 		main.barulho(global_position, 6.0)
+		_impacto(float(st.get("dano", 9.0)), bool(d.get("vertical", false)))
 		if arma:
 			_gastar()
 		return
 	if c.has_meta("recurso"):
 		_coletar(c.get_meta("recurso"), d, arma, h)
 		main.barulho(global_position, 6.0)
+		# madeira e pedra seguram a arma mais do que carne
+		_impacto(float(st.get("dano", 9.0)) * 1.3, bool(d.get("vertical", false)))
 	elif c.has_meta("peca") and bool(d.get("conserta", false)):
 		var r: String = main.construcao.consertar(c.get_meta("peca"), inv)
 		if r == "":
@@ -1206,6 +1252,19 @@ func atacar() -> void:
 			_gastar()
 		else:
 			main.ui.aviso(r)
+
+
+## o tranco do golpe que pegou: a mão agarra um instante no alvo (mais nas armas pesadas), a câmera dá um tranco para baixo
+## (golpe de cima) ou de lado, e treme um pouco. Só na tela de quem bateu: o mundo não para
+func _impacto(dano: float, vertical: bool) -> void:
+	var k := clampf(dano / 30.0, 0.25, 1.0)
+	_pausa_golpe = lerpf(0.04, 0.09, k)
+	if vertical:
+		_soco.x -= lerpf(0.012, 0.035, k)
+	else:
+		_soco.z += lerpf(0.01, 0.028, k) * (1.0 if golpe_n % 2 == 0 else -1.0)
+		_soco.x -= lerpf(0.004, 0.012, k)
+	tremor = maxf(tremor, lerpf(0.05, 0.16, k))
 
 
 ## um golpe num zumbi: de cima rende mais; agachado, pelas costas de quem não te viu, dobra (golpe furtivo); as armas pesadas
@@ -1516,6 +1575,9 @@ func _ganhar(id: String, n: int, extra := {}) -> void:
 func _coletar(i: int, d: Dictionary, arma: bool, h: Dictionary) -> void:
 	var rec: Dictionary = main.mundo.recursos[i]
 	var tp: String = rec["tipo"]
+	# a árvore, o tronco e a pedra tremem com o golpe (e a árvore guarda de onde veio, para cair para o lado de lá)
+	if tp in ["arvore", "pedra", "tronco"]:
+		main.mundo.tremer(i, global_position)
 	match tp:
 		"arvore":
 			if arma and bool(d.get("corta", false)):
@@ -1927,6 +1989,9 @@ func ferir(dano: float, tremer := true, de := Vector3.INF) -> void:
 
 func renascer(p: Vector3) -> void:
 	rola = {}
+	golpe_pend = {}
+	_pausa_golpe = 0.0
+	_soco = Vector3.ZERO
 	if veiculo != null:
 		veiculo = null
 		cam.transform = Transform3D.IDENTITY
@@ -2003,6 +2068,57 @@ func _tiro_hit(o: Vector3, d: Vector3, maxd: float, ign: Array) -> Dictionary:
 	return {"p": h["position"], "n": h["normal"], "c": c}
 
 
+## o tiro pegou em alguma coisa (não em gente nem bicho): a poeira, a lasca ou a faísca de cada material e a marca
+func _tiro_pegou(h: Dictionary) -> void:
+	var p: Vector3 = h["p"]
+	var n: Vector3 = h.get("n", Vector3.UP)
+	var mat := _material_tiro(h)
+	if mat == "agua":
+		var na: float = main.terreno.nivel_agua(p.x, p.z)
+		main.efeitos.impacto(Vector3(p.x, na, p.z), Vector3.UP, "agua")
+		return
+	main.efeitos.impacto(p, n, mat)
+	var c = h.get("c")
+	# a marca fica no que não anda (no carro ela anda junto com ele)
+	if c is Node3D and is_instance_valid(c) and mat != "planta":
+		main.efeitos.marca(p, n, c as Node3D if (c as Object).has_meta("veiculo") else null)
+
+
+## do que é feito o que o tiro pegou
+func _material_tiro(h: Dictionary) -> String:
+	var p: Vector3 = h["p"]
+	var na: float = main.terreno.nivel_agua(p.x, p.z)
+	if na > -900.0 and p.y < na - 0.02:
+		return "agua"
+	var c = h.get("c")
+	if c == null or not is_instance_valid(c):
+		return "terra"
+	if c == main.terreno.corpo_chao:
+		var ch: Dictionary = main.chao_em(p.x, p.z, p.y + 0.3)
+		return "terra" if bool(ch.get("terra", true)) else "concreto"
+	var o: Object = c
+	if o.has_meta("recurso"):
+		var ri := int(o.get_meta("recurso"))
+		if ri >= 0 and ri < main.mundo.recursos.size():
+			match str(main.mundo.recursos[ri]["tipo"]):
+				"arvore", "tronco":
+					return "madeira"
+				"pedra":
+					return "pedra"
+		return "planta"
+	if o.has_meta("veiculo"):
+		return "metal"
+	if o.has_meta("peca"):
+		var pi := int(o.get_meta("peca"))
+		var pid := str(main.construcao.pecas[pi]["id"]) if pi >= 0 and pi < main.construcao.pecas.size() else ""
+		if pid.contains("Pedra"):
+			return "pedra"
+		if pid.contains("Metal") or pid.contains("Ferro") or pid.contains("Chapa"):
+			return "metal"
+		return "madeira"
+	return "concreto"
+
+
 ## o tiro (pistola, espingarda, rifle) ou o virote (besta)
 func _disparar(s: Dictionary, id: String) -> void:
 	var B := Armas.dados(id)
@@ -2060,7 +2176,7 @@ func _disparar(s: Dictionary, id: String) -> void:
 				main.efeitos.sangue(hb, -dir)
 				main.ui.acerto()
 			elif h.has("p"):
-				main.efeitos.faiscas(h["p"])
+				_tiro_pegou(h)
 		var cab := false
 		for z in acum:
 			var a: Dictionary = acum[z]
@@ -2092,7 +2208,7 @@ func _disparar(s: Dictionary, id: String) -> void:
 			break
 		if not h.has("z"):
 			if h.has("p"):
-				main.efeitos.faiscas(h["p"])
+				_tiro_pegou(h)
 				fim = h["p"]
 			break
 		var z = h["z"]

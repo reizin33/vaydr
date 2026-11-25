@@ -393,3 +393,120 @@ class Nuvem extends Node3D:
 			tosse = 1.8
 			main.sons.tocar("tosse", j.global_position, -2.0)
 			main.ui.aviso("Gás! Saia da nuvem verde (a máscara de gás protege)", 2.0)
+
+
+# ---------------------------------------------------------------- o acabamento: poeira, o tiro que acerta cada coisa e as marcas
+var _bola: SphereMesh
+var _marcas: Array = []           # as marcas de tiro (as mais velhas somem quando passa de MARCAS_MAX)
+const MARCAS_MAX := 48
+var _mat_marca: StandardMaterial3D
+
+
+func _bola_poeira() -> SphereMesh:
+	if _bola == null:
+		_bola = SphereMesh.new()
+		_bola.radius = 0.35
+		_bola.height = 0.7
+		_bola.radial_segments = 8
+		_bola.rings = 4
+		var m := StandardMaterial3D.new()
+		m.vertex_color_use_as_albedo = true
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		_bola.material = m
+	return _bola
+
+
+## a poeira que sobe (a árvore que cai, a pedra que quebra, o tiro na terra): bolas macias que crescem devagar e somem
+func poeira(p: Vector3, cor: Color, qtd: int, raio: float) -> void:
+	var part := CPUParticles3D.new()
+	part.one_shot = true
+	part.emitting = false
+	part.amount = maxi(1, qtd)
+	part.lifetime = 1.6
+	part.explosiveness = 0.9
+	part.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	part.emission_sphere_radius = maxf(0.05, raio)
+	part.direction = Vector3.UP
+	part.spread = 75.0
+	part.initial_velocity_min = 0.3
+	part.initial_velocity_max = 1.3
+	part.gravity = Vector3(0, 0.12, 0)
+	part.damping_min = 1.0
+	part.damping_max = 2.0
+	part.scale_amount_min = 0.5
+	part.scale_amount_max = 1.0
+	var cv := Curve.new()
+	cv.add_point(Vector2(0.0, 0.35))
+	cv.add_point(Vector2(1.0, 1.9))
+	part.scale_amount_curve = cv
+	var gr := Gradient.new()
+	gr.set_color(0, Color(cor, 0.5))
+	gr.set_color(1, Color(cor, 0.0))
+	part.color_ramp = gr
+	part.mesh = _bola_poeira()
+	part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(part)
+	part.global_position = p
+	part.emitting = true
+	get_tree().create_timer(2.4).timeout.connect(part.queue_free)
+
+
+## o tiro que pega em alguma coisa (não em gente nem bicho): na terra levanta poeira, na madeira solta lasca, na pedra e no
+## concreto pó e lasquinha, no metal faísca, na água espirra
+func impacto(p: Vector3, n: Vector3, material: String) -> void:
+	match material:
+		"terra":
+			poeira(p + n * 0.05, Color(0.45, 0.38, 0.28), 4, 0.08)
+			_jato(p, n, Color(0.32, 0.26, 0.18), 8, 0.03, 2.6, 9.0, 0.5)
+		"madeira":
+			lascas(p, n, "madeira")
+		"pedra", "concreto":
+			poeira(p + n * 0.05, Color(0.62, 0.6, 0.56), 3, 0.06)
+			_jato(p, n, Color(0.58, 0.56, 0.52), 8, 0.025, 3.4, 9.0, 0.45)
+		"metal":
+			faiscas(p)
+		"agua":
+			_jato(p, Vector3.UP, Color(0.75, 0.82, 0.88), 14, 0.03, 3.2, 9.0, 0.6)
+		"planta":
+			lascas(p, n, "fibra")
+		_:
+			faiscas(p)
+
+
+## a marca do tiro na parede, no chão, na árvore e no carro (um furinho escuro rente à superfície; as mais velhas somem)
+func marca(p: Vector3, n: Vector3, pai: Node3D = null) -> void:
+	if n.length() < 0.1:
+		return
+	if _mat_marca == null:
+		var img := Image.create_empty(32, 32, false, Image.FORMAT_RGBA8)
+		for y in 32:
+			for x in 32:
+				var d := Vector2(x - 15.5, y - 15.5).length() / 15.5
+				var a := clampf(1.0 - d, 0.0, 1.0)
+				# o miolo escuro e a borda mais clara (a tinta ou a casca lascada em volta)
+				var c := Color(0.06, 0.05, 0.04, smoothstep(0.0, 0.25, a)) if d < 0.45 else Color(0.32, 0.29, 0.25, smoothstep(0.0, 0.6, a) * 0.6)
+				img.set_pixel(x, y, c)
+		img.generate_mipmaps()
+		_mat_marca = StandardMaterial3D.new()
+		_mat_marca.albedo_texture = ImageTexture.create_from_image(img)
+		_mat_marca.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_mat_marca.roughness = 1.0
+		_mat_marca.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mi := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(0.09, 0.09)
+	mi.mesh = q
+	mi.material_override = _mat_marca
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	(pai if pai != null and is_instance_valid(pai) else self).add_child(mi)
+	var z := n.normalized()
+	var x := z.cross(Vector3.UP if absf(z.y) < 0.95 else Vector3.RIGHT).normalized()
+	var y := z.cross(x)
+	mi.global_transform = Transform3D(Basis(x, y, z).rotated(z, randf() * TAU), p + z * 0.012)
+	_marcas.append(mi)
+	while _marcas.size() > MARCAS_MAX:
+		var velha = _marcas.pop_front()
+		if is_instance_valid(velha):
+			(velha as Node).queue_free()
