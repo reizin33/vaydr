@@ -20,6 +20,7 @@ var noites: Noites          # as noites: as ondas da horda, a lua de sangue e o 
 var fauna: Fauna            # os bichos do mato: as regiões, a caça e as carcaças (etapa 6a)
 var clima: Clima            # o tempo, as estações e a lua (etapa 6b)
 var sono: Sono              # o sono e o dormir (etapa 6c)
+var pesca: Pesca            # a pesca (etapa 6d)
 var neblina_base := 0.0046  # a neblina das configurações (o tempo mexe em cima dela)
 var lua_rede := false       # no convidado: a lua de sangue que veio de quem abriu
 var jogador: Jogador
@@ -116,6 +117,8 @@ func _ready() -> void:
 	add_child(clima)
 	sono = Sono.new(self)
 	add_child(sono)
+	pesca = Pesca.new(self)
+	add_child(pesca)
 	construcao = Construcao.new(self)
 	add_child(construcao)
 	jogador = Jogador.new(self)
@@ -862,6 +865,10 @@ func fabricar(r: Dictionary) -> void:
 func texto_mira() -> String:
 	if not jogador.vivo or ui.aberto:
 		return ""
+	if pesca != null and pesca.ativa():
+		return pesca.texto()
+	if pesca != null and str(jogador.item_mao().get("id", "")) == "vara" and pesca.agua_na_frente(jogador) != Vector3.INF:
+		return "E  Pescar (jogue a linha e espere morder)"
 	var h := jogador.mira(Jogador.ALCANCE + 0.4)
 	if h.is_empty():
 		return ""
@@ -961,7 +968,7 @@ func salvar_jogo() -> bool:
 		"jogador": {"pos": [j.global_position.x, j.global_position.y, j.global_position.z], "giro": j.rotation.y,
 			"vida": j.vida, "fome": j.fome, "sede": j.sede, "bateria": j.bateria, "sel": j.sel, "inv": j.inv.salvar(),
 			"vistos": j.vistos.keys(), "aprendidas": j.aprendidas.keys(), "consertos": j.consertos},
-		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar()}
+		"base": construcao.salvar(), "mundo": mundo.salvar(), "stats": stats, "noites": noites.salvar(), "fauna": fauna.salvar(), "clima": clima.salvar(), "sono": sono.salvar(), "pesca": pesca.salvar()}
 	if arq_salvo == "":
 		return false
 	DirAccess.make_dir_recursive_absolute(arq_salvo.get_base_dir())
@@ -1020,6 +1027,9 @@ func carregar_jogo() -> bool:
 	var sd = d.get("sono", {})
 	if sd is Dictionary:
 		sono.carregar(sd)
+	var pd = d.get("pesca", {})
+	if pd is Dictionary:
+		pesca.carregar(pd)
 	ui.atualizar()
 	ui.aviso("Jogo carregado: dia %d, %s" % [dia, hora_txt()], 5.0)
 	return true
@@ -2103,6 +2113,92 @@ func _teste_sono(livre: Vector3) -> void:
 	jogador.vida = 100.0
 	hora = hora_antes
 	spawn_t = spawn_antes
+
+
+## a pesca (etapa 6d): com a vara na mão, na beira do Rio Claro, E joga a linha; quando morde, E puxa o peixe (a espécie do
+## rio, com peso; ou lixo); esperando demais ele escapa; saindo do lugar a linha volta; o jogo guarda as espécies pescadas
+func _teste_pesca() -> void:
+	var hora_antes := hora
+	hora = 10.0
+	var centro := Vector2(16, -45)
+	var pm := Vector3.INF
+	var pa := Vector3.INF
+	for r in range(2, 60):
+		for a8 in 24:
+			var a := a8 / 24.0 * TAU
+			var q := centro + Vector2(cos(a), sin(a)) * r * 0.5
+			if terreno.tipo_agua(q.x, q.y) != 0 or not terreno.dentro(q.x, q.y):
+				continue
+			var dirc := (centro - q).normalized()
+			var w := q + dirc * 3.5
+			var n: float = terreno.nivel_agua(w.x, w.y)
+			if n < -900.0 or n - terreno.h(w.x, w.y) < 0.3 or absf(n - terreno.h(q.x, q.y)) > 1.5:
+				continue
+			pm = Vector3(q.x, terreno.h(q.x, q.y), q.y)
+			pa = Vector3(w.x, n, w.y)
+			break
+		if pm != Vector3.INF:
+			break
+	_confere(pm != Vector3.INF, "pesca: achou a beira do Rio Claro para pescar")
+	if pm == Vector3.INF:
+		return
+	_jogador_em(pm, pa)
+	jogador.inv.por("vara", 1)
+	_na_mao("vara")
+	await _quadros(4)
+	_olhar(pa)
+	await _quadros(2)
+	var txt := texto_mira()
+	var n_peixe := jogador.inv.conta("peixeCru")
+	var lixo := 0
+	var peixes := 0
+	var mordeu_ok := true
+	for tentativa in 12:
+		jogador.usar()
+		if not pesca.ativa():
+			mordeu_ok = false
+			break
+		pesca.P["morde"] = 0.1
+		await _quadros(20)
+		if not bool(pesca.P.get("mordeu", false)) or not pesca.texto().begins_with("E  Puxar o peixe!"):
+			mordeu_ok = false
+		var antes_l := jogador.inv.conta("sucata") + jogador.inv.conta("garrafa")
+		jogador.usar()
+		if jogador.inv.conta("sucata") + jogador.inv.conta("garrafa") > antes_l:
+			lixo += 1
+		else:
+			peixes += 1
+		await _quadros(2)
+		if peixes >= 2:
+			break
+	var ganhou := jogador.inv.conta("peixeCru") - n_peixe
+	var esp := PackedStringArray()
+	for k in pesca.registro:
+		esp.append(str(pesca.PEIXES[k]["nome"]))
+	_confere(txt.begins_with("E  Pescar") and mordeu_ok and peixes >= 1 and ganhou >= peixes and pesca.local(pa.x, pa.z) == "rio" and not esp.is_empty(),
+		"pesca: E joga a linha, a boia afunda quando morde e E puxa: %d peixes (%d peixes crus: %s) e %d vez%s lixo" % [
+			peixes, ganhou, ", ".join(esp), lixo, "" if lixo == 1 else "es"])
+	# esperando demais o peixe escapa; saindo do lugar a linha volta
+	jogador.usar()
+	pesca.P["morde"] = 0.05
+	await _quadros(150)
+	var escapou := not pesca.ativa()
+	jogador.usar()
+	var lancou := pesca.ativa()
+	_por_em(pm + Vector3(3.0, 0.2, 0))
+	await _quadros(3)
+	_confere(escapou and lancou and not pesca.ativa(), "pesca: demorou e o peixe escapou; saindo do lugar a linha volta")
+	var sv := pesca.salvar()
+	pesca.carregar({})
+	var vazio := pesca.registro.is_empty()
+	pesca.carregar(sv)
+	_confere(vazio and pesca.registro.size() == (sv["registro"] as Dictionary).size(), "jogo salvo: as espécies pescadas ficam guardadas")
+	for id in ["vara", "peixeCru", "sucata", "garrafa"]:
+		var n := jogador.inv.conta(id) - (n_peixe if id == "peixeCru" else 0)
+		if n > 0:
+			jogador.inv.tirar(id, n)
+	_mao_vazia()
+	hora = hora_antes
 
 
 ## o HUD com a arma de fogo na mão: as balas no pente / na mochila
@@ -3382,6 +3478,7 @@ func _teste() -> void:
 	await _teste_fauna(livre)
 	await _teste_clima(livre)
 	await _teste_sono(livre)
+	await _teste_pesca()
 	await _teste_personagem(livre)
 	if _erros.is_empty():
 		print("TESTE OK")

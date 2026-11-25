@@ -71,6 +71,11 @@ func _ready() -> void:
 	bancos["bicho_grunhido"] = [_mistura(_ruido(0.45, 800.0, 0.7, 6.0), _tom(0.35, 120.0, 90.0, 0.6, 7.0))]
 	bancos["bicho_guincho"] = [_tom(0.18, 2100.0, 1500.0, 0.35, 16.0)]
 	bancos["trovao"] = [_mistura(_ruido(3.2, 260.0, 1.0, 1.0), _tom(2.6, 52.0, 32.0, 0.75, 1.2)), _mistura(_ruido(2.6, 340.0, 1.0, 1.3), _tom(2.0, 60.0, 36.0, 0.7, 1.5))]
+	# a pesca (etapa 6d): a linha voando, o peixe mordendo, o carretel puxando e o peixe pulando na água
+	bancos["lancar"] = [_varrida(0.32, 1800.0, 600.0, 0.18)]
+	bancos["morde_peixe"] = [_mistura(_tom(0.12, 420.0, 260.0, 0.35, 22.0), _ruido(0.16, 1600.0, 0.3, 18.0))]
+	bancos["puxar"] = [_mistura(_ruido(0.45, 2600.0, 0.3, 6.0), _tom(0.4, 900.0, 1300.0, 0.12, 6.0))]
+	bancos["nado"] = [_ruido(0.35, 1300.0, 0.35, 9.0)]
 	bancos["bicho_fuga"] = [_ruido(0.45, 2400.0, 0.32, 5.0), _ruido(0.5, 1900.0, 0.3, 4.5)]
 	# partida em rede: alguém entrou, mensagem no bate-papo (dois tons subindo, curtos)
 	bancos["aviso"] = [_mistura(_tom(0.14, 620.0, 640.0, 0.28, 16.0), _tom(0.3, 930.0, 940.0, 0.22, 9.0))]

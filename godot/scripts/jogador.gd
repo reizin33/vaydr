@@ -1211,6 +1211,13 @@ func _colher(i: int, h: Dictionary) -> void:
 
 
 func usar() -> void:
+	# a pesca (etapa 6d): com a linha na água, E puxa (na hora da mordida) ou recolhe; com a vara na mão e água na frente, joga
+	if main.pesca != null and main.pesca.ativa():
+		main.ui.aviso(main.pesca.puxar(self), 4.0)
+		return
+	if str(item_mao().get("id", "")) == "vara" and main.pesca != null and main.pesca.agua_na_frente(self) != Vector3.INF:
+		main.pesca.comecar(self)
+		return
 	var h := mira(ALCANCE + 0.4)
 	if not h.is_empty():
 		var c: Object = h["collider"]
