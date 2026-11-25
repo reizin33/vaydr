@@ -2270,9 +2270,11 @@ func _teste_lesoes(livre: Vector3) -> void:
 	ui.hud._chips()
 	var chip_s := str(ui.hud.chips.get_meta("chave", ""))
 	jogador.inv.por("bandagem", 1)
+	var n_band := jogador.inv.conta("bandagem")
 	jogador.consumir_slot(_slot_de("bandagem"))
-	_confere(caiu and parou and forte_continua and chip_s.contains("Sangrando") and lesoes.sangra == 0 and jogador.inv.conta("bandagem") == 0,
-		"sangramento: a vida cai, o leve para sozinho, o forte continua (o HUD mostra) e a bandagem para")
+	_confere(caiu and parou and forte_continua and chip_s.contains("Sangrando") and lesoes.sangra == 0 and jogador.inv.conta("bandagem") == n_band - 1,
+		"sangramento: a vida cai (%s), o leve para sozinho (%s), o forte continua (%s; o HUD mostra: %s) e a bandagem para (%d)" % [
+			caiu, parou, forte_continua, chip_s.contains("Sangrando"), lesoes.sangra])
 	# a perna quebrada: a queda alta quebra; devagar, sem correr nem pular; a tala; sara
 	jogador.vida = 100.0
 	lesoes.queda(6.0)
@@ -2702,6 +2704,9 @@ func _z_teste(p: Vector3, tipo: String, olha: Vector3, parado := true, dorme := 
 ## põe o jogador no chão em p olhando para o peito de z (ou para um ponto)
 func _jogador_em(p: Vector3, olha: Vector3) -> void:
 	_por_em(Vector3(p.x, terreno.h(p.x, p.z) + 0.15, p.z))
+	# os ferimentos dos testes anteriores (a mordida do lobo, o vírus do zumbi) não atrapalham o próximo
+	if lesoes != null:
+		lesoes.zerar()
 	jogador.vida = 100.0
 	jogador.energia = 100.0
 	jogador.cd = 0.0
